@@ -276,6 +276,18 @@ export default function TenantVerification({ user, onUserUpdated }) {
     await saveFieldArray('bank_documents', newDocs);
   };
 
+  const addPropertyDoc = async (url) => {
+    const currentDocs = verification?.property_documents || [];
+    const newDocs = [url, ...currentDocs];
+    await saveFieldArray('property_documents', newDocs);
+  };
+
+  const deletePropertyDoc = async (index) => {
+    const currentDocs = verification?.property_documents || [];
+    const newDocs = currentDocs.filter((_, idx) => idx !== index);
+    await saveFieldArray('property_documents', newDocs);
+  };
+
 
   const handleSatSubmit = async (e) => {
     e.preventDefault();
@@ -565,6 +577,39 @@ export default function TenantVerification({ user, onUserUpdated }) {
         )}
       </div>
 
+      {isOwnerOrAgent && (
+        <div className="space-y-4 pt-4 border-t">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold">Property Documents</h3>
+          </div>
+ 
+          <div className="flex items-start gap-3 rounded-xl px-4 py-3 border bg-slate-50 border-slate-200">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-slate-600" />
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Property Verification Documents</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Upload your deeds, registration proofs, or other documents demonstrating ownership/authorization to list properties.
+              </p>
+            </div>
+          </div>
+ 
+          <Card>
+            <CardContent className="p-4">
+              <MultiUploadDocRow
+                icon={FileText}
+                label="Property Ownership Documents"
+                description="Upload deeds, registration certificates, or agent authority proof (PDF, JPG, PNG)"
+                documents={verification?.property_documents || []}
+                folder="property-docs"
+                onUploaded={addPropertyDoc}
+                onDeleted={deletePropertyDoc}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+ 
       {!isOwnerOrAgent && (
         <>
           {/* Employment Verification Section (Belvo) */}
