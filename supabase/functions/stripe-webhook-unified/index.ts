@@ -296,9 +296,9 @@ serve(async (req: any) => {
 
           if (agentId) {
             const { data: agentSub } = await supabase
-              .from('agent_subscriptions')
+              .from('subscriptions')
               .select('id, featured_listing_ids')
-              .eq('agent_id', agentId)
+              .eq('user_id', agentId)
               .eq('status', 'active')
               .maybeSingle();
 
@@ -306,16 +306,15 @@ serve(async (req: any) => {
               const currentIds = Array.isArray(agentSub.featured_listing_ids) ? agentSub.featured_listing_ids : [];
               if (!currentIds.includes(listingId)) {
                 await supabase
-                  .from('agent_subscriptions')
+                  .from('subscriptions')
                   .update({ featured_listing_ids: [...currentIds, listingId] })
                   .eq('id', agentSub.id);
                 console.log('Added listing to featured_listing_ids:', listingId);
               }
             } else {
-              await supabase.from('agent_subscriptions').insert({
-                id: crypto.randomUUID(),
-                agent_id: agentId,
-                plan: 'feature_boost',
+              await supabase.from('subscriptions').insert({
+                user_id: agentId,
+                plan: 'basic',
                 status: 'active',
                 featured_listing_ids: [listingId],
               });

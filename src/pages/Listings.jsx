@@ -28,7 +28,7 @@ export default function Listings() {
   }, [urlRefCode]);
   const refCode = urlRefCode || sessionStorage.getItem('referral_code') || '';
 
-  useEffect(() => { base44.auth.me().then(setUser).catch(() => {}); }, []);
+  useEffect(() => { base44.auth.me().then(setUser).catch(() => { }); }, []);
 
   const { favoriteIds, toggle } = useFavorites(user?.id);
   const [filters, setFilters] = useState({
@@ -37,8 +37,16 @@ export default function Listings() {
   });
   const [sortBy, setSortBy] = useState('newest');
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 6;
   const [compareIds, setCompareIds] = useState(new Set());
   const [showCompare, setShowCompare] = useState(false);
+
+  // Reset page to 1 whenever filters or search parameters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, search, sortBy]);
+
   const MAX_COMPARE = 4;
 
   const toggleCompare = (id) => {
@@ -115,35 +123,65 @@ export default function Listings() {
     if (filters.rentalType) result = result.filter(l => l.rental_type === filters.rentalType || l.rental_type === 'both');
     if (filters.petFriendly) result = result.filter(l => l.pet_friendly);
 
-    if (sortBy === 'price_asc') result.sort((a, b) => (a.price_usd || 0) - (b.price_usd || 0));
-    else if (sortBy === 'price_desc') result.sort((a, b) => (b.price_usd || 0) - (a.price_usd || 0));
-    else if (sortBy === 'verified') result.sort((a, b) => {
-      if (a.is_verified && !b.is_verified) return -1;
-      if (!a.is_verified && b.is_verified) return 1;
-      return new Date(b.last_verified_date || 0) - new Date(a.last_verified_date || 0);
-    });
-    // Default sort: listings in active subscription featured_listing_ids first, then by newest
+    const isFeatured = (item) => item.is_featured || subscriptionFeaturedIds.has(item.id);
+
+    if (sortBy === 'price_asc') {
+      result.sort((a, b) => {
+        const aFeat = isFeatured(a);
+        const bFeat = isFeatured(b);
+        if (aFeat && !bFeat) return -1;
+        if (!aFeat && bFeat) return 1;
+        return (a.price_usd || 0) - (b.price_usd || 0);
+      });
+    }
+    else if (sortBy === 'price_desc') {
+      result.sort((a, b) => {
+        const aFeat = isFeatured(a);
+        const bFeat = isFeatured(b);
+        if (aFeat && !bFeat) return -1;
+        if (!aFeat && bFeat) return 1;
+        return (b.price_usd || 0) - (a.price_usd || 0);
+      });
+    }
+    else if (sortBy === 'verified') {
+      result.sort((a, b) => {
+        const aFeat = isFeatured(a);
+        const bFeat = isFeatured(b);
+        if (aFeat && !bFeat) return -1;
+        if (!aFeat && bFeat) return 1;
+
+        if (a.is_verified && !b.is_verified) return -1;
+        if (!a.is_verified && b.is_verified) return 1;
+        return new Date(b.last_verified_date || 0) - new Date(a.last_verified_date || 0);
+      });
+    }
+    // Default sort: newest
     else {
       result.sort((a, b) => {
-        const aFeatured = subscriptionFeaturedIds.has(a.id);
-        const bFeatured = subscriptionFeaturedIds.has(b.id);
-        if (aFeatured && !bFeatured) return -1;
-        if (!aFeatured && bFeatured) return 1;
+        const aFeat = isFeatured(a);
+        const bFeat = isFeatured(b);
+        if (aFeat && !bFeat) return -1;
+        if (!aFeat && bFeat) return 1;
         return new Date(b.created_date || 0) - new Date(a.created_date || 0);
       });
     }
 
     return result;
-  }, [listings, filters, sortBy, search]);
+  }, [listings, filters, sortBy, search, subscriptionFeaturedIds]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginatedListings = useMemo(() => {
+    return filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  }, [filtered, currentPage]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       {/* Header */}
       <div className="mb-5">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Browse Rentals</h1>
-        <p className="text-muted-foreground mt-0.5 text-sm flex items-center gap-1">
+        {/* <p className="text-muted-foreground mt-0.5 text-sm flex items-center gap-1">
           <MapPin className="w-3.5 h-3.5" /> Puerto Vallarta, Mexico
-        </p>
+        </p> */}
       </div>
 
       {/* Sticky search + filter bar */}
@@ -225,19 +263,66 @@ export default function Listings() {
               <p className="text-muted-foreground mt-2 text-sm">Try adjusting your filters or search term</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {filtered.map(listing => (
-                <ListingCard
-                  key={listing.id}
-                  listing={listing}
-                  favoriteIds={favoriteIds}
-                  onToggleFavorite={user ? (id) => toggle.mutate(id) : undefined}
-                  compareIds={compareIds}
-                  onToggleCompare={toggleCompare}
-                  hasBookingRequest={userBookedListingIds.has(listing.id)}
-                  refCode={refCode}
-                />
-              ))}
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                {paginatedListings.map(listing => (
+                  <ListingCard
+                    key={listing.id}
+                    listing={listing}
+                    favoriteIds={favoriteIds}
+                    onToggleFavorite={user ? (id) => toggle.mutate(id) : undefined}
+                    compareIds={compareIds}
+                    onToggleCompare={toggleCompare}
+                    hasBookingRequest={userBookedListingIds.has(listing.id)}
+                    refCode={refCode}
+                  />
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border pt-6 mt-4">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Showing <span className="font-semibold text-foreground">{((currentPage - 1) * PAGE_SIZE) + 1}</span> to{' '}
+                    <span className="font-semibold text-foreground">
+                      {Math.min(currentPage * PAGE_SIZE, filtered.length)}
+                    </span>{' '}
+                    of <span className="font-semibold text-foreground">{filtered.length}</span> properties
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="text-xs h-9"
+                    >
+                      Previous
+                    </Button>
+                    <div className="hidden sm:flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="text-xs h-9 w-9 p-0"
+                        >
+                          {page}
+                        </Button>
+                      ))}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="text-xs h-9"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

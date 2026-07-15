@@ -15,7 +15,7 @@ const entityTableMap = {
   User: 'profiles',
   AgentReferral: 'agent_referrals',
   AgentReview: 'agent_reviews',
-  AgentSubscription: 'agent_subscriptions',
+  AgentSubscription: 'subscriptions',
   Subscription: 'subscriptions',
   BookingDate: 'booking_dates',
   CommissionPayout: 'commission_payouts',

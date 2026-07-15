@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ShieldCheck, Star, Zap, CheckCircle, CreditCard, Loader2, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 
 const PLANS = [
   {
@@ -46,6 +47,7 @@ const FEATURE_BOOST_PRICE = 19;
 const FEATURE_BOOST_PRICE_ID = 'price_feature_boost_placeholder';
 
 export default function AgentBilling() {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [loadingBoost, setLoadingBoost] = useState(null);
@@ -60,6 +62,8 @@ export default function AgentBilling() {
     enabled: !!user?.id,
     select: data => data[0] || null,
   });
+
+  const activeSub = subscription?.status === 'active' ? subscription : null;
 
   const { data: myListings = [] } = useQuery({
     queryKey: ['my-listings', user?.email],
@@ -87,11 +91,11 @@ export default function AgentBilling() {
       if (data?.url) {
         window.location.href = data.url;
       } else {
-        alert('Failed to create checkout session. Please try again.');
+        toast.error('Failed to create checkout session. Please try again.');
       }
     } catch (err) {
       console.error('Checkout error:', err);
-      alert(err?.message || 'Failed to start checkout. Please try again.');
+      toast.error(err?.message || 'Failed to start checkout. Please try again.');
     }
     setLoadingPlan(null);
   };
@@ -116,16 +120,24 @@ export default function AgentBilling() {
       if (data?.url) {
         window.location.href = data.url;
       } else {
-        alert('Failed to create checkout session. Please try again.');
+        toast.error('Failed to create checkout session. Please try again.');
       }
     } catch (err) {
       console.error('Feature boost error:', err);
-      alert(err?.message || 'Failed to start checkout. Please try again.');
+      toast.error(err?.message || 'Failed to start checkout. Please try again.');
     }
     setLoadingBoost(null);
   };
 
   const handleFeatureSubscription = async (listingId) => {
+    const maxFeatured = activeSub?.plan === 'pro' ? 3 : 0;
+    const currentDbFeaturedCount = myListings.filter(l => l.is_featured).length;
+ 
+    if (currentDbFeaturedCount >= maxFeatured) {
+      toast.error(`You have reached the maximum limit of ${maxFeatured} featured listings on the Pro plan.`);
+      return;
+    }
+
     setLoadingBoost(listingId);
     try {
       const { error: listingError } = await supabase
@@ -140,27 +152,26 @@ export default function AgentBilling() {
       if (listingError) throw listingError;
 
       // Add listing to subscription's featured_listing_ids
-      const currentIds = activeSub.featured_listing_ids || [];
+      const currentIds = activeSub?.featured_listing_ids || [];
       if (!currentIds.includes(listingId)) {
         const { error: subError } = await supabase
-          .from('agent_subscriptions')
+          .from('subscriptions')
           .update({ featured_listing_ids: [...currentIds, listingId] })
           .eq('id', activeSub.id);
 
         if (subError) throw subError;
       }
 
-      alert('Listing featured successfully!');
-      // Invalidate queries to refresh UI
-      window.location.reload();
+      toast.success('Listing featured successfully!');
+      // Invalidate React Query cache to refresh UI state dynamically
+      queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
     } catch (err) {
       console.error('Feature subscription error:', err);
-      alert(err?.message || 'Failed to feature listing. Please try again.');
+      toast.error(err?.message || 'Failed to feature listing. Please try again.');
     }
     setLoadingBoost(null);
   };
-
-  const activeSub = subscription?.status === 'active' ? subscription : null;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -254,7 +265,7 @@ export default function AgentBilling() {
         <p className="text-sm text-muted-foreground mb-4">
           {activeSub
             ? activeSub.plan === 'pro'
-              ? `You have ${Math.max(0, 3 - (activeSub.featured_listing_ids?.length || 0))} of 3 featured slots remaining this month.`
+              ? `You have ${Math.max(0, 3 - myListings.filter(l => l.is_featured).length)} of 3 featured slots remaining this month.`
               : `You have ${Math.max(0, 5 - myListings.length)} of 5 active listings remaining.`
             : `Pay $${FEATURE_BOOST_PRICE} once to feature a listing for 30 days — it appears at the top of search results.`}
         </p>
@@ -271,10 +282,9 @@ export default function AgentBilling() {
           <div className="space-y-3">
             {myListings.map(listing => {
               const isFeatured = listing.is_featured;
-              const isInSubscription = activeSub.featured_listing_ids?.includes(listing.id);
-              const featuredCount = activeSub.featured_listing_ids?.length || 0;
+              const currentDbFeaturedCount = myListings.filter(l => l.is_featured).length;
               const maxFeatured = activeSub.plan === 'pro' ? 3 : 0; // Basic plan: 0 featured listings
-              const canFeature = activeSub.plan === 'pro' && !isFeatured && !isInSubscription && featuredCount < maxFeatured;
+              const canFeature = activeSub.plan === 'pro' && !isFeatured && currentDbFeaturedCount < maxFeatured;
 
               return (
                 <Card key={listing.id}>
@@ -286,7 +296,7 @@ export default function AgentBilling() {
                       <p className="font-medium text-sm line-clamp-1">{listing.title}</p>
                       <p className="text-xs text-muted-foreground">${listing.price_usd?.toLocaleString()}/mo</p>
                     </div>
-                    {isFeatured || isInSubscription ? (
+                    {isFeatured ? (
                       <Badge className="bg-yellow-100 text-yellow-800 gap-1">
                         <Star className="w-3 h-3" /> Featured
                       </Badge>
