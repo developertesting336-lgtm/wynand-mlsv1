@@ -471,6 +471,130 @@ create table public.verifications (
   constraint verifications_user_id_fkey foreign key (user_id) references profiles (id) on delete CASCADE
 ) TABLESPACE pg_default;
 
+-- Notification system
+create table public.notifications (
+  id uuid not null default gen_random_uuid (),
+  user_id uuid not null,
+  title text not null,
+  message text not null,
+  type text not null default 'general'::text,
+  is_read boolean not null default false,
+  created_at timestamp with time zone null default now(),
+  constraint notifications_pkey primary key (id),
+  constraint notifications_user_id_fkey foreign key (user_id) references profiles (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index if not exists idx_notifications_user_id on public.notifications using btree (user_id) TABLESPACE pg_default;
+create index if not exists idx_notifications_created_at on public.notifications using btree (created_at) TABLESPACE pg_default;
+
+-- Enable Row Level Security
+alter table public.notifications enable row level security;
+
+-- Policies for RLS
+create policy "Users can view their own notifications"
+  on public.notifications for select
+  using (auth.uid() = user_id);
+
+create policy "Users can update their own notifications"
+  on public.notifications for update
+  using (auth.uid() = user_id);
+
+create policy "System can insert notifications"
+  on public.notifications for insert
+  with check (true);
+
+-- Enable realtime for notifications
+alter publication supabase_realtime add table public.notifications;
+
+-- Database function to check expiring subscriptions and create reminders
+create or replace function public.check_and_create_subscription_reminders()
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  sub record;
+  days_remaining integer;
+begin
+  for sub in 
+    select s.user_id, s.current_period_end, s.plan, p.full_name, p.email
+    from public.subscriptions s
+    join public.profiles p on s.user_id = p.id
+    where s.status = 'active'
+      and s.current_period_end is not null
+      and s.current_period_end >= now()
+      and s.current_period_end <= (now() + interval '3 days')
+  loop
+    -- Calculate days remaining
+    days_remaining := extract(day from (sub.current_period_end - now()))::integer;
+    if days_remaining < 0 then
+      days_remaining := 0;
+    end if;
+
+    -- Avoid duplicate reminders for the same subscription expiration:
+    -- check if we've sent a subscription_expiry notification in the last 7 days to this user
+    if not exists (
+      select 1 
+      from public.notifications 
+      where user_id = sub.user_id 
+        and type = 'subscription_expiry'
+        and created_at >= (now() - interval '7 days')
+    ) then
+      insert into public.notifications (user_id, title, message, type)
+      values (
+        sub.user_id,
+        'Subscription Renewal Reminder',
+        format('Your %s plan subscription is set to renew on %s. Only %s days left!', 
+               upper(sub.plan), 
+               to_char(sub.current_period_end, 'Mon DD, YYYY'),
+               days_remaining + 1),
+        'subscription_expiry'
+      );
+    end if;
+  end loop;
+end;
+$$;
+
+-- Schedule the cron job to run daily at midnight and call the Deno Edge Function (requires pg_cron and pg_net)
+-- Note: Replace <your-project-ref> and <your-service-role-key> with your actual credentials.
+select cron.schedule(
+  'check-expiring-subscriptions-edge',
+  '0 0 * * *',
+  $$
+  select net.http_post(
+    url := 'https://<your-project-ref>.supabase.co/functions/v1/subscription-reminder',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer <your-service-role-key>"}'::jsonb,
+    body := '{}'::jsonb
+  );
+  $$
+);
+
+
+-- Web Push subscriptions
+create table public.user_push_subscriptions (
+  id uuid not null default gen_random_uuid (),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  endpoint text not null,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamp with time zone default now(),
+  constraint user_push_subscriptions_pkey primary key (id),
+  constraint user_push_subscriptions_endpoint_unique unique (endpoint)
+) TABLESPACE pg_default;
+
+create index if not exists idx_user_push_subscriptions_user_id on public.user_push_subscriptions using btree (user_id) TABLESPACE pg_default;
+
+-- Enable Row Level Security
+alter table public.user_push_subscriptions enable row level security;
+
+-- Policies for user_push_subscriptions
+create policy "Users can manage their own push subscriptions"
+  on public.user_push_subscriptions for all
+  using (auth.uid() = user_id);
+
+
+
+
 
 
 

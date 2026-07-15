@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ShieldCheck, Upload, FileText, CheckCircle, AlertCircle, Loader2, ExternalLink, Building2 } from 'lucide-react';
+import { ShieldCheck, Upload, FileText, CheckCircle, AlertCircle, Loader2, ExternalLink, Building2, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -84,6 +84,78 @@ function UploadDocRow({ icon: Icon, label, description, existingUrl, onUploaded 
   );
 }
 
+function MultiUploadDocRow({ icon: Icon, label, description, documents = [], folder, onUploaded, onDeleted }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file, folder });
+      onUploaded(file_url);
+      toast.success(`${label} uploaded successfully`);
+    } catch (err) {
+      console.error(err);
+      toast.error(`Failed to upload ${label}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="py-4 border-b last:border-0 space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-muted text-muted-foreground rounded-lg shrink-0">
+            <Icon className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="font-medium text-sm">{label}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+          </div>
+        </div>
+        <div className="shrink-0">
+          <label className="cursor-pointer">
+            <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFile} />
+            <Button size="sm" className="gap-1.5" disabled={uploading} asChild>
+              <span>
+                {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                {uploading ? 'Uploading…' : 'Upload File'}
+              </span>
+            </Button>
+          </label>
+        </div>
+      </div>
+
+      {documents && documents.length > 0 && (
+        <div className="pl-11 flex flex-col gap-2">
+          {documents.map((url, idx) => {
+            const fileName = url.split('/').pop().replace(/^\d+_\d+_(.+)$/, '$1') || `Document ${idx + 1}`;
+            return (
+              <div key={idx} className="flex items-center justify-between p-2 rounded-lg border bg-muted/30 text-xs">
+                <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:underline font-medium truncate max-w-[80%]">
+                  <FileText className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{fileName}</span>
+                </a>
+                <Button
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                  className="w-6 h-6 text-muted-foreground hover:text-destructive"
+                  onClick={() => onDeleted(idx)}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TenantVerification({ user, onUserUpdated }) {
   const queryClient = useQueryClient();
   const [verification, setVerification] = useState(null);
@@ -118,12 +190,16 @@ export default function TenantVerification({ user, onUserUpdated }) {
   }, [user?.id]);
 
   const idDocUrl = verification?.id_document_url || user?.id_document_url;
+  const identityDocs = verification?.identity_documents || [];
+  const targetIdDocUrl = identityDocs.length > 0 ? identityDocs[0] : idDocUrl;
+
   const employmentProofUrl = verification?.employment_proof_url || user?.employment_proof_url;
   const identityStatus = verification?.id_verification || 'new';
   const employmentVerificationStatus = verification?.employment_verification || 'pending';
   const employer_name = verification?.employer_name;
   const salary = Number(verification?.monthly_income || 0).toLocaleString();
   const isOwnerOrAgent = user?.role === 'owner' || user?.role === 'agent';
+
 
   const saveField = async (field, url) => {
     try {
@@ -150,6 +226,56 @@ export default function TenantVerification({ user, onUserUpdated }) {
       toast.error('Failed to save document record');
     }
   };
+
+  const saveFieldArray = async (field, arrayValue) => {
+    try {
+      const payload = {
+        ...verification, // spread existing verification record fields
+        user_id: user.id,
+        id_document_url: idDocUrl || '', // Ensure NOT NULL constraint is met
+        [field]: arrayValue,
+        updated_date: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('verifications')
+        .upsert(payload, { onConflict: 'user_id' })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setVerification(data);
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+    } catch (err) {
+      console.error(`Error saving ${field}:`, err);
+      toast.error('Failed to save document record');
+    }
+  };
+
+  const addIdentityDoc = async (url) => {
+    const currentDocs = verification?.identity_documents || [];
+    const newDocs = [url, ...currentDocs];
+    await saveFieldArray('identity_documents', newDocs);
+  };
+
+  const deleteIdentityDoc = async (index) => {
+    const currentDocs = verification?.identity_documents || [];
+    const newDocs = currentDocs.filter((_, idx) => idx !== index);
+    await saveFieldArray('identity_documents', newDocs);
+  };
+
+  const addBankDoc = async (url) => {
+    const currentDocs = verification?.bank_documents || [];
+    const newDocs = [url, ...currentDocs];
+    await saveFieldArray('bank_documents', newDocs);
+  };
+
+  const deleteBankDoc = async (index) => {
+    const currentDocs = verification?.bank_documents || [];
+    const newDocs = currentDocs.filter((_, idx) => idx !== index);
+    await saveFieldArray('bank_documents', newDocs);
+  };
+
 
   const handleSatSubmit = async (e) => {
     e.preventDefault();
@@ -323,7 +449,7 @@ export default function TenantVerification({ user, onUserUpdated }) {
   };
 
   const startVerification = async () => {
-    if (!idDocUrl) {
+    if (!targetIdDocUrl) {
       toast.error('Please upload your Government-Issued ID first.');
       return;
     }
@@ -332,7 +458,7 @@ export default function TenantVerification({ user, onUserUpdated }) {
       const res = await supabase.functions.invoke('veriff-verify', {
         body: JSON.stringify({
           userId: user.id,
-          idDocumentUrl: idDocUrl,
+          idDocumentUrl: targetIdDocUrl,
           employmentProofUrl: employmentProofUrl || null,
         })
       });
@@ -416,17 +542,19 @@ export default function TenantVerification({ user, onUserUpdated }) {
 
         <Card>
           <CardContent className="p-4">
-            <UploadDocRow
+            <MultiUploadDocRow
               icon={FileText}
               label="Government-Issued ID"
               description="Passport, national ID, or driver's license (PDF, JPG, PNG)"
-              existingUrl={idDocUrl}
-              onUploaded={(url) => saveField('id_document_url', url)}
+              documents={verification?.identity_documents || []}
+              folder="identity"
+              onUploaded={addIdentityDoc}
+              onDeleted={deleteIdentityDoc}
             />
           </CardContent>
         </Card>
 
-        {idDocUrl && identityStatus !== 'approved' && (
+        {targetIdDocUrl && identityStatus !== 'approved' && (
           <div className="flex justify-end">
             <Button size="lg" onClick={startVerification} disabled={verifying} className="gap-2">
               {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
@@ -564,6 +692,20 @@ export default function TenantVerification({ user, onUserUpdated }) {
             </Button>
           </div>
         )}
+
+        <Card className="mt-4">
+          <CardContent className="p-4">
+            <MultiUploadDocRow
+              icon={FileText}
+              label="Bank Details & Statements"
+              description="Upload your bank statements or details (PDF, JPG, PNG)"
+              documents={verification?.bank_documents || []}
+              folder="bank-details"
+              onUploaded={addBankDoc}
+              onDeleted={deleteBankDoc}
+            />
+          </CardContent>
+        </Card>
       </div>
     </>
   )}

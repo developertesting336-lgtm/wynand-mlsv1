@@ -299,19 +299,19 @@ export const emailIntegration = {
 const storageBucket = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'MLS'
 
 export const storageIntegration = {
-  async UploadFile({ file }) {
+  async UploadFile({ file, folder }) {
     let fileName = file.name;
-    if (!fileName.includes('/')) {
-      fileName = `${Date.now()}_${fileName}`;
-    } else {
+    if (fileName.includes('/')) {
       const parts = fileName.split('/');
-      parts[parts.length - 1] = `${Date.now()}_${parts[parts.length - 1]}`;
-      fileName = parts.join('/');
+      fileName = parts[parts.length - 1];
     }
-    console.log('Supabase storage upload', { bucket: storageBucket, fileName, fileType: file.type })
+    const folderPrefix = folder ? `${folder}/` : '';
+    const fullPath = `${folderPrefix}${Date.now()}_${fileName}`;
+
+    console.log('Supabase storage upload', { bucket: storageBucket, path: fullPath, fileType: file.type })
     const { data, error } = await supabase.storage
       .from(storageBucket)
-      .upload(fileName, file, { cacheControl: '3600', upsert: false })
+      .upload(fullPath, file, { cacheControl: '3600', upsert: false })
 
     if (error) {
       console.error('Supabase storage upload error', error)
@@ -326,4 +326,4 @@ export const storageIntegration = {
 
     return { file_url: urlData.publicUrl }
   }
-}
+}

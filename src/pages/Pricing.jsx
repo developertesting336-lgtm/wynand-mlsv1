@@ -14,6 +14,7 @@ export default function Pricing() {
   const [loadingUser, setLoadingUser] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+  const [activeSubscription, setActiveSubscription] = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -22,10 +23,55 @@ export default function Pricing() {
     }
 
     base44.auth.me()
-      .then(setUser)
+      .then(async (u) => {
+        setUser(u);
+        if (u) {
+          try {
+            const { data, error } = await supabase
+              .from('subscriptions')
+              .select('*')
+              .eq('user_id', u.id)
+              .eq('status', 'active')
+              .maybeSingle();
+
+            if (data) {
+              setActiveSubscription(data);
+              setSubscribed(true);
+            }
+          } catch (err) {
+            console.error('Failed to fetch user subscription:', err);
+          }
+        }
+      })
       .catch(() => setUser(null))
       .finally(() => setLoadingUser(false));
   }, []);
+
+  const getNextPaymentDate = (sub) => {
+    if (!sub) return 'N/A';
+
+    const formatDate = (d) => {
+      const day = d.getDate();
+      const month = d.toLocaleDateString('en-US', { month: 'short' });
+      const year = d.getFullYear();
+      return `${day} ${month}, ${year}`;
+    };
+
+    if (sub.current_period_end) {
+      return formatDate(new Date(sub.current_period_end));
+    }
+    if (sub.last_payment_date) {
+      const date = new Date(sub.last_payment_date);
+      date.setMonth(date.getMonth() + 1);
+      return formatDate(date);
+    }
+    if (sub.created_date) {
+      const date = new Date(sub.created_date);
+      date.setMonth(date.getMonth() + 1);
+      return formatDate(date);
+    }
+    return 'N/A';
+  };
 
   const handleSubscribe = async () => {
     if (!user) {
@@ -124,8 +170,12 @@ export default function Pricing() {
 
               {subscribed ? (
                 <div className="rounded-2xl border border-accent/20 bg-accent/5 p-4 text-sm text-accent-900">
-                  <p className="font-semibold">Thank you!</p>
-                  <p>Your subscription was successfully activated.</p>
+                  <p className="font-semibold">Active Membership</p>
+                  <p className="mt-1">
+                    {activeSubscription 
+                      ? `Your ${activeSubscription.plan} plan is active. Next payment date: ${getNextPaymentDate(activeSubscription)}`
+                      : "Your subscription was successfully activated."}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">

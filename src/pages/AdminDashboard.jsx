@@ -136,7 +136,7 @@ export default function AdminDashboard() {
       const userIds = users.map(u => u.id).filter(Boolean);
       const { data, error } = await supabase
         .from('verifications')
-        .select('user_id, id_verification, employment_verification, bank_statement_verification')
+        .select('user_id, id_verification, employment_verification, bank_statement_verification, identity_documents, bank_documents')
         .in('user_id', userIds);
       if (error) throw error;
       return data || [];
@@ -300,6 +300,7 @@ export default function AdminDashboard() {
 
   const [confirmAction, setConfirmAction] = useState(null); // { listing, action: 'approve' | 'reject' }
   const [confirmUserAction, setConfirmUserAction] = useState(null); // { user, verified: boolean }
+  const [selectedUserDocs, setSelectedUserDocs] = useState(null); // { userName, identityDocs, bankDocs }
   const [usersSearch, setUsersSearch] = useState('');
   const [propertiesSearch, setPropertiesSearch] = useState('');
   const [bookingsSearch, setBookingsSearch] = useState('');
@@ -337,6 +338,42 @@ export default function AdminDashboard() {
     },
     onError: (err) => toast.error(`Failed to update user verification: ${err.message || err}`),
   });
+
+  const updateVerificationStatus = useMutation({
+    mutationFn: async ({ userId, field, status }) => {
+      const { data: existing } = await supabase
+        .from('verifications')
+        .select('id, id_document_url')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const payload = {
+        user_id: userId,
+        [field]: status,
+        updated_date: new Date().toISOString()
+      };
+
+      if (!existing) {
+        payload.id_document_url = '';
+      } else {
+        payload.id = existing.id;
+      }
+
+      const { error } = await supabase
+        .from('verifications')
+        .upsert(payload, { onConflict: 'user_id' });
+
+      if (error) throw error;
+      return { userId, field, status };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-verifications'] });
+      toast.success('Verification status updated');
+    },
+    onError: (err) => toast.error(`Failed to update verification: ${err.message || err}`),
+  });
+
+
 
   // Pagination state for properties table (uses Supabase for scalable pagination)
   const [page, setPage] = useState(1);
@@ -629,6 +666,7 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 font-semibold text-muted-foreground text-center">Identity</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground text-center">Employment</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground text-center">Financial Data</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground text-center">Documents</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Verified</th>
                   </tr>
                 </thead>
@@ -644,28 +682,94 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-center align-middle">
                           <div className="flex items-center justify-center">
-                            {verification.id_verification ? (
-                              <CheckCircle className="w-5 h-5 text-emerald-600" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-rose-600" />
-                            )}
+                            <select
+                              className={`text-xs p-1.5 rounded-lg border font-semibold cursor-pointer shadow-sm focus:outline-none focus:ring-1 focus:ring-primary ${
+                                verification.id_verification === 'approved'
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                  : verification.id_verification === 'declined'
+                                    ? 'bg-rose-50 border-rose-300 text-rose-700'
+                                    : 'bg-slate-50 border-slate-300 text-slate-700'
+                              }`}
+                              value={verification.id_verification || 'pending'}
+                              onChange={(e) => updateVerificationStatus.mutate({
+                                userId: u.id,
+                                field: 'id_verification',
+                                status: e.target.value
+                              })}
+                            >
+                              <option value="approved">Approved</option>
+                              <option value="pending">Pending</option>
+                              <option value="started">Started</option>
+                              <option value="declined">Declined</option>
+                            </select>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center align-middle">
                           <div className="flex items-center justify-center">
-                            {verification.employment_verification ? (
-                              <CheckCircle className="w-5 h-5 text-emerald-600" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-rose-600" />
-                            )}
+                            <select
+                              className={`text-xs p-1.5 rounded-lg border font-semibold cursor-pointer shadow-sm focus:outline-none focus:ring-1 focus:ring-primary ${
+                                verification.employment_verification === 'approved'
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                  : verification.employment_verification === 'declined'
+                                    ? 'bg-rose-50 border-rose-300 text-rose-700'
+                                    : 'bg-slate-50 border-slate-300 text-slate-700'
+                              }`}
+                              value={verification.employment_verification || 'pending'}
+                              onChange={(e) => updateVerificationStatus.mutate({
+                                userId: u.id,
+                                field: 'employment_verification',
+                                status: e.target.value
+                              })}
+                            >
+                              <option value="approved">Approved</option>
+                              <option value="pending">Pending</option>
+                              <option value="started">Started</option>
+                              <option value="declined">Declined</option>
+                            </select>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center align-middle">
                           <div className="flex items-center justify-center">
-                            {verification.bank_statement_verification ? (
-                              <CheckCircle className="w-5 h-5 text-emerald-600" />
+                            <select
+                              className={`text-xs p-1.5 rounded-lg border font-semibold cursor-pointer shadow-sm focus:outline-none focus:ring-1 focus:ring-primary ${
+                                verification.bank_statement_verification === 'approved'
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                  : verification.bank_statement_verification === 'declined'
+                                    ? 'bg-rose-50 border-rose-300 text-rose-700'
+                                    : 'bg-slate-50 border-slate-300 text-slate-700'
+                              }`}
+                              value={verification.bank_statement_verification || 'pending'}
+                              onChange={(e) => updateVerificationStatus.mutate({
+                                userId: u.id,
+                                field: 'bank_statement_verification',
+                                status: e.target.value
+                              })}
+                            >
+                              <option value="approved">Approved</option>
+                              <option value="pending">Pending</option>
+                              <option value="started">Started</option>
+                              <option value="declined">Declined</option>
+                            </select>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center align-middle">
+                          <div className="flex items-center justify-center">
+                            {((verification.identity_documents && verification.identity_documents.length > 0) ||
+                              (verification.bank_documents && verification.bank_documents.length > 0)) ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs h-7 gap-1"
+                                onClick={() => setSelectedUserDocs({
+                                  userName: u.full_name || u.email,
+                                  identityDocs: verification.identity_documents || [],
+                                  bankDocs: verification.bank_documents || []
+                                })}
+                              >
+                                <Eye className="w-3.5 h-3.5" /> View ({ (verification.identity_documents?.length || 0) + (verification.bank_documents?.length || 0) })
+                              </Button>
                             ) : (
-                              <XCircle className="w-5 h-5 text-rose-600" />
+                              <span className="text-xs text-muted-foreground italic">None</span>
                             )}
                           </div>
                         </td>
@@ -1005,6 +1109,105 @@ export default function AdminDashboard() {
                   setConfirmUserAction(null);
                 }
               }}>{confirmUserAction?.verified ? 'Confirm Verify' : 'Confirm Unverify'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!selectedUserDocs} onOpenChange={(open) => { if (!open) setSelectedUserDocs(null); }}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Documents - {selectedUserDocs?.userName}</DialogTitle>
+              <DialogDescription>
+                Review uploaded identity verification and bank documents.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-6">
+              {/* Identity Documents */}
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5 border-b pb-1.5">
+                  <ShieldCheck className="w-4 h-4 text-primary" /> Identity Documents ({selectedUserDocs?.identityDocs?.length || 0})
+                </h4>
+                {selectedUserDocs?.identityDocs && selectedUserDocs.identityDocs.length > 0 ? (
+                  <div className="space-y-4">
+                    {selectedUserDocs.identityDocs.map((url, idx) => {
+                      const fileExtension = url.split('.').pop()?.toLowerCase();
+                      const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension);
+                      const isPdf = fileExtension === 'pdf';
+                      const fileName = url.split('/').pop().replace(/^\d+_\d+_(.+)$/, '$1') || `ID Document ${idx + 1}`;
+                      return (
+                        <div key={idx} className="border rounded-xl p-3 bg-slate-50 space-y-2">
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="font-semibold text-xs text-slate-700 truncate max-w-[70%]">{fileName}</span>
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                              <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                                <ExternalLink className="w-3 h-3" /> Open in New Tab
+                              </Button>
+                            </a>
+                          </div>
+                          <div className="flex justify-center bg-white p-2 rounded-lg border">
+                            {isImage ? (
+                              <img src={url} alt={fileName} className="max-w-full max-h-[300px] object-contain rounded" />
+                            ) : isPdf ? (
+                              <iframe src={url} title={fileName} className="w-full h-[350px] rounded border" />
+                            ) : (
+                              <div className="py-8 text-center text-xs text-muted-foreground">
+                                No inline preview available for this file. Click the button above to view.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic pl-6">No identity documents uploaded</p>
+                )}
+              </div>
+
+              {/* Bank Documents */}
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5 border-b pb-1.5">
+                  <FileText className="w-4 h-4 text-primary" /> Bank Details & Statements ({selectedUserDocs?.bankDocs?.length || 0})
+                </h4>
+                {selectedUserDocs?.bankDocs && selectedUserDocs.bankDocs.length > 0 ? (
+                  <div className="space-y-4">
+                    {selectedUserDocs.bankDocs.map((url, idx) => {
+                      const fileExtension = url.split('.').pop()?.toLowerCase();
+                      const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension);
+                      const isPdf = fileExtension === 'pdf';
+                      const fileName = url.split('/').pop().replace(/^\d+_\d+_(.+)$/, '$1') || `Bank Document ${idx + 1}`;
+                      return (
+                        <div key={idx} className="border rounded-xl p-3 bg-slate-50 space-y-2">
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="font-semibold text-xs text-slate-700 truncate max-w-[70%]">{fileName}</span>
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                              <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                                <ExternalLink className="w-3 h-3" /> Open in New Tab
+                              </Button>
+                            </a>
+                          </div>
+                          <div className="flex justify-center bg-white p-2 rounded-lg border">
+                            {isImage ? (
+                              <img src={url} alt={fileName} className="max-w-full max-h-[300px] object-contain rounded" />
+                            ) : isPdf ? (
+                              <iframe src={url} title={fileName} className="w-full h-[350px] rounded border" />
+                            ) : (
+                              <div className="py-8 text-center text-xs text-muted-foreground">
+                                No inline preview available for this file. Click the button above to view.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic pl-6">No bank documents uploaded</p>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setSelectedUserDocs(null)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, ShieldCheck, Search, PlusCircle, LayoutDashboard, DollarSign, Users, Heart, UserCircle, KeyRound, Handshake, Building2, UserCog } from 'lucide-react';
+import { Menu, X, ShieldCheck, Search, PlusCircle, LayoutDashboard, DollarSign, Users, Heart, UserCircle, KeyRound, Handshake, Building2, UserCog, Bell, CheckCheck } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { registerPushNotifications, checkPushSubscription, unsubscribePushNotifications } from '@/utils/pushNotification';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,6 +14,147 @@ export default function Navbar() {
   useEffect(() => { setIsOpen(false); }, [location.pathname]);
 
   const role = user?.role || 'renter';
+
+  const [notifications, setNotifications] = useState([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [pushStatus, setPushStatus] = useState('checking'); // 'checking', 'subscribed', 'unsubscribed', 'denied', 'unsupported'
+  const [showPrompt, setShowPrompt] = useState(false);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+
+    // Check push subscription status
+    checkPushSubscription().then(status => setPushStatus(status));
+
+    const fetchNotifications = async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (!error && data) {
+        setNotifications(data);
+      }
+    };
+
+    fetchNotifications();
+
+    const channel = supabase
+      .channel(`notifications:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setNotifications(prev => [payload.new, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setNotifications(prev =>
+              prev.map(n => n.id === payload.new.id ? payload.new : n)
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (user && pushStatus === 'unsubscribed') {
+      const dismissedAt = localStorage.getItem('push_prompt_dismissed_at');
+      const oneHour = 60 * 60 * 1000;
+      if (!dismissedAt || Date.now() - parseInt(dismissedAt, 10) > oneHour) {
+        const timer = setTimeout(() => setShowPrompt(true), 3000);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      setShowPrompt(false);
+    }
+  }, [user, pushStatus]);
+
+  const handleDismissPrompt = () => {
+    localStorage.setItem('push_prompt_dismissed_at', Date.now().toString());
+    setShowPrompt(false);
+  };
+
+  const handleEnableFromPrompt = async () => {
+    const res = await registerPushNotifications(user.id);
+    if (res.success) {
+      setPushStatus('subscribed');
+      setShowPrompt(false);
+    } else if (res.error === 'permission_denied') {
+      setPushStatus('denied');
+      setShowPrompt(false);
+      alert('Notification permission was denied. Please allow notifications in your browser settings.');
+    } else {
+      alert('Could not enable push notifications: ' + res.error);
+    }
+  };
+
+  const handleTogglePush = async () => {
+    if (pushStatus === 'subscribed') {
+      const res = await unsubscribePushNotifications(user.id);
+      if (res.success) setPushStatus('unsubscribed');
+    } else {
+      const res = await registerPushNotifications(user.id);
+      if (res.success) {
+        setPushStatus('subscribed');
+      } else if (res.error === 'permission_denied') {
+        setPushStatus('denied');
+        alert('Notification permission was denied. Please allow notifications in your browser settings.');
+      } else {
+        alert('Could not enable push notifications: ' + res.error);
+      }
+    }
+  };
+
+
+  const handleMarkAsRead = async (id) => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', id);
+    if (!error) {
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
+      );
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (unreadCount === 0) return;
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+    if (!error) {
+      setNotifications(prev =>
+        prev.map(n => ({ ...n, is_read: true }))
+      );
+    }
+  };
+
+
+  const handleLogout = () => {
+    localStorage.removeItem('push_prompt_dismissed_at');
+    logout();
+  };
+
 
   const navLinks = [
     { to: '/pricing', icon: DollarSign, label: 'Pricing', roles: ['renter', 'owner'], requiresAuth: false },
@@ -65,11 +208,78 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-2">
               {user ? (
                 <div className="flex items-center gap-3">
+                  {/* Notification Dropdown */}
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="relative h-9 w-9 rounded-full"
+                      onClick={() => setIsNotifOpen(!isNotifOpen)}
+                    >
+                      <Bell className="h-5 w-5 text-muted-foreground" />
+                      {unreadCount > 0 && (
+                        <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                        </span>
+                      )}
+                    </Button>
+
+                    {isNotifOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsNotifOpen(false)} />
+                        <div className="absolute right-0 mt-2 w-80 bg-white border border-border shadow-xl rounded-xl z-50 py-2 max-h-[350px] overflow-y-auto">
+                          <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 pb-2">
+                            <span className="font-semibold text-sm">Notifications</span>
+                            {unreadCount > 0 && (
+                              <button
+                                onClick={handleMarkAllAsRead}
+                                className="text-xs text-primary hover:underline flex items-center gap-1 font-medium animate-fade-in"
+                              >
+                                <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="divide-y divide-border/50">
+                            {notifications.length === 0 ? (
+                              <div className="p-4 text-center text-xs text-muted-foreground">
+                                No notifications yet
+                              </div>
+                            ) : (
+                              notifications.map((n) => (
+                                <div
+                                  key={n.id}
+                                  className={`p-3 text-left transition-colors cursor-pointer hover:bg-muted/50 relative ${!n.is_read ? 'bg-primary/5' : ''}`}
+                                  onClick={() => handleMarkAsRead(n.id)}
+                                >
+                                  {!n.is_read && (
+                                    <span className="absolute top-4 right-3 h-2 w-2 rounded-full bg-primary" />
+                                  )}
+                                  <div className="font-semibold text-xs text-foreground pr-4">{n.title}</div>
+                                  <div className="text-[11px] text-muted-foreground mt-0.5 pr-4 leading-normal">{n.message}</div>
+                                  <div className="text-[9px] text-muted-foreground/60 mt-1">
+                                    {new Date(n.created_at).toLocaleDateString(undefined, {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
                   <Link to={role === 'admin' ? '/admin' : '/profile'} className="text-sm text-foreground hover:text-primary transition-colors max-w-[140px] truncate">
                     {user.full_name ? user.full_name.split(' ')[0] : user.email}
                   </Link>
-                  <Button variant="outline" size="sm" onClick={logout}>Log out</Button>
+                  <Button variant="outline" size="sm" onClick={handleLogout}>Log out</Button>
                 </div>
               ) : (
                 <Button size="sm" onClick={login}>Sign In</Button>
@@ -100,18 +310,78 @@ export default function Navbar() {
               ))}
               <div className="pt-2 pb-1 border-t mt-2">
                {user ? (
-                  <div className="flex items-center justify-between px-4 py-2">
-                    <div>
-                      <Link to={role === 'admin' ? '/admin' : '/profile'} className="text-sm text-foreground hover:text-primary transition-colors truncate max-w-[200px] block">
-                        {user.full_name ? user.full_name.split(' ')[0] : user.email}
-                      </Link>
-                      <span className="text-xs text-muted-foreground">{role}</span>
+                  <div className="flex flex-col gap-2 px-4 py-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Link to={role === 'admin' ? '/admin' : '/profile'} className="text-sm text-foreground hover:text-primary transition-colors truncate max-w-[200px] block">
+                          {user.full_name ? user.full_name.split(' ')[0] : user.email}
+                        </Link>
+                        <span className="text-xs text-muted-foreground">{role}</span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={handleLogout}>Log out</Button>
                     </div>
-                    <Button variant="outline" size="sm" onClick={logout}>Log out</Button>
+
+                    {/* Mobile Notifications Area */}
+                    <div className="mt-3 border-t pt-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notifications ({unreadCount})</span>
+                        {unreadCount > 0 && (
+                          <button onClick={handleMarkAllAsRead} className="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
+                            <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto divide-y divide-border/50 border rounded-lg bg-muted/20">
+                        {notifications.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-muted-foreground">
+                            No notifications yet
+                          </div>
+                        ) : (
+                          notifications.map((n) => (
+                            <div
+                              key={n.id}
+                              className={`p-3 text-left relative transition-colors cursor-pointer hover:bg-muted/50 ${!n.is_read ? 'bg-primary/5' : ''}`}
+                              onClick={() => handleMarkAsRead(n.id)}
+                            >
+                              {!n.is_read && (
+                                <span className="absolute top-4 right-3 h-2 w-2 rounded-full bg-primary" />
+                              )}
+                              <div className="font-semibold text-xs text-foreground pr-4">{n.title}</div>
+                              <div className="text-[11px] text-muted-foreground mt-0.5 pr-4 leading-normal">{n.message}</div>
+                              <div className="text-[9px] text-muted-foreground/60 mt-1">
+                                {new Date(n.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <Button className="w-full h-12 text-base" onClick={login}>Sign In</Button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showPrompt && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[90%] sm:w-full bg-white border border-border shadow-2xl rounded-2xl p-4 animate-in slide-in-from-top duration-300">
+          <div className="flex gap-3">
+            <div className="p-2 bg-primary/10 rounded-xl h-fit">
+              <Bell className="w-5 h-5 text-primary animate-pulse" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-sm text-foreground">Enable Push Notifications</h4>
+              <p className="text-xs text-muted-foreground mt-1">Get updates on your subscription expiry and account activities in real time.</p>
+              <div className="flex items-center gap-2 mt-3 justify-end">
+                <Button variant="ghost" size="sm" className="text-xs h-8" onClick={handleDismissPrompt}>
+                  Maybe Later
+                </Button>
+                <Button size="sm" className="text-xs font-semibold h-8" onClick={handleEnableFromPrompt}>
+                  Enable
+                </Button>
               </div>
             </div>
           </div>
