@@ -17,7 +17,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 // Enter your VAPID Public Key here
-const VAPID_PUBLIC_KEY = 'BHG82gzAj_Kk92DYDMAVWUysUZyC8IctG49T5fFpQATz3KhXAcRHP-_kAB18Uxse1DgrDkIIxcEuZ0Xp6YQwgs0';
+const VAPID_PUBLIC_KEY = 'BCCW5bb7HgyST570k0LwvSLoUH6GkNMLYmGek5eXA+DZMn8J5Rt9EfdszmMqg60tpcYuP9jmXq3xDPAdAebb538';
 
 export async function registerPushNotifications(userId) {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {

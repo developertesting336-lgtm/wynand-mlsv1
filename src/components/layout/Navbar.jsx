@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Menu, X, ShieldCheck, Search, PlusCircle, LayoutDashboard, DollarSign, Users, Heart, UserCircle, KeyRound, Handshake, Building2, UserCog, Bell, CheckCheck } from 'lucide-react';
@@ -13,12 +13,28 @@ export default function Navbar() {
 
   useEffect(() => { setIsOpen(false); }, [location.pathname]);
 
+  const notifRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setIsNotifOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const role = user?.role || 'renter';
 
   const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [pushStatus, setPushStatus] = useState('checking'); // 'checking', 'subscribed', 'unsubscribed', 'denied', 'unsupported'
   const [showPrompt, setShowPrompt] = useState(false);
+  const [notifLimit, setNotifLimit] = useState(10);
+  const [hasMoreNotifs, setHasMoreNotifs] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
@@ -35,10 +51,17 @@ export default function Navbar() {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(notifLimit + 1);
       if (!error && data) {
-        setNotifications(data);
+        if (data.length > notifLimit) {
+          setNotifications(data.slice(0, notifLimit));
+          setHasMoreNotifs(true);
+        } else {
+          setNotifications(data);
+          setHasMoreNotifs(false);
+        }
       }
     };
 
@@ -56,7 +79,7 @@ export default function Navbar() {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setNotifications(prev => [payload.new, ...prev]);
+            setNotifications(prev => [payload.new, ...prev].slice(0, notifLimit));
           } else if (payload.eventType === 'UPDATE') {
             setNotifications(prev =>
               prev.map(n => n.id === payload.new.id ? payload.new : n)
@@ -71,7 +94,7 @@ export default function Navbar() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, notifLimit]);
 
   useEffect(() => {
     if (user && pushStatus === 'unsubscribed') {
@@ -128,7 +151,10 @@ export default function Navbar() {
       .from('notifications')
       .update({ is_read: true })
       .eq('id', id);
-    if (!error) {
+    if (error) {
+      console.error("Failed to mark notification as read:", error);
+      toast.error(`Failed to update notification: ${error.message}`);
+    } else {
       setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, is_read: true } : n)
       );
@@ -142,7 +168,10 @@ export default function Navbar() {
       .update({ is_read: true })
       .eq('user_id', user.id)
       .eq('is_read', false);
-    if (!error) {
+    if (error) {
+      console.error("Failed to mark all as read:", error);
+      toast.error(`Failed to update notifications: ${error.message}`);
+    } else {
       setNotifications(prev =>
         prev.map(n => ({ ...n, is_read: true }))
       );
@@ -209,7 +238,8 @@ export default function Navbar() {
               {user ? (
                 <div className="flex items-center gap-3">
                   {/* Notification Dropdown */}
-                  <div className="relative">
+                  {role !== 'admin' && (
+                    <div className="relative" ref={notifRef}>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -227,7 +257,6 @@ export default function Navbar() {
 
                     {isNotifOpen && (
                       <>
-                        <div className="fixed inset-0 z-40" onClick={() => setIsNotifOpen(false)} />
                         <div className="absolute right-0 mt-2 w-80 bg-white border border-border shadow-xl rounded-xl z-50 py-2 max-h-[350px] overflow-y-auto">
                           <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 pb-2">
                             <span className="font-semibold text-sm">Notifications</span>
@@ -270,10 +299,22 @@ export default function Navbar() {
                               ))
                             )}
                           </div>
+
+                          {hasMoreNotifs && (
+                            <div className="p-2 border-t text-center bg-slate-50/50">
+                              <button
+                                onClick={() => setNotifLimit(prev => prev + 10)}
+                                className="text-xs text-primary hover:underline font-semibold w-full py-1.5"
+                              >
+                                Load More
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </>
                     )}
                   </div>
+                )}
 
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
                   <Link to={role === 'admin' ? '/admin' : '/profile'} className="text-sm text-foreground hover:text-primary transition-colors max-w-[140px] truncate">
@@ -322,7 +363,8 @@ export default function Navbar() {
                     </div>
 
                     {/* Mobile Notifications Area */}
-                    <div className="mt-3 border-t pt-3">
+                    {role !== 'admin' && (
+                      <div className="mt-3 border-t pt-3">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notifications ({unreadCount})</span>
                         {unreadCount > 0 && (
@@ -355,8 +397,20 @@ export default function Navbar() {
                             </div>
                           ))
                         )}
+
+                        {hasMoreNotifs && (
+                          <div className="p-2 border-t text-center bg-slate-50/50">
+                            <button
+                              onClick={() => setNotifLimit(prev => prev + 10)}
+                              className="text-xs text-primary hover:underline font-semibold w-full py-1"
+                            >
+                              Load More
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
+                  )}
                   </div>
                 ) : (
                   <Button className="w-full h-12 text-base" onClick={login}>Sign In</Button>

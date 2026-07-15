@@ -474,6 +474,9 @@ export default function OwnerDashboard() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [editingListing, setEditingListing] = useState(null);
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('owner_dashboard_active_tab') || 'properties';
+  });
   const queryClient = useQueryClient();
   const { onboardingLoading, handleStripeOnboard } = useStripeOnboarding(user);
 
@@ -782,7 +785,10 @@ export default function OwnerDashboard() {
         <StatCard icon={Calendar} label="Pending Requests" value={pendingCount} color="bg-amber-100 text-amber-600" />
       </div>
 
-      <Tabs defaultValue="properties">
+      <Tabs value={activeTab} onValueChange={(val) => {
+        setActiveTab(val);
+        localStorage.setItem('owner_dashboard_active_tab', val);
+      }}>
         <TabsList className="mb-6 flex flex-wrap gap-2 justify-start">
           <TabsTrigger value="properties" className="gap-1.5">
             <Home className="w-4 h-4" /> Properties ({myListings.length})

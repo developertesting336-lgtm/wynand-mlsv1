@@ -43,6 +43,9 @@ export default function AgentDashboard() {
   const [user, setUser] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [inquiryTab, setInquiryTab] = useState('all');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('agent_dashboard_active_tab') || 'listings';
+  });
   const [listingsSearch, setListingsSearch] = useState('');
   const [listingsPage, setListingsPage] = useState(1);
   const [listingsPageSize, setListingsPageSize] = useState(10);
@@ -278,7 +281,10 @@ export default function AgentDashboard() {
         ))}
       </div>
 
-      <Tabs defaultValue="listings">
+      <Tabs value={activeTab} onValueChange={(val) => {
+        setActiveTab(val);
+        localStorage.setItem('agent_dashboard_active_tab', val);
+      }}>
         <TabsList>
           <TabsTrigger value="listings" className="gap-1"><Home className="w-4 h-4" /> My Listings</TabsTrigger>
           <TabsTrigger value="bookings" className="gap-1"><Calendar className="w-4 h-4" /> Bookings ({myBookings.length})</TabsTrigger>

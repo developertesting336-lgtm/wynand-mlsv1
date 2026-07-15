@@ -301,6 +301,9 @@ export default function AdminDashboard() {
   const [confirmAction, setConfirmAction] = useState(null); // { listing, action: 'approve' | 'reject' }
   const [confirmUserAction, setConfirmUserAction] = useState(null); // { user, verified: boolean }
   const [selectedUserDocs, setSelectedUserDocs] = useState(null); // { userName, identityDocs, bankDocs }
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('admin_dashboard_active_tab') || 'users';
+  });
   const [usersSearch, setUsersSearch] = useState('');
   const [propertiesSearch, setPropertiesSearch] = useState('');
   const [bookingsSearch, setBookingsSearch] = useState('');
@@ -529,7 +532,10 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      <Tabs defaultValue="users">
+      <Tabs value={activeTab} onValueChange={(val) => {
+        setActiveTab(val);
+        localStorage.setItem('admin_dashboard_active_tab', val);
+      }}>
         <TabsList>
           <TabsTrigger value="users" className="gap-1"><Users className="w-4 h-4" /> Users ({users.length})</TabsTrigger>
           <TabsTrigger value="properties" className="gap-1"><Home className="w-4 h-4" /> Properties ({totalCount})</TabsTrigger>

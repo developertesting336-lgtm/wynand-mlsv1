@@ -768,6 +768,9 @@ export default function UserDashboard() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [selectedInquiry, setSelectedInquiry] = useState(null);
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('tenant_dashboard_active_tab') || 'favorites';
+  });
   const { onboardingLoading, handleStripeOnboard } = useStripeOnboarding(user);
 
   useEffect(() => {
@@ -897,7 +900,10 @@ export default function UserDashboard() {
     
 
       {/* Tabs */}
-      <Tabs defaultValue="favorites">
+      <Tabs value={activeTab} onValueChange={(val) => {
+        setActiveTab(val);
+        localStorage.setItem('tenant_dashboard_active_tab', val);
+      }}>
         <TabsList className="mb-8 flex flex-wrap gap-2 justify-start">
           <TabsTrigger value="favorites" className="gap-1.5">
             <Heart className="w-4 h-4" /> Favorites

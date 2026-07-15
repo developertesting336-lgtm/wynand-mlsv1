@@ -277,7 +277,7 @@ export default function ListingDetail() {
           </div>
 
           {/* Booking status banner */}
-          {hasBookingRequest && (
+          {hasBookingRequest && bookingStatus !== 'declined' && (
             <div className={`flex items-center gap-3 rounded-xl px-4 py-3 border ${
               bookingStatus === 'approved' 
                 ? 'bg-green-50 border-green-200' 
@@ -303,10 +303,19 @@ export default function ListingDetail() {
                   {bookingStatus === 'approved' && '✓ Your booking has been approved!'}
                   {bookingStatus === 'pending' && '⏳ Booking request pending approval'}
                   {bookingStatus === 'confirmed' && '✓ Your booking is confirmed & paid'}
-                  {bookingStatus === 'declined' && '✗ Your booking request was declined'}
+                  {bookingStatus === 'declined' && `✗ Your booking request was declined on ${
+                    userBookings[0]?.updated_date 
+                      ? format(new Date(userBookings[0].updated_date), 'MMMM d, yyyy') 
+                      : 'a recent date'
+                  }`}
                 </p>
                 {bookingStatus === 'approved' && <p className="text-xs mt-0.5">Head to your dashboard to complete payment.</p>}
                 {bookingStatus === 'pending' && <p className="text-xs mt-0.5">The owner will review your request soon.</p>}
+                {bookingStatus === 'declined' && (
+                  <p className="text-xs mt-0.5">
+                    You can submit a new booking request in the future by using the availability calendar or contacting the owner/agent.
+                  </p>
+                )}
               </div>
             </div>
           )}
