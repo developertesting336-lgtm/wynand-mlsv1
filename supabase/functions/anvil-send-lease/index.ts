@@ -153,7 +153,7 @@ serve(async (req) => {
     }
 
     // 5. Fill the PDF template using Anvil Fill PDF API
-    const pdfTemplateId = "s0rRwejtPYVOu5Zrmrt0";
+    const pdfTemplateId = "OQX8J8rLtRn0jpj9mwNn";
     const rentAmount = listing.price_usd || 0;
     const depositAmount = listing.deposit_amount || 0;
     const leaseStart = booking.move_in_date || new Date().toISOString().split("T")[0];

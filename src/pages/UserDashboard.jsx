@@ -628,15 +628,15 @@ function ReviewsTab({ user, listings }) {
   const debouncedSearch = useDebouncedValue(search, 500);
 
   const { data: allBookings = [], isLoading } = useQuery({
-    queryKey: ['user-bookings-reviews', user.email],
-    queryFn: () => base44.entities.Booking.filter({ renter_email: user.email }, '-created_date', 100),
-    enabled: !!user.email,
+    queryKey: ['user-bookings-reviews', user.id],
+    queryFn: () => base44.entities.Booking.filter({ renter_id: user.id }, '-created_date', 100),
+    enabled: !!user.id,
   });
 
   const { data: existingReviews = [] } = useQuery({
-    queryKey: ['all-reviews'],
-    queryFn: () => base44.entities.PropertyReview.filter({ reviewer_email: user.email }, '-created_date', 100),
-    enabled: !!user.email,
+    queryKey: ['all-reviews', user.id],
+    queryFn: () => base44.entities.PropertyReview.filter({ reviewer_id: user.id }, '-created_date', 100),
+    enabled: !!user.id,
   });
 
   const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));

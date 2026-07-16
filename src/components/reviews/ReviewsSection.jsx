@@ -9,27 +9,33 @@ import StarRating from './StarRating';
 
 // Fetch reviews for a listing, joining profiles to get reviewer's name
 async function fetchReviews(listingId) {
-  const { data, error } = await supabase
+  const { data: reviews, error: reviewsError } = await supabase
     .from('property_reviews')
-    .select(`
-      id,
-      listing_id,
-      rating,
-      comment,
-      verified_tenant,
-      created_date,
-      reviewer_id,
-      profiles:reviewer_id (
-        full_name,
-        email
-      )
-    `)
+    .select('id, listing_id, rating, comment, verified_tenant, created_date, reviewer_id')
     .eq('listing_id', listingId)
     .order('created_date', { ascending: false })
     .limit(50);
 
-  if (error) throw error;
-  return data || [];
+  if (reviewsError) throw reviewsError;
+  if (!reviews || reviews.length === 0) return [];
+
+  const reviewerIds = [...new Set(reviews.map(r => r.reviewer_id).filter(Boolean))];
+  if (reviewerIds.length > 0) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', reviewerIds);
+
+    if (!profilesError && profiles) {
+      const profileMap = Object.fromEntries(profiles.map(p => [p.id, p]));
+      return reviews.map(r => ({
+        ...r,
+        profiles: profileMap[r.reviewer_id] || null
+      }));
+    }
+  }
+
+  return reviews;
 }
 
 function getReviewerName(review) {

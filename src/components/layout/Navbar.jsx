@@ -97,7 +97,7 @@ export default function Navbar() {
   }, [user, notifLimit]);
 
   useEffect(() => {
-    if (user && pushStatus === 'unsubscribed') {
+    if (user && user.role !== 'admin' && pushStatus === 'unsubscribed') {
       const dismissedAt = localStorage.getItem('push_prompt_dismissed_at');
       const oneHour = 60 * 60 * 1000;
       if (!dismissedAt || Date.now() - parseInt(dismissedAt, 10) > oneHour) {
@@ -420,7 +420,7 @@ export default function Navbar() {
           </div>
         </div>
       )}
-      {showPrompt && (
+      {showPrompt && role !== 'admin' && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[90%] sm:w-full bg-white border border-border shadow-2xl rounded-2xl p-4 animate-in slide-in-from-top duration-300">
           <div className="flex gap-3">
             <div className="p-2 bg-primary/10 rounded-xl h-fit">
