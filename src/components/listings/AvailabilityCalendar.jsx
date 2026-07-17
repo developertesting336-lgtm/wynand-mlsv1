@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
-  ChevronLeft, ChevronRight, Lock, Calendar, Send, CheckCircle, X, Loader2
+  ChevronLeft, ChevronRight, Lock, Calendar, Send, CheckCircle, X, Loader2, AlertCircle
 } from 'lucide-react';
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
@@ -31,7 +31,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
 
   const [month, setMonth] = useState(new Date());
   const [selectedDates, setSelectedDates] = useState(new Set());
-  const [requestForm, setRequestForm] = useState({ name: '', email: '', note: '', dates: [] });
+  const [requestForm, setRequestForm] = useState({ name: '', email: '', note: '', budget: '', dates: [] });
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [tenantVerification, setTenantVerification] = useState({});
   const [verificationLoading, setVerificationLoading] = useState(false);
@@ -62,12 +62,28 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
     enabled: !!currentUser?.id,
   });
 
+  const { data: existingBookings = [] } = useQuery({
+    queryKey: ['renter-existing-bookings-on-listing', currentUser?.id, listing.id],
+    queryFn: async () => {
+      if (!currentUser?.id || !listing.id) return [];
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('id, status, end_lease')
+        .eq('renter_id', currentUser.id)
+        .eq('listing_id', listing.id)
+        .in('status', ['pending', 'approved', 'confirmed', 'lease_pending']);
+      if (error) throw error;
+      return (data || []).filter(b => b.end_lease !== true);
+    },
+    enabled: !!currentUser?.id && !!listing.id,
+  });
+
+  const hasAlreadyRequested = existingBookings.length > 0;
+
   const hasActiveSubscription = currentUser?.role === 'renter' ? isSubscriptionActive(subscription) : true;
 
   // Build lookup maps
-  const blockedSet = new Set(
-    bookingDates.filter(d => d.type === 'blocked').map(d => d.date)
-  );
+  const blockedSet = new Set(listing.blocked_dates || []);
   const requestMap = {};
   bookingDates.filter(d => d.type === 'request').forEach(d => {
     requestMap[d.date] = d;
@@ -76,19 +92,24 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
   // Owner: toggle blocked dates
   const toggleBlockMutation = useMutation({
     mutationFn: async (dateStr) => {
+      const currentBlocked = listing.blocked_dates || [];
+      let updatedBlocked;
       if (blockedSet.has(dateStr)) {
-        const existing = bookingDates.find(d => d.type === 'blocked' && d.date === dateStr);
-        if (existing) await base44.entities.BookingDate.delete(existing.id);
+        updatedBlocked = currentBlocked.filter(d => d !== dateStr);
       } else {
-        await base44.entities.BookingDate.create({
-          listing_id: listing.id,
-          date: dateStr,
-          type: 'blocked',
-          listing_owner_email: listing.owner_email,
-        });
+        updatedBlocked = Array.from(new Set([...currentBlocked, dateStr]));
       }
+      const { error } = await supabase
+        .from('listings')
+        .update({ blocked_dates: updatedBlocked })
+        .eq('id', listing.id);
+      if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['booking-dates', listing.id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['listing', listing.id] });
+      queryClient.invalidateQueries({ queryKey: ['owner-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['listings'] });
+    },
   });
 
   // Fetch tenant verification on mount / when currentUser changes
@@ -145,7 +166,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
         }
       }
       console.log('SubmitRequestMutation called with', form);
-      const { name, email, note, dates } = form;
+      const { name, email, note, budget, dates } = form;
       const sortedDates = dates ? [...dates].sort() : [];
       const moveInDate = sortedDates[0];
       // Resolve owner ID via owner_email
@@ -213,6 +234,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
             referral_code: refCode || null,
             move_in_date: moveInDate,
             lease_duration_months: 12,
+            monthly_budget_mxn: budget ? Number(budget) : null,
             message:
               note ||
               `Booking request for ${sortedDates.length} date(s) starting ${format(
@@ -287,6 +309,10 @@ ${note ? `<p>Note: ${note}</p>` : ''}
     if (isBefore(day, today)) return;
 
     if (!isOwner && currentUser?.role === 'renter') {
+      if (hasAlreadyRequested) {
+        toast.error('You already have an active booking request for this property.');
+        return;
+      }
       if (!hasActiveSubscription) {
         toast.error('An active subscription is required to request booking dates. Please subscribe first.');
         return;
@@ -318,7 +344,11 @@ ${note ? `<p>Note: ${note}</p>` : ''}
     const selected = selectedDates.has(dateStr);
 
     if (past) return 'text-muted-foreground/40 cursor-default bg-transparent';
-    if (blocked) return 'bg-red-100 text-red-700 cursor-pointer hover:bg-red-200 rounded-lg font-medium';
+    if (blocked) {
+      return isOwner
+        ? 'bg-red-100 text-red-700 cursor-pointer hover:bg-red-200 rounded-lg font-medium'
+        : 'bg-red-50/50 text-red-300 cursor-not-allowed rounded-lg';
+    }
     if (selected) return 'bg-primary text-primary-foreground rounded-lg font-semibold ring-2 ring-primary ring-offset-1';
     if (request?.status === 'approved') return 'bg-green-100 text-green-700 rounded-lg font-medium cursor-default';
     if (request?.status === 'pending') return 'bg-amber-100 text-amber-700 rounded-lg font-medium cursor-pointer hover:bg-amber-200';
@@ -420,7 +450,15 @@ ${note ? `<p>Note: ${note}</p>` : ''}
 
       {!isOwner && (
         <>
-          {requestSent ? (
+          {hasAlreadyRequested && currentUser?.role === 'renter' ? (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-5 text-center shadow-sm">
+              <AlertCircle className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+              <p className="font-semibold text-blue-950 text-sm">Active Booking Request Found</p>
+              <p className="text-xs text-blue-800 mt-1 max-w-xs mx-auto">
+                You have already submitted an active booking request for this property. Please check your Dashboard to view details, sign lease, or process payments.
+              </p>
+            </div>
+          ) : requestSent ? (
             <div className="rounded-2xl border bg-card p-6 text-center">
               <CheckCircle className="w-10 h-10 text-primary mx-auto mb-2" />
               <p className="font-semibold">Booking request sent!</p>
@@ -479,6 +517,10 @@ ${note ? `<p>Note: ${note}</p>` : ''}
                       <Label className="text-xs text-muted-foreground">Email *</Label>
                       <Input required type="email" value={requestForm.email} onChange={e => setRequestForm(p => ({ ...p, email: e.target.value }))} className="mt-1" />
                     </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Monthly Budget (MXN) *</Label>
+                    <Input required type="number" value={requestForm.budget} onChange={e => setRequestForm(p => ({ ...p, budget: e.target.value }))} className="mt-1" />
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Note (optional)</Label>

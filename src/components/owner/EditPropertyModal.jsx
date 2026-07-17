@@ -38,6 +38,9 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
     contact_email: listing.contact_email || listing.owner_email || '',
     video_url: listing.video_url || '',
     photos: listing.photos || [],
+    agent_name: listing.agent_name || '',
+    agent_email: listing.agent_email || '',
+    agent_phone: listing.agent_phone || '',
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -128,6 +131,9 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
           bathrooms: Number(form.bathrooms),
           deposit_amount: form.deposit_amount ? Number(form.deposit_amount) : null,
           pet_friendly: form.pet_friendly,
+          agent_name: form.agent_name || null,
+          agent_email: form.agent_email || null,
+          agent_phone: form.agent_phone || null,
         },
       });
     } catch {
@@ -304,6 +310,20 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
             <div>
               <Label>Video Walkthrough URL</Label>
               <Input value={form.video_url} onChange={e => update('video_url', e.target.value)} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              <div>
+                <Label>Agent Name</Label>
+                <Input value={form.agent_name} onChange={e => update('agent_name', e.target.value)} />
+              </div>
+              <div>
+                <Label>Agent Email</Label>
+                <Input type="email" value={form.agent_email} onChange={e => update('agent_email', e.target.value)} />
+              </div>
+              <div>
+                <Label>Agent Phone</Label>
+                <Input value={form.agent_phone} onChange={e => update('agent_phone', e.target.value)} />
+              </div>
             </div>
           </div>
         </form>

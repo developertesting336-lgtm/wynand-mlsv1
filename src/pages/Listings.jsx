@@ -69,19 +69,21 @@ export default function Listings() {
     enabled: !!user?.email,
   });
 
-  // Fetch all bookings that are approved or confirmed to hide those listings
   const { data: bookedListingIdsData = [] } = useQuery({
     queryKey: ['booked-listing-ids'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('bookings')
-        .select('listing_id')
-        .in('status', ['approved', 'confirmed'])
+        .select('listing_id, end_lease')
+        .in('status', ['approved', 'confirmed', 'lease_pending'])
         .not('listing_id', 'is', null);
 
       if (error) throw error;
-      return Array.isArray(data) ? Array.from(new Set(data.map(item => item.listing_id))) : [];
+      const activeBookings = (data || []).filter(item => item.end_lease !== true);
+      return Array.from(new Set(activeBookings.map(item => item.listing_id)));
     },
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: activeSubscriptions = [] } = useQuery({

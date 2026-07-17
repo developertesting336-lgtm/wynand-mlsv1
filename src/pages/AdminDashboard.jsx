@@ -541,7 +541,7 @@ export default function AdminDashboard() {
         setActiveTab(val);
         localStorage.setItem('admin_dashboard_active_tab', val);
       }}>
-        <TabsList>
+        <TabsList className="flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl">
           <TabsTrigger value="users" className="gap-1"><Users className="w-4 h-4" /> Users ({users.length})</TabsTrigger>
           <TabsTrigger value="properties" className="gap-1"><Home className="w-4 h-4" /> Properties ({totalCount})</TabsTrigger>
           <TabsTrigger value="bookings" className="gap-1"><Calendar className="w-4 h-4" /> Bookings ({allBookings.length})</TabsTrigger>
@@ -979,7 +979,7 @@ export default function AdminDashboard() {
           </div>
 
           <Tabs defaultValue="platform-fees" value={earningsTab} onValueChange={setEarningsTab}>
-            <TabsList>
+            <TabsList className="flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl">
               <TabsTrigger value="platform-fees" className="gap-1">Platform Fees ({platformEarnings.length})</TabsTrigger>
               <TabsTrigger value="subscriptions" className="gap-1">Subscriptions ({allSubscriptions.length})</TabsTrigger>
             </TabsList>

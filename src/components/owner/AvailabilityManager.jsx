@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -33,12 +34,6 @@ export default function AvailabilityManager({ listings }) {
   const listing = listings.find(l => l.id === selectedListingId);
   const today = startOfDay(new Date());
 
-  const { data: bookingDates = [], isLoading: datesLoading } = useQuery({
-    queryKey: ['booking-dates', selectedListingId],
-    queryFn: () => base44.entities.BookingDate.filter({ listing_id: selectedListingId }, 'date', 400),
-    enabled: !!selectedListingId,
-  });
-
   // Also fetch actual booking requests from the bookings table
   const { data: listingBookings = [], isLoading: bookingsLoading } = useQuery({
     queryKey: ['owner-availability-bookings', selectedListingId],
@@ -46,9 +41,25 @@ export default function AvailabilityManager({ listings }) {
     enabled: !!selectedListingId,
   });
 
-  const isLoading = datesLoading || bookingsLoading;
+  const { data: renterProfiles = [] } = useQuery({
+    queryKey: ['renter-profiles-availability', listingBookings.map(b => b.renter_id).filter(Boolean)],
+    queryFn: async () => {
+      if (listingBookings.length === 0) return [];
+      const renterIds = listingBookings.map(b => b.renter_id).filter(Boolean);
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, phone_number')
+        .in('id', renterIds);
+      return data || [];
+    },
+    enabled: listingBookings.length > 0,
+  });
 
-  const blockedSet = new Set(bookingDates.filter(d => d.type === 'blocked').map(d => d.date));
+  const renterProfileMap = Object.fromEntries(renterProfiles.map(p => [p.id, p]));
+
+  const isLoading = bookingsLoading;
+
+  const blockedSet = new Set(listing?.blocked_dates || []);
 
   // Build a set of dates that have approved/confirmed bookings (occupied)
   const occupiedDates = new Set();
@@ -60,68 +71,58 @@ export default function AvailabilityManager({ listings }) {
       }
     });
 
-  // Pending requests: from booking_dates (type=request) + bookings (status=pending)
-  const pendingRequests = [
-    ...bookingDates.filter(d => d.type === 'request' && d.status === 'pending').map(d => ({
-      id: d.id,
-      date: d.date,
-      type: 'booking_date',
-      requester_name: d.requester_name,
-      note: d.note,
-      listing_title: listing?.title,
-    })),
-    ...listingBookings.filter(b => b.status === 'pending').map(b => ({
-      id: b.id,
-      date: b.move_in_date,
-      type: 'booking',
-      requester_name: b.renter_name,
-      note: b.message,
-      listing_title: b.listing_title || listing?.title,
-      renter_email: b.renter_email,
-      renter_phone: b.renter_phone,
-      lease_duration_months: b.lease_duration_months,
-    })),
-  ];
+  // Pending requests: from bookings (status=pending)
+  const pendingRequests = listingBookings.filter(b => b.status === 'pending').map(b => ({
+    id: b.id,
+    date: b.move_in_date,
+    type: 'booking',
+    requester_name: renterProfileMap[b.renter_id]?.full_name || 'Renter',
+    note: b.message,
+    listing_title: b.listing_title || listing?.title,
+    renter_email: renterProfileMap[b.renter_id]?.email || '',
+    renter_phone: renterProfileMap[b.renter_id]?.phone_number || '',
+    lease_duration_months: b.lease_duration_months,
+  }));
 
   const blockMutation = useMutation({
     mutationFn: async (datesToBlock) => {
-      await Promise.all(
-        datesToBlock.map(dateStr =>
-          base44.entities.BookingDate.create({
-            listing_id: selectedListingId,
-            date: dateStr,
-            type: 'blocked',
-            listing_owner_email: listing.owner_email,
-          })
-        )
-      );
+      const currentBlocked = listing.blocked_dates || [];
+      const updatedBlocked = Array.from(new Set([...currentBlocked, ...datesToBlock]));
+      const { error } = await supabase
+        .from('listings')
+        .update({ blocked_dates: updatedBlocked })
+        .eq('id', selectedListingId);
+      if (error) throw error;
     },
     onSuccess: (_, dates) => {
-      queryClient.invalidateQueries({ queryKey: ['booking-dates', selectedListingId] });
+      queryClient.invalidateQueries({ queryKey: ['owner-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['listings'] });
       toast.success(`${dates.length} date${dates.length > 1 ? 's' : ''} blocked`);
     },
   });
 
   const unblockMutation = useMutation({
     mutationFn: async (datesToUnblock) => {
-      const toDelete = bookingDates.filter(d => d.type === 'blocked' && datesToUnblock.includes(d.date));
-      await Promise.all(toDelete.map(d => base44.entities.BookingDate.delete(d.id)));
+      const currentBlocked = listing.blocked_dates || [];
+      const updatedBlocked = currentBlocked.filter(d => !datesToUnblock.includes(d));
+      const { error } = await supabase
+        .from('listings')
+        .update({ blocked_dates: updatedBlocked })
+        .eq('id', selectedListingId);
+      if (error) throw error;
     },
     onSuccess: (_, dates) => {
-      queryClient.invalidateQueries({ queryKey: ['booking-dates', selectedListingId] });
+      queryClient.invalidateQueries({ queryKey: ['owner-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['listings'] });
       toast.success(`${dates.length} date${dates.length > 1 ? 's' : ''} unblocked`);
     },
   });
 
   const updateRequestMutation = useMutation({
     mutationFn: ({ id, type, status }) => {
-      if (type === 'booking') {
-        return base44.entities.Booking.update(id, { status });
-      }
-      return base44.entities.BookingDate.update(id, { status });
+      return base44.entities.Booking.update(id, { status });
     },
-    onSuccess: (_, { status, type }) => {
-      queryClient.invalidateQueries({ queryKey: ['booking-dates', selectedListingId] });
+    onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['owner-availability-bookings', selectedListingId] });
       queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
       toast.success(status === 'approved' ? 'Request approved' : 'Request declined');
@@ -159,15 +160,13 @@ export default function AvailabilityManager({ listings }) {
     const dateStr = format(day, 'yyyy-MM-dd');
     const past = isBefore(day, today);
     const blocked = blockedSet.has(dateStr);
-    const req = bookingDates.find(d => d.type === 'request' && d.date === dateStr);
     const isOccupied = occupiedDates.has(dateStr);
     const hasBookingPending = listingBookings.some(b => b.status === 'pending' && b.move_in_date === dateStr);
 
     if (past) return 'text-muted-foreground/30 cursor-default';
     if (isOccupied) return 'bg-green-100 text-green-700 rounded-lg font-medium cursor-default';
     if (blocked) return 'bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 cursor-pointer';
-    if (req?.status === 'approved') return 'bg-green-100 text-green-700 rounded-lg font-medium cursor-default';
-    if (req?.status === 'pending' || hasBookingPending) return 'bg-amber-100 text-amber-700 rounded-lg font-medium cursor-pointer';
+    if (hasBookingPending) return 'bg-amber-100 text-amber-700 rounded-lg font-medium cursor-pointer';
     return 'hover:bg-primary/10 rounded-lg cursor-pointer text-foreground';
   };
 
@@ -200,9 +199,9 @@ export default function AvailabilityManager({ listings }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
         {/* Calendar */}
-        <div className="lg:col-span-2 rounded-2xl border bg-card shadow-sm overflow-hidden">
+        <div className="lg:col-span-3 rounded-2xl border bg-card shadow-sm overflow-hidden">
           {/* Calendar header */}
           <div className="flex items-center justify-between px-5 py-4 border-b gap-3 flex-wrap">
             <div>
@@ -275,54 +274,8 @@ export default function AvailabilityManager({ listings }) {
           </div>
         </div>
 
-        {/* Right panel: pending requests */}
-        <div className="space-y-3">
-          <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b flex items-center justify-between">
-              <h4 className="font-semibold text-sm flex items-center gap-2">
-                <Hourglass className="w-4 h-4 text-amber-500" />
-                Pending Requests
-              </h4>
-              {pendingRequests.length > 0 && (
-                <Badge className="bg-amber-100 text-amber-800 border-amber-200">{pendingRequests.length}</Badge>
-              )}
-            </div>
-
-            {pendingRequests.length === 0 ? (
-              <div className="px-4 py-8 text-center">
-                <Calendar className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-                <p className="text-sm text-muted-foreground">No pending requests for this property.</p>
-              </div>
-            ) : (
-              <div className="divide-y max-h-[420px] overflow-y-auto">
-                {pendingRequests.sort((a,b) => a.date.localeCompare(b.date)).map(req => (
-                  <div key={req.id} className="px-4 py-3">
-                    <p className="text-sm font-semibold">{req.requester_name || 'Anonymous'}</p>
-                    <p className="text-xs text-muted-foreground">{format(new Date(req.date + 'T00:00:00'), 'MMMM d, yyyy')}</p>
-                    {req.note && <p className="text-xs italic text-muted-foreground mt-0.5 truncate">"{req.note}"</p>}
-                    <div className="flex gap-2 mt-2">
-                      <Button
-                        size="sm"
-                        className="flex-1 h-7 text-xs gap-1 bg-green-600 hover:bg-green-700"
-                        onClick={() => updateRequestMutation.mutate({ id: req.id, type: req.type, status: 'approved' })}
-                      >
-                        <CheckCircle className="w-3 h-3" /> Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="flex-1 h-7 text-xs gap-1"
-                        onClick={() => updateRequestMutation.mutate({ id: req.id, type: req.type, status: 'declined' })}
-                      >
-                        <XCircle className="w-3 h-3" /> Decline
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
+        {/* Right panel: summary */}
+        <div className="space-y-3 lg:col-span-1">
           {/* Blocked count summary */}
           <div className="rounded-2xl border bg-muted/40 px-4 py-3">
             <p className="text-xs text-muted-foreground">Blocked dates this month</p>

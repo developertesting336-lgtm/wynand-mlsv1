@@ -214,10 +214,9 @@ export default function Navbar() {
     <>
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link to="/" className="flex items-center gap-2 shrink-0">
-              <ShieldCheck className="w-7 h-7 text-primary" />
-              <span className="font-bold text-base tracking-tight">PV Verified</span>
+          <div className="flex items-center justify-between h-[100px]">
+            <Link to="/" className="flex items-center shrink-0">
+              <img src="/logo.png" alt="PV Verified Logo" className="h-[80px] w-auto object-contain" />
             </Link>
 
             <div className="hidden md:flex items-center gap-1">
@@ -240,81 +239,81 @@ export default function Navbar() {
                   {/* Notification Dropdown */}
                   {role !== 'admin' && (
                     <div className="relative" ref={notifRef}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="relative h-9 w-9 rounded-full"
-                      onClick={() => setIsNotifOpen(!isNotifOpen)}
-                    >
-                      <Bell className="h-5 w-5 text-muted-foreground" />
-                      {unreadCount > 0 && (
-                        <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                        </span>
-                      )}
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="relative h-9 w-9 rounded-full"
+                        onClick={() => setIsNotifOpen(!isNotifOpen)}
+                      >
+                        <Bell className="h-5 w-5 text-muted-foreground" />
+                        {unreadCount > 0 && (
+                          <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                          </span>
+                        )}
+                      </Button>
 
-                    {isNotifOpen && (
-                      <>
-                        <div className="absolute right-0 mt-2 w-80 bg-white border border-border shadow-xl rounded-xl z-50 py-2 max-h-[350px] overflow-y-auto">
-                          <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 pb-2">
-                            <span className="font-semibold text-sm">Notifications</span>
-                            {unreadCount > 0 && (
-                              <button
-                                onClick={handleMarkAllAsRead}
-                                className="text-xs text-primary hover:underline flex items-center gap-1 font-medium animate-fade-in"
-                              >
-                                <CheckCheck className="w-3.5 h-3.5" /> Mark all read
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="divide-y divide-border/50">
-                            {notifications.length === 0 ? (
-                              <div className="p-4 text-center text-xs text-muted-foreground">
-                                No notifications yet
-                              </div>
-                            ) : (
-                              notifications.map((n) => (
-                                <div
-                                  key={n.id}
-                                  className={`p-3 text-left transition-colors cursor-pointer hover:bg-muted/50 relative ${!n.is_read ? 'bg-primary/5' : ''}`}
-                                  onClick={() => handleMarkAsRead(n.id)}
+                      {isNotifOpen && (
+                        <>
+                          <div className="absolute right-0 mt-2 w-80 bg-white border border-border shadow-xl rounded-xl z-50 py-2 max-h-[350px] overflow-y-auto">
+                            <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 pb-2">
+                              <span className="font-semibold text-sm">Notifications</span>
+                              {unreadCount > 0 && (
+                                <button
+                                  onClick={handleMarkAllAsRead}
+                                  className="text-xs text-primary hover:underline flex items-center gap-1 font-medium animate-fade-in"
                                 >
-                                  {!n.is_read && (
-                                    <span className="absolute top-4 right-3 h-2 w-2 rounded-full bg-primary" />
-                                  )}
-                                  <div className="font-semibold text-xs text-foreground pr-4">{n.title}</div>
-                                  <div className="text-[11px] text-muted-foreground mt-0.5 pr-4 leading-normal">{n.message}</div>
-                                  <div className="text-[9px] text-muted-foreground/60 mt-1">
-                                    {new Date(n.created_at).toLocaleDateString(undefined, {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
-                                  </div>
+                                  <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="divide-y divide-border/50">
+                              {notifications.length === 0 ? (
+                                <div className="p-4 text-center text-xs text-muted-foreground">
+                                  No notifications yet
                                 </div>
-                              ))
+                              ) : (
+                                notifications.map((n) => (
+                                  <div
+                                    key={n.id}
+                                    className={`p-3 text-left transition-colors cursor-pointer hover:bg-muted/50 relative ${!n.is_read ? 'bg-primary/5' : ''}`}
+                                    onClick={() => handleMarkAsRead(n.id)}
+                                  >
+                                    {!n.is_read && (
+                                      <span className="absolute top-4 right-3 h-2 w-2 rounded-full bg-primary" />
+                                    )}
+                                    <div className="font-semibold text-xs text-foreground pr-4">{n.title}</div>
+                                    <div className="text-[11px] text-muted-foreground mt-0.5 pr-4 leading-normal">{n.message}</div>
+                                    <div className="text-[9px] text-muted-foreground/60 mt-1">
+                                      {new Date(n.created_at).toLocaleDateString(undefined, {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+
+                            {hasMoreNotifs && (
+                              <div className="p-2 border-t text-center bg-slate-50/50">
+                                <button
+                                  onClick={() => setNotifLimit(prev => prev + 10)}
+                                  className="text-xs text-primary hover:underline font-semibold w-full py-1.5"
+                                >
+                                  Load More
+                                </button>
+                              </div>
                             )}
                           </div>
-
-                          {hasMoreNotifs && (
-                            <div className="p-2 border-t text-center bg-slate-50/50">
-                              <button
-                                onClick={() => setNotifLimit(prev => prev + 10)}
-                                className="text-xs text-primary hover:underline font-semibold w-full py-1.5"
-                              >
-                                Load More
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
                   <Link to={role === 'admin' ? '/admin' : '/profile'} className="text-sm text-foreground hover:text-primary transition-colors max-w-[140px] truncate">
@@ -339,7 +338,7 @@ export default function Navbar() {
       </nav>
 
       {isOpen && (
-        <div className="md:hidden fixed inset-0 top-16 z-40 bg-black/20 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
+        <div className="md:hidden fixed inset-0 top-[100px] z-40 bg-black/20 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
           <div className="bg-white border-b shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="max-w-7xl mx-auto px-4 py-3 space-y-1">
               {visibleLinks.map(({ to, icon: Icon, label }) => (
@@ -350,7 +349,7 @@ export default function Navbar() {
                 </Link>
               ))}
               <div className="pt-2 pb-1 border-t mt-2">
-               {user ? (
+                {user ? (
                   <div className="flex flex-col gap-2 px-4 py-2">
                     <div className="flex items-center justify-between">
                       <div>
@@ -365,52 +364,52 @@ export default function Navbar() {
                     {/* Mobile Notifications Area */}
                     {role !== 'admin' && (
                       <div className="mt-3 border-t pt-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notifications ({unreadCount})</span>
-                        {unreadCount > 0 && (
-                          <button onClick={handleMarkAllAsRead} className="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
-                            <CheckCheck className="w-3.5 h-3.5" /> Mark all read
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="max-h-48 overflow-y-auto divide-y divide-border/50 border rounded-lg bg-muted/20">
-                        {notifications.length === 0 ? (
-                          <div className="p-3 text-center text-xs text-muted-foreground">
-                            No notifications yet
-                          </div>
-                        ) : (
-                          notifications.map((n) => (
-                            <div
-                              key={n.id}
-                              className={`p-3 text-left relative transition-colors cursor-pointer hover:bg-muted/50 ${!n.is_read ? 'bg-primary/5' : ''}`}
-                              onClick={() => handleMarkAsRead(n.id)}
-                            >
-                              {!n.is_read && (
-                                <span className="absolute top-4 right-3 h-2 w-2 rounded-full bg-primary" />
-                              )}
-                              <div className="font-semibold text-xs text-foreground pr-4">{n.title}</div>
-                              <div className="text-[11px] text-muted-foreground mt-0.5 pr-4 leading-normal">{n.message}</div>
-                              <div className="text-[9px] text-muted-foreground/60 mt-1">
-                                {new Date(n.created_at).toLocaleDateString()}
-                              </div>
-                            </div>
-                          ))
-                        )}
-
-                        {hasMoreNotifs && (
-                          <div className="p-2 border-t text-center bg-slate-50/50">
-                            <button
-                              onClick={() => setNotifLimit(prev => prev + 10)}
-                              className="text-xs text-primary hover:underline font-semibold w-full py-1"
-                            >
-                              Load More
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notifications ({unreadCount})</span>
+                          {unreadCount > 0 && (
+                            <button onClick={handleMarkAllAsRead} className="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
+                              <CheckCheck className="w-3.5 h-3.5" /> Mark all read
                             </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
+
+                        <div className="max-h-48 overflow-y-auto divide-y divide-border/50 border rounded-lg bg-muted/20">
+                          {notifications.length === 0 ? (
+                            <div className="p-3 text-center text-xs text-muted-foreground">
+                              No notifications yet
+                            </div>
+                          ) : (
+                            notifications.map((n) => (
+                              <div
+                                key={n.id}
+                                className={`p-3 text-left relative transition-colors cursor-pointer hover:bg-muted/50 ${!n.is_read ? 'bg-primary/5' : ''}`}
+                                onClick={() => handleMarkAsRead(n.id)}
+                              >
+                                {!n.is_read && (
+                                  <span className="absolute top-4 right-3 h-2 w-2 rounded-full bg-primary" />
+                                )}
+                                <div className="font-semibold text-xs text-foreground pr-4">{n.title}</div>
+                                <div className="text-[11px] text-muted-foreground mt-0.5 pr-4 leading-normal">{n.message}</div>
+                                <div className="text-[9px] text-muted-foreground/60 mt-1">
+                                  {new Date(n.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                            ))
+                          )}
+
+                          {hasMoreNotifs && (
+                            <div className="p-2 border-t text-center bg-slate-50/50">
+                              <button
+                                onClick={() => setNotifLimit(prev => prev + 10)}
+                                className="text-xs text-primary hover:underline font-semibold w-full py-1"
+                              >
+                                Load More
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                   </div>
                 ) : (
                   <Button className="w-full h-12 text-base" onClick={login}>Sign In</Button>

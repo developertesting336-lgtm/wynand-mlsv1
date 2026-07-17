@@ -505,6 +505,14 @@ export default function OwnerDashboard() {
   const openEditModal = (listing) => setEditingListing(listing);
   const closeEditModal = () => setEditingListing(null);
 
+  const getLeaseEndDate = (moveInDateStr, durationMonths) => {
+    if (!moveInDateStr) return null;
+    const moveInDate = new Date(moveInDateStr + 'T00:00:00');
+    const duration = Number(durationMonths) || 12;
+    moveInDate.setMonth(moveInDate.getMonth() + duration);
+    return moveInDate;
+  };
+
   useEffect(() => {
     base44.auth.me().then(async (u) => {
       setUser(u);
@@ -547,6 +555,23 @@ export default function OwnerDashboard() {
   });
   
   const renterProfileMap = Object.fromEntries(renterProfiles.map(p => [p.id, p]));
+
+  const { data: agentProfiles = [] } = useQuery({
+    queryKey: ['agent-profiles-supabase', allBookings.map(b => b.agent_id).filter(Boolean)],
+    queryFn: async () => {
+      if (allBookings.length === 0) return [];
+      const agentIds = allBookings.map(b => b.agent_id).filter(Boolean);
+      if (agentIds.length === 0) return [];
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, phone_number')
+        .in('id', agentIds);
+      return data || [];
+    },
+    enabled: allBookings.length > 0,
+  });
+
+  const agentProfileMap = Object.fromEntries(agentProfiles.map(p => [p.id, p]));
 
   // Owner only sees their own inquiries (where they are the listing_owner_id)
   const { data: allInquiries = [], isLoading: inquiriesLoading } = useQuery({
@@ -611,6 +636,7 @@ export default function OwnerDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] });
       toast.success('Booking updated');
       setUpdatingState({ id: null, action: null });
     },
@@ -645,6 +671,7 @@ export default function OwnerDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] });
       toast.success('Booking approved and lease agreement sent!');
       setUpdatingState({ id: null, action: null });
       setEditingBookingId(null);
@@ -666,6 +693,7 @@ export default function OwnerDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] });
       toast.success('Agreement updated and resent!');
       setUpdatingState({ id: null, action: null });
       setEditingAgreementId(null);
@@ -673,6 +701,28 @@ export default function OwnerDashboard() {
     },
     onError: (err) => {
       toast.error(`Failed to update agreement: ${err.message}`);
+      setUpdatingState({ id: null, action: null });
+    },
+  });
+
+  const endLeaseMutation = useMutation({
+    mutationFn: async (bookingId) => {
+      setUpdatingState({ id: bookingId, action: 'end_lease' });
+      const { error } = await supabase
+        .from('bookings')
+        .update({ end_lease: true, status: 'resolved', lease_status: 'ended', updated_date: new Date().toISOString() })
+        .eq('id', bookingId);
+      if (error) throw new Error(error.message);
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-bookings', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] });
+      toast.success('Lease ended successfully!');
+      setUpdatingState({ id: null, action: null });
+    },
+    onError: (err) => {
+      toast.error(`Failed to end lease: ${err.message}`);
       setUpdatingState({ id: null, action: null });
     },
   });
@@ -811,7 +861,7 @@ export default function OwnerDashboard() {
         setActiveTab(val);
         localStorage.setItem('owner_dashboard_active_tab', val);
       }}>
-        <TabsList className="mb-6 flex flex-wrap gap-2 justify-start">
+        <TabsList className="mb-6 flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl">
           <TabsTrigger value="properties" className="gap-1.5">
             <Home className="w-4 h-4" /> Properties ({myListings.length})
           </TabsTrigger>
@@ -938,7 +988,7 @@ export default function OwnerDashboard() {
           ) : (
             <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <Tabs value={bookingTab} onValueChange={(value) => setBookingTab(value)} className="space-y-4">
-                <TabsList className="flex flex-wrap gap-2 rounded-2xl bg-slate-50 p-2">
+                <TabsList className="flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl">
                   <TabsTrigger value="requests" className="gap-1.5">
                     <Hourglass className="w-4 h-4" /> Booking Requests
                     <span className="ml-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
@@ -1039,7 +1089,6 @@ export default function OwnerDashboard() {
                                   <tr className="hover:bg-muted/30 transition-colors">
                                     <td className="px-4 py-3 align-top">
                                       <div className="font-medium">{renter?.full_name || 'Anonymous'}</div>
-                                      <div className="text-xs text-muted-foreground">{renter?.email || 'No email'}</div>
                                       {verifiedTenantEmails.has(renter?.email) && (
                                         <span className="inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-full text-[10px] font-semibold bg-accent/10 text-accent border border-accent/20">
                                           <ShieldCheck className="w-3 h-3" /> Verified
@@ -1064,15 +1113,26 @@ export default function OwnerDashboard() {
                                       {b.lease_duration_months || 12} mo
                                     </td>
                                     <td className="px-4 py-3 align-top text-muted-foreground">
-                                       {b.monthly_budget_usd ? (
-                                         <>
-                                           ${b.monthly_budget_usd.toLocaleString()}
-                                           <span className="text-[10px] font-normal text-muted-foreground ml-0.5"> MXN</span>
-                                         </>
-                                       ) : '—'}
+                                      {b.monthly_budget_mxn || b.monthly_budget_usd ? (
+                                        <>
+                                          ${(b.monthly_budget_mxn || b.monthly_budget_usd).toLocaleString()}
+                                          <span className="text-[10px] font-normal text-muted-foreground ml-0.5"> MXN</span>
+                                        </>
+                                      ) : '—'}
                                     </td>
                                     <td className="px-4 py-3 align-top text-muted-foreground">
-                                      {b.agent_email || '—'}
+                                       {(() => {
+                                         const agent = agentProfileMap[b.agent_id];
+                                         if (agent) {
+                                           return (
+                                             <div>
+                                               <div className="font-medium text-foreground">{agent.full_name || 'Agent'}</div>
+                                               <div className="text-xs">{agent.email}</div>
+                                             </div>
+                                           );
+                                         }
+                                         return b.agent_email || '—';
+                                       })()}
                                     </td>
                                     <td className="px-4 py-3 align-top">
                                       <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${cfg.cls}`}>
@@ -1249,6 +1309,7 @@ export default function OwnerDashboard() {
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Lease</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Agreement</th>
+                              <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border">
@@ -1300,6 +1361,39 @@ export default function OwnerDashboard() {
                                       <span className="text-xs text-muted-foreground italic">Pending...</span>
                                     )}
                                   </td>
+                                  <td className="px-4 py-3 text-right">
+                                    {(() => {
+                                      if (b.end_lease) {
+                                        return (
+                                          <span className="text-xs text-muted-foreground font-semibold">Lease Ended</span>
+                                        );
+                                      }
+                                      const leaseEndDate = getLeaseEndDate(b.move_in_date, b.agreement_conditions?.leaseDuration || b.lease_duration_months);
+                                      const isLeaseOver = leaseEndDate ? leaseEndDate <= new Date() : false;
+                                      
+                                      if (isLeaseOver) {
+                                        return (
+                                          <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            className="text-xs font-semibold py-1 px-2.5 h-auto whitespace-nowrap"
+                                            onClick={() => endLeaseMutation.mutate(b.id)}
+                                            disabled={updatingState?.id === b.id && updatingState?.action === 'end_lease'}
+                                          >
+                                            {updatingState?.id === b.id && updatingState?.action === 'end_lease' ? (
+                                              <span className="flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Ending...</span>
+                                            ) : (
+                                              'End Lease'
+                                            )}
+                                          </Button>
+                                        );
+                                      }
+                                      
+                                      return (
+                                        <span className="text-xs text-emerald-600 font-semibold">Lease Active</span>
+                                      );
+                                    })()}
+                                  </td>
                                 </tr>
                               );
                             })}
@@ -1344,8 +1438,8 @@ export default function OwnerDashboard() {
                             {paginatedResolvedBookings.map(b => {
                               const renter = renterProfileMap[b.renter_id];
                               const listing = listingMap[b.listing_id] || allListingMap[b.listing_id];
-                              const statusLabel = b.status === 'declined' ? 'Declined' : b.status === 'cancelled' ? 'Cancelled' : b.status;
-                              const statusCls = b.status === 'declined' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700';
+                              const statusLabel = b.status === 'declined' ? 'Declined' : b.status === 'cancelled' ? 'Cancelled' : b.end_lease ? 'Lease Ended' : b.status;
+                              const statusCls = b.status === 'declined' ? 'bg-red-100 text-red-700' : b.end_lease ? 'bg-slate-100 text-slate-700 font-semibold' : 'bg-slate-100 text-slate-700';
                               return (
                                 <tr key={b.id} className="hover:bg-muted/30 transition-colors">
                                   <td className="px-4 py-3 font-medium">

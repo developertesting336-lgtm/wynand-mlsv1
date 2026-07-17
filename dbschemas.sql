@@ -1,26 +1,3 @@
-create table public.agent_payments (
-  id uuid not null default gen_random_uuid (),
-  agent_id uuid not null,
-  amount_cents integer not null,
-  currency text null default 'usd'::text,
-  plan text not null,
-  stripe_session_id text null,
-  stripe_payment_intent_id text null,
-  status text null default 'succeeded'::text,
-  created_date timestamp with time zone null default now(),
-  constraint agent_payments_pkey primary key (id),
-  constraint agent_payments_agent_id_fkey foreign KEY (agent_id) references profiles (id)
-) TABLESPACE pg_default;
-
-create index IF not exists idx_agent_payments_agent_id on public.agent_payments using btree (agent_id) TABLESPACE pg_default;
-
-create index IF not exists idx_agent_payments_created_date on public.agent_payments using btree (created_date) TABLESPACE pg_default;
-
-
-
-
-
-
 create table public.agent_referrals (
   id uuid not null,
   referral_code text not null,
@@ -47,84 +24,32 @@ create table public.agent_referrals (
 
 
 
-
-
-
 create table public.agent_reviews (
-  id uuid not null default gen_random_uuid(),
+  id uuid not null,
   rating numeric not null,
   comment text null,
   created_date timestamp with time zone null default now(),
   agent_id uuid null,
   reviewer_id uuid null,
   constraint agent_reviews_pkey primary key (id),
-  constraint agent_reviews_reviewer_id_fkey foreign KEY (reviewer_id) references profiles (id) on delete set null
+  constraint unique_review_per_agent unique (reviewer_id, agent_id)
 ) TABLESPACE pg_default;
 
-create index IF not exists idx_agent_reviews_agent_id on public.agent_reviews using btree (agent_id) TABLESPACE pg_default;
-
-create index IF not exists idx_agent_reviews_reviewer_id on public.agent_reviews using btree (reviewer_id) TABLESPACE pg_default;
 
 
 
 
 
-
-
-
-
-
-create table public.agent_subscriptions (
-  id uuid not null,
-  stripe_customer_id text null,
-  stripe_subscription_id text null,
-  plan text not null,
-  status text null default 'active'::text,
-  current_period_end timestamp with time zone null,
-  featured_listing_ids jsonb null default '[]'::jsonb,
-  created_date timestamp with time zone null default now(),
-  agent_id uuid null,
-  constraint agent_subscriptions_pkey primary key (id)
+create table public.audit_logs (
+  id uuid not null default gen_random_uuid (),
+  user_id uuid null,
+  action text not null,
+  entity_type text null,
+  entity_id text null,
+  created_at timestamp with time zone null default now(),
+  constraint audit_logs_pkey primary key (id),
+  constraint audit_logs_user_id_fkey foreign KEY (user_id) references profiles (id) on update CASCADE on delete set null
 ) TABLESPACE pg_default;
-
-create table public.subscriptions (
-  id uuid not null default gen_random_uuid(),
-  user_id uuid not null,
-  stripe_customer_id text null,
-  stripe_subscription_id text null,
-  plan text not null,
-  status text not null default 'active'::text,
-  current_period_end timestamp with time zone null,
-  featured_listing_ids jsonb not null default '[]'::jsonb,
-  last_payment_date timestamp with time zone null default now(),
-  created_date timestamp with time zone null default now(),
-  constraint subscriptions_pkey primary key (id),
-  constraint subscriptions_user_id_fkey foreign key (user_id) references profiles (id) on delete cascade
-) TABLESPACE pg_default;
-
-create unique index if not exists subscriptions_user_id_idx on public.subscriptions using btree (user_id) TABLESPACE pg_default;
-
-
-
-
-
-
-
-
-create table public.booking_dates (
-  id uuid not null,
-  listing_id text not null,
-  date date not null,
-  type text not null,
-  requester_name text null,
-  requester_email text null,
-  note text null,
-  status text null default 'pending'::text,
-  listing_owner_email text null,
-  created_date timestamp with time zone null default now(),
-  constraint booking_dates_pkey primary key (id)
-) TABLESPACE pg_default;
-
 
 
 
@@ -134,7 +59,7 @@ create table public.bookings (
   id uuid not null default gen_random_uuid (),
   move_in_date date not null,
   lease_duration_months integer null default 12,
-  monthly_budget_usd numeric null,
+  monthly_budget_mxn numeric null,
   message text null,
   status text null default 'pending'::text,
   created_date timestamp without time zone null default now(),
@@ -144,8 +69,10 @@ create table public.bookings (
   owner_id uuid not null default gen_random_uuid (),
   agent_id uuid null,
   referral_code text null,
-  anvil_eid text null,
   lease_status text null default 'pending'::text,
+  lease_pdf_url text null,
+  agreement_conditions jsonb null,
+  end_lease boolean not null default false,
   constraint bookings_pkey primary key (id),
   constraint bookings_agent_id_fkey foreign KEY (agent_id) references profiles (id),
   constraint bookings_listing_id_fkey foreign KEY (listing_id) references listings (id),
@@ -153,29 +80,12 @@ create table public.bookings (
   constraint bookings_renter_id_fkey foreign KEY (renter_id) references profiles (id) on delete CASCADE
 ) TABLESPACE pg_default;
 
-
-
-
-
-
-create table public.commission_payouts (
-  id uuid not null,
-  agent_email text not null,
-  agent_name text null,
-  referral_id text not null,
-  referral_code text null,
-  client_name text null,
-  listing_title text null,
-  commission_amount numeric not null,
-  payment_method text null default 'bank_transfer'::text,
-  payment_details text null,
-  status text null default 'pending'::text,
-  admin_notes text null,
-  paid_date timestamp with time zone null,
-  created_date timestamp with time zone null default now(),
-  constraint commission_payouts_pkey primary key (id)
-) TABLESPACE pg_default;
-
+create trigger audit_bookings_trigger
+after INSERT
+or DELETE
+or
+update on bookings for EACH row
+execute FUNCTION log_table_change ();
 
 
 
@@ -185,18 +95,12 @@ create table public.commission_payouts (
 
 
 create table public.favorites (
-  id uuid not null default gen_random_uuid(),
+  id uuid not null,
   listing_id text not null,
-  user_id uuid null,
   created_date timestamp with time zone null default now(),
-  constraint favorites_pkey primary key (id),
-  constraint favorites_user_id_fkey foreign KEY (user_id) references profiles (id) on delete cascade
+  user_id uuid not null,
+  constraint favorites_pkey primary key (user_id, listing_id)
 ) TABLESPACE pg_default;
-
-create index IF not exists idx_favorites_user_id on public.favorites using btree (user_id) TABLESPACE pg_default;
-
-create index IF not exists idx_favorites_listing_id on public.favorites using btree (listing_id) TABLESPACE pg_default;
-
 
 
 
@@ -209,17 +113,12 @@ create table public.inquiries (
   id uuid not null,
   listing_id uuid not null,
   listing_title text null,
-  name text not null,
-  email text not null,
-  whatsapp text null,
-  budget numeric null,
-  move_in_date date null,
   message text null,
-  referral_code text null,
   status text null default 'new'::text,
   created_date timestamp with time zone null default now(),
   agent_id uuid null,
   listing_owner_id uuid null,
+  tenant_id uuid null,
   constraint inquiries_pkey primary key (id)
 ) TABLESPACE pg_default;
 
@@ -244,9 +143,12 @@ create table public.inquiry_replies (
   constraint inquiry_replies_inquiry_id_fkey foreign KEY (inquiry_id) references inquiries (id) on delete CASCADE
 ) TABLESPACE pg_default;
 
+create index IF not exists idx_inquiry_replies_inquiry_id on public.inquiry_replies using btree (inquiry_id) TABLESPACE pg_default;
+
 create index IF not exists idx_inquiry_replies_recipient_type on public.inquiry_replies using btree (recipient_type) TABLESPACE pg_default;
 
-create index IF not exists idx_inquiry_replies_inquiry_id on public.inquiry_replies using btree (inquiry_id) TABLESPACE pg_default;
+
+
 
 
 
@@ -285,10 +187,30 @@ create table public.listings (
   agent_phone text null,
   agent_name text null,
   owner_phone text null,
+  blocked_dates jsonb null default '[]'::jsonb,
   constraint listings_pkey primary key (id)
 ) TABLESPACE pg_default;
 
 
+
+
+
+
+create table public.notifications (
+  id uuid not null default gen_random_uuid (),
+  user_id uuid not null,
+  title text not null,
+  message text not null,
+  type text not null default 'general'::text,
+  is_read boolean not null default false,
+  created_at timestamp with time zone null default now(),
+  constraint notifications_pkey primary key (id),
+  constraint notifications_user_id_fkey foreign KEY (user_id) references profiles (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists idx_notifications_user_id on public.notifications using btree (user_id) TABLESPACE pg_default;
+
+create index IF not exists idx_notifications_created_at on public.notifications using btree (created_at) TABLESPACE pg_default;
 
 
 
@@ -298,9 +220,8 @@ create table public.payments (
   id uuid not null default gen_random_uuid (),
   booking_id uuid null,
   payee_stripe_connect_id text null,
-  agent_id uuid null,
-  amount_cents integer null,
-  amount_usd numeric null,
+  amount_centavos integer null,
+  amount_mxn numeric null,
   currency text null,
   stripe_event_id text null,
   stripe_session_id text null,
@@ -312,20 +233,52 @@ create table public.payments (
   payout_status text null default 'pending'::text,
   payout_transfer_id text null,
   payout_error text null,
+  payment_type text null,
   constraint payments_pkey primary key (id),
   constraint payments_booking_id_fkey foreign KEY (booking_id) references bookings (id),
   constraint payments_listing_id_fkey foreign KEY (listing_id) references listings (id)
 ) TABLESPACE pg_default;
 
-create index IF not exists idx_payments_payout_status on public.payments using btree (payout_status) TABLESPACE pg_default;
-
-create index IF not exists idx_payments_payer_id on public.payments using btree (payer_id) TABLESPACE pg_default;
+create index IF not exists idx_payments_booking_id on public.payments using btree (booking_id) TABLESPACE pg_default;
 
 create index IF not exists idx_payments_payee_id on public.payments using btree (payee_id) TABLESPACE pg_default;
 
-create index IF not exists idx_payments_booking_id on public.payments using btree (booking_id) TABLESPACE pg_default;
+create index IF not exists idx_payments_payer_id on public.payments using btree (payer_id) TABLESPACE pg_default;
 
-create index IF not exists idx_payments_agent_id on public.payments using btree (agent_id) TABLESPACE pg_default;
+create index IF not exists idx_payments_payout_status on public.payments using btree (payout_status) TABLESPACE pg_default;
+
+create trigger audit_payments_trigger
+after INSERT
+or DELETE
+or
+update on payments for EACH row
+execute FUNCTION log_table_change ();
+
+
+
+
+
+
+
+create table public.platform_earnings (
+  id uuid not null default gen_random_uuid (),
+  user_id uuid not null,
+  booking_id uuid null,
+  amount_centavos integer not null,
+  amount_mxn numeric not null,
+  currency text not null default 'USD'::text,
+  payout_status text null,
+  payout_error text null,
+  created_date timestamp with time zone not null default now(),
+  constraint platform_earnings_pkey primary key (id),
+  constraint platform_earnings_booking_id_fkey foreign KEY (booking_id) references bookings (id),
+  constraint platform_earnings_user_id_fkey foreign KEY (user_id) references profiles (id)
+) TABLESPACE pg_default;
+
+create index IF not exists idx_platform_earnings_booking on public.platform_earnings using btree (booking_id) TABLESPACE pg_default;
+
+create index IF not exists idx_platform_earnings_user on public.platform_earnings using btree (user_id) TABLESPACE pg_default;
+
 
 
 
@@ -336,7 +289,6 @@ create index IF not exists idx_payments_agent_id on public.payments using btree 
 create table public.profiles (
   id uuid not null,
   email text not null,
-  password text null,
   full_name text null,
   role text null default 'renter'::text,
   google_id text null,
@@ -361,18 +313,23 @@ create table public.profiles (
 
 
 
+
 create table public.property_reviews (
   id uuid not null,
   listing_id uuid not null,
   listing_title text null,
-  reviewer_email text not null,
-  reviewer_name text null,
   rating numeric not null,
   comment text null,
   verified_tenant boolean null default true,
   created_date timestamp with time zone null default now(),
-  constraint property_reviews_pkey primary key (id)
+  reviewer_id uuid null,
+  constraint property_reviews_pkey primary key (id),
+  constraint unique_property_review unique (reviewer_id, listing_id)
 ) TABLESPACE pg_default;
+
+
+
+
 
 
 
@@ -383,8 +340,8 @@ create table public.referral_payments (
   booking_id uuid not null,
   payer_id uuid not null,
   referrer_id uuid not null,
-  amount_cents integer not null,
-  amount_usd numeric not null,
+  amount_centavos integer not null,
+  amount_mxn numeric not null,
   currency text not null default 'USD'::text,
   payout_status text not null default 'pending'::text,
   payout_transfer_id text null,
@@ -397,14 +354,11 @@ create table public.referral_payments (
   constraint referral_payments_referrer_id_fkey foreign KEY (referrer_id) references profiles (id)
 ) TABLESPACE pg_default;
 
-create index IF not exists idx_referral_payments_status on public.referral_payments using btree (payout_status) TABLESPACE pg_default;
+create index IF not exists idx_referral_payments_booking on public.referral_payments using btree (booking_id) TABLESPACE pg_default;
 
 create index IF not exists idx_referral_payments_referrer on public.referral_payments using btree (referrer_id) TABLESPACE pg_default;
 
-create index IF not exists idx_referral_payments_booking on public.referral_payments using btree (booking_id) TABLESPACE pg_default;
-
-
-
+create index IF not exists idx_referral_payments_status on public.referral_payments using btree (payout_status) TABLESPACE pg_default;
 
 
 
@@ -435,6 +389,53 @@ create table public.sale_referrals (
 
 
 
+create table public.subscriptions (
+  id uuid not null default gen_random_uuid (),
+  user_id uuid not null,
+  stripe_customer_id text null,
+  stripe_subscription_id text null,
+  plan text not null,
+  status text not null default 'active'::text,
+  current_period_end timestamp with time zone null,
+  featured_listing_ids jsonb not null default '[]'::jsonb,
+  created_date timestamp with time zone null default now(),
+  last_payment_date timestamp with time zone null default now(),
+  amount_centavos integer not null default 0,
+  amount numeric not null default 0,
+  constraint subscriptions_pkey primary key (id),
+  constraint subscriptions_user_id_fkey foreign KEY (user_id) references profiles (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create unique INDEX IF not exists subscriptions_user_id_idx on public.subscriptions using btree (user_id) TABLESPACE pg_default;
+
+create trigger audit_subscriptions_trigger
+after INSERT
+or DELETE
+or
+update on subscriptions for EACH row
+execute FUNCTION log_table_change ();
+
+
+
+
+
+
+create table public.user_push_subscriptions (
+  id uuid not null default gen_random_uuid (),
+  user_id uuid not null,
+  endpoint text not null,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamp with time zone null default now(),
+  constraint user_push_subscriptions_pkey primary key (id),
+  constraint user_push_subscriptions_endpoint_unique unique (endpoint),
+  constraint user_push_subscriptions_user_id_fkey foreign KEY (user_id) references profiles (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists idx_user_push_subscriptions_user_id on public.user_push_subscriptions using btree (user_id) TABLESPACE pg_default;
+
+
+
 
 
 
@@ -442,161 +443,28 @@ create table public.sale_referrals (
 create table public.verifications (
   id uuid not null default gen_random_uuid (),
   user_id uuid not null,
-  id_document_url text not null,
+  id_document_url text null,
   employment_proof_url text null,
   veriff_session_id text null,
   veriff_session_url text null,
-  status text not null default 'new'::text,
   created_date timestamp with time zone null default now(),
   updated_date timestamp with time zone null default now(),
-  powens_connection_id text null,
-  powens_account_id text null,
-  belvo_link_id text null,
-  belvo_account_id text null,
-  belvo_purpose text null,
-  balance_amount numeric null default 0,
-  monthly_income numeric null default 0,
+  monthly_income numeric null,
   employer_name text null,
-  bank_statement_verification text null default 'pending'::text,
-  employment_verification text null default 'pending'::text,
-  id_verification text null default 'new'::text,
-  bank_name text null,
-  account_last_4 text null,
-  account_holder_name text null,
-  account_type text null,
-  currency text null default 'MXN'::text,
-  verification_status text null default 'pending'::text,
-  constraint verifications_pkey primary key (id),
-  constraint verifications_user_id_key unique (user_id),
-  constraint verifications_user_id_fkey foreign key (user_id) references profiles (id) on delete CASCADE
+  id_verification text null,
+  employment_verification text null,
+  bank_statement_verification text null,
+  belvo_link_id text null,
+  belvo_institution_id text null,
+  total_income numeric null,
+  total_expenses numeric null,
+  fiscal_year numeric null,
+  financial_currency text null,
+  financial_document_type text null,
+  identity_documents json null,
+  bank_documents json null,
+  property_documents jsonb null,
+  constraint tenant_verifications_pkey primary key (id),
+  constraint tenant_verifications_user_id_key unique (user_id),
+  constraint tenant_verifications_user_id_fkey foreign KEY (user_id) references profiles (id) on delete CASCADE
 ) TABLESPACE pg_default;
-
--- Notification system
-create table public.notifications (
-  id uuid not null default gen_random_uuid (),
-  user_id uuid not null,
-  title text not null,
-  message text not null,
-  type text not null default 'general'::text,
-  is_read boolean not null default false,
-  created_at timestamp with time zone null default now(),
-  constraint notifications_pkey primary key (id),
-  constraint notifications_user_id_fkey foreign key (user_id) references profiles (id) on delete CASCADE
-) TABLESPACE pg_default;
-
-create index if not exists idx_notifications_user_id on public.notifications using btree (user_id) TABLESPACE pg_default;
-create index if not exists idx_notifications_created_at on public.notifications using btree (created_at) TABLESPACE pg_default;
-
--- Enable Row Level Security
-alter table public.notifications enable row level security;
-
--- Policies for RLS
-create policy "Users can view their own notifications"
-  on public.notifications for select
-  using (auth.uid() = user_id);
-
-create policy "Users can update their own notifications"
-  on public.notifications for update
-  using (auth.uid() = user_id);
-
-create policy "System can insert notifications"
-  on public.notifications for insert
-  with check (true);
-
--- Enable realtime for notifications
-alter publication supabase_realtime add table public.notifications;
-
--- Database function to check expiring subscriptions and create reminders
-create or replace function public.check_and_create_subscription_reminders()
-returns void
-language plpgsql
-security definer
-as $$
-declare
-  sub record;
-  days_remaining integer;
-begin
-  for sub in 
-    select s.user_id, s.current_period_end, s.plan, p.full_name, p.email
-    from public.subscriptions s
-    join public.profiles p on s.user_id = p.id
-    where s.status = 'active'
-      and s.current_period_end is not null
-      and s.current_period_end >= now()
-      and s.current_period_end <= (now() + interval '3 days')
-  loop
-    -- Calculate days remaining
-    days_remaining := extract(day from (sub.current_period_end - now()))::integer;
-    if days_remaining < 0 then
-      days_remaining := 0;
-    end if;
-
-    -- Avoid duplicate reminders for the same subscription expiration:
-    -- check if we've sent a subscription_expiry notification in the last 7 days to this user
-    if not exists (
-      select 1 
-      from public.notifications 
-      where user_id = sub.user_id 
-        and type = 'subscription_expiry'
-        and created_at >= (now() - interval '7 days')
-    ) then
-      insert into public.notifications (user_id, title, message, type)
-      values (
-        sub.user_id,
-        'Subscription Renewal Reminder',
-        format('Your %s plan subscription is set to renew on %s. Only %s days left!', 
-               upper(sub.plan), 
-               to_char(sub.current_period_end, 'Mon DD, YYYY'),
-               days_remaining + 1),
-        'subscription_expiry'
-      );
-    end if;
-  end loop;
-end;
-$$;
-
--- Schedule the cron job to run daily at midnight and call the Deno Edge Function (requires pg_cron and pg_net)
--- Note: Replace <your-project-ref> and <your-service-role-key> with your actual credentials.
-select cron.schedule(
-  'check-expiring-subscriptions-edge',
-  '0 0 * * *',
-  $$
-  select net.http_post(
-    url := 'https://<your-project-ref>.supabase.co/functions/v1/subscription-reminder',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer <your-service-role-key>"}'::jsonb,
-    body := '{}'::jsonb
-  );
-  $$
-);
-
-
--- Web Push subscriptions
-create table public.user_push_subscriptions (
-  id uuid not null default gen_random_uuid (),
-  user_id uuid not null references public.profiles(id) on delete cascade,
-  endpoint text not null,
-  p256dh text not null,
-  auth text not null,
-  created_at timestamp with time zone default now(),
-  constraint user_push_subscriptions_pkey primary key (id),
-  constraint user_push_subscriptions_endpoint_unique unique (endpoint)
-) TABLESPACE pg_default;
-
-create index if not exists idx_user_push_subscriptions_user_id on public.user_push_subscriptions using btree (user_id) TABLESPACE pg_default;
-
--- Enable Row Level Security
-alter table public.user_push_subscriptions enable row level security;
-
--- Policies for user_push_subscriptions
-create policy "Users can manage their own push subscriptions"
-  on public.user_push_subscriptions for all
-  using (auth.uid() = user_id);
-
-
-
-
-
-
-
-
-

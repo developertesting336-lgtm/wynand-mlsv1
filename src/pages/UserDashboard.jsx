@@ -393,9 +393,15 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
                     {b.lease_duration_months} months
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
-                      <Icon className="w-3.5 h-3.5" /> {label}
-                    </span>
+                    {b.end_lease ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-slate-100 text-slate-700 border-slate-200">
+                        <CheckCircle className="w-3.5 h-3.5 text-slate-500" /> Lease Ended
+                      </span>
+                    ) : (
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
+                        <Icon className="w-3.5 h-3.5" /> {label}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {b.lease_pdf_url ? (
@@ -911,7 +917,7 @@ export default function UserDashboard() {
         setActiveTab(val);
         localStorage.setItem('tenant_dashboard_active_tab', val);
       }}>
-        <TabsList className="mb-8 flex flex-wrap gap-2 justify-start">
+        <TabsList className="mb-8 flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl">
           <TabsTrigger value="favorites" className="gap-1.5">
             <Heart className="w-4 h-4" /> Favorites
             {savedListings.length > 0 && (
