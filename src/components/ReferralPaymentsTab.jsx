@@ -97,7 +97,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
 
   const totalEarnings = filteredReferralPayments
     .filter(p => p.payout_status === 'paid')
-    .reduce((sum, p) => sum + (p.amount_cents || 0), 0);
+    .reduce((sum, p) => sum + (p.amount_centavos || 0), 0);
 
   const totalPages = Math.max(1, Math.ceil(filteredReferralPayments.length / pageSize));
   const paginatedReferralPayments = filteredReferralPayments.slice((page - 1) * pageSize, page * pageSize);
@@ -164,7 +164,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
             <div>
               <p className="text-sm text-muted-foreground">Total Earnings</p>
               <p className="text-3xl font-bold text-emerald-600">
-                ${(totalEarnings / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                ${(totalEarnings / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-1"> MXN</span>
               </p>
             </div>
             <div className="text-right">
@@ -183,7 +183,6 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
               <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Client</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Referral Type</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Commission %</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Amount Earned</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Date</th>
@@ -192,7 +191,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
           <tbody className="divide-y divide-border">
             {paginatedReferralPayments.map(p => {
               const listing = listingMap[p.listingId];
-              const amountUsd = p.amount_cents ? (p.amount_cents / 100) : 0;
+              const amountUsd = p.amount_centavos ? (p.amount_centavos / 100) : 0;
               const commissionPct = p.referral?.commission_pct || 15;
               const clientName = p.payer?.full_name || p.referral?.client_name || 'Unknown';
               const clientEmail = p.payer?.email || p.referral?.client_email || '';
@@ -218,9 +217,8 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
                       {referralType}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-semibold">{commissionPct}%</td>
                   <td className="px-4 py-3 font-semibold text-emerald-600">
-                    ${amountUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    ${amountUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-1"> MXN</span>
                   </td>
                   <td className="px-4 py-3">
                     {p.payout_status === 'paid' ? (

@@ -15,6 +15,45 @@ export const AuthProvider = ({ children }) => {
   // Handles: initial page load (INITIAL_SESSION), new logins (SIGNED_IN),
   // token refreshes (TOKEN_REFRESHED), and logouts (SIGNED_OUT).
   useEffect(() => {
+    let mounted = true
+
+    // Retrieve active session immediately on mount to avoid stuck loading states
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (mounted) {
+          if (session?.user) {
+            try {
+              const currentUser = await auth.me()
+              if (mounted) {
+                setUser(currentUser)
+                setIsAuthenticated(true)
+              }
+            } catch (error) {
+              console.error('Error fetching profile during init:', error)
+              if (mounted) {
+                setUser(null)
+                setIsAuthenticated(false)
+              }
+            }
+          } else {
+            if (mounted) {
+              setUser(null)
+              setIsAuthenticated(false)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to get initial session:', error)
+      } finally {
+        if (mounted) {
+          setIsLoadingAuth(false)
+        }
+      }
+    }
+
+    initializeAuth()
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email)
@@ -27,23 +66,37 @@ export const AuthProvider = ({ children }) => {
           if (session?.user) {
             try {
               const currentUser = await auth.me()
-              setUser(currentUser)
-              setIsAuthenticated(true)
+              if (mounted) {
+                setUser(currentUser)
+                setIsAuthenticated(true)
+              }
             } catch (error) {
               console.error('Error fetching profile after auth change:', error)
+              if (mounted) {
+                setUser(null)
+                setIsAuthenticated(false)
+              }
+            }
+          } else {
+            if (mounted) {
               setUser(null)
               setIsAuthenticated(false)
             }
-          } else {
-            // INITIAL_SESSION with no active session — user is logged out
+          }
+          if (mounted) {
+            setIsLoadingAuth(false)
+          }
+        } else if (event === 'SIGNED_OUT') {
+          if (mounted) {
             setUser(null)
             setIsAuthenticated(false)
+            setIsLoadingAuth(false)
           }
-          setIsLoadingAuth(false)
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null)
-          setIsAuthenticated(false)
-          setIsLoadingAuth(false)
+        } else {
+          // Fallback to ensure loading ends for any other events (e.g. USER_UPDATED)
+          if (mounted) {
+            setIsLoadingAuth(false)
+          }
         }
       }
     )
@@ -53,6 +106,7 @@ export const AuthProvider = ({ children }) => {
     window.addEventListener('app:open-auth-modal', handler)
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
       window.removeEventListener('app:open-auth-modal', handler)
     }

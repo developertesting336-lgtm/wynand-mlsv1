@@ -53,7 +53,7 @@ export default function AgentDashboard() {
   const [bookingsPage, setBookingsPage] = useState(1);
   const [bookingsPageSize, setBookingsPageSize] = useState(10);
   const queryClient = useQueryClient();
-  const { onboardingLoading, handleStripeOnboard } = useStripeOnboarding(null);
+  const { onboardingLoading, handleStripeOnboard } = useStripeOnboarding(user);
 
   useEffect(() => {
     base44.auth.me().then(setUser).catch(() => {});
@@ -361,7 +361,7 @@ export default function AgentDashboard() {
                               {NEIGHBORHOOD_LABELS[listing.neighborhood] || listing.neighborhood}
                             </td>
                             <td className="px-4 py-3 font-semibold whitespace-nowrap">
-                              ${listing.price_usd?.toLocaleString() || '—'}/mo
+                              ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString() || '—'}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
                             </td>
                             <td className="px-4 py-3 text-center font-bold">{listing.views || 0}</td>
                             <td className="px-4 py-3">

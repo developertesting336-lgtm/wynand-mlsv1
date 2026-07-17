@@ -649,7 +649,7 @@ export default function TenantVerification({ user, onUserUpdated }) {
 
         {employmentVerificationStatus !== 'approved' && (
           <div className="flex justify-end">
-            <Button size="lg" onClick={() => connectBank('employment')} disabled={connectingPurpose !== null} className="gap-2">
+            <Button size="lg" onClick={() => connectBank('employment')} disabled={true} className="gap-2">
               {connectingPurpose === 'employment' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Building2 className="w-5 h-5" />}
               {connectingPurpose === 'employment' ? 'Connecting...' : 'Connect Bank for Employment'}
               <ExternalLink className="w-4 h-4 ml-0.5" />
@@ -730,7 +730,7 @@ export default function TenantVerification({ user, onUserUpdated }) {
 
         {verification?.bank_statement_verification !== 'approved' && (
           <div className="flex justify-end">
-            <Button size="lg" onClick={() => connectBank('bank_statement')} disabled={connectingPurpose !== null} className="gap-2">
+            <Button size="lg" onClick={() => connectBank('bank_statement')} disabled={true} className="gap-2">
               {connectingPurpose === 'bank_statement' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Building2 className="w-5 h-5" />}
               {connectingPurpose === 'bank_statement' ? 'Connecting...' : 'Connect SAT for Financial Statements'}
               <ExternalLink className="w-4 h-4 ml-0.5" />

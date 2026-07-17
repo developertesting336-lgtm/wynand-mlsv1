@@ -123,7 +123,7 @@ function PropertiesTable({ listings, pendingBookingsCount, bookingStatusMap, onE
                   {NEIGHBORHOOD_LABELS[l.neighborhood] || l.neighborhood}
                 </td>
                 <td className="px-4 py-3 font-semibold whitespace-nowrap">
-                  ${l.price_usd?.toLocaleString()}<span className="text-muted-foreground font-normal">/mo</span>
+                  ${l.price_mxn?.toLocaleString() || l.price_usd?.toLocaleString()}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span><span className="text-muted-foreground font-normal">/mo</span>
                 </td>
                 <td className="px-4 py-3 text-center font-bold">{l.views || 0}</td>
                 <td className="px-4 py-3">
@@ -197,7 +197,7 @@ function BookingRequestCard({ booking, listing, onApprove, onDecline, verifiedTe
               </p>
               {booking.monthly_budget_usd && (
                 <p>
-                  Monthly Budget: <span className="font-semibold text-foreground">${booking.monthly_budget_usd} USD</span>
+                  Monthly Budget: <span className="font-semibold text-foreground">${booking.monthly_budget_usd}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span></span>
                 </p>
               )}
               {booking.agent_email && (
@@ -387,20 +387,42 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
           <tbody className="divide-y divide-border">
             {paginatedPayments.map(p => {
               const booking = bookingMap[p.booking_id];
-              const amountUsd = p.amount_cents ? (p.amount_cents / 100) : 0;
+              const amountUsd = p.amount_centavos ? (p.amount_centavos / 100) : 0;
               const datePart = p.created_date ? format(new Date(p.created_date), 'MMMM d, yyyy') : 'N/A';
               const timePart = p.created_date ? format(new Date(p.created_date), 'h:mm a') : '';
               
               const dbCommissionPct = p.commission_paid_percentage ?? p.commision_paid_percentage;
-              const hasReferral = dbCommissionPct != null ? dbCommissionPct > 0 : referralBookingIds.has(p.booking_id);
-              const commissionPct = dbCommissionPct ?? (hasReferral ? 15 : 0);
-              const ownerPct = hasReferral ? 0.8 : 0.9;
-              
-              let description = hasReferral ? '80% after agent + platform fees' : '90% after platform fee';
-              if (commissionPct === 15) {
-                description = '80% after 15% for agent, 5% for platform';
-              } else if (commissionPct > 0) {
-                description = `80% after ${commissionPct}% for agent, 5% for platform`;
+              const hasAgentOrReferral = !!booking?.agent_id || (dbCommissionPct != null ? Number(dbCommissionPct) > 0 : referralBookingIds.has(p.booking_id));
+
+              const conditions = booking?.agreement_conditions || {};
+              const depositAmount = parseFloat(conditions.securityDepositAmount || 0);
+              const rentAmount = parseFloat(conditions.monthlyRent?.toString().replace(/[^0-9.]/g, '') || 0);
+
+              let ownerDisplayAmount = 0;
+              let description = '';
+
+              if (rentAmount > 0) {
+                if (hasAgentOrReferral) {
+                  ownerDisplayAmount = depositAmount + rentAmount;
+                  description = 'Deposit + First Month Rent (Last month rent went to Agent commission)';
+                } else {
+                  const totalPaidByTenant = depositAmount + (rentAmount * 2);
+                  const platformFee = totalPaidByTenant * 0.10;
+                  const iva = platformFee * 0.16;
+                  ownerDisplayAmount = totalPaidByTenant - platformFee - iva;
+                  description = 'Net payout after 10% platform fee and 16% IVA';
+                }
+              } else {
+                // Fallback to database payout amount split if agreement_conditions are not set
+                if (hasAgentOrReferral) {
+                  ownerDisplayAmount = amountUsd * 0.80;
+                  description = '80% of total payment';
+                } else {
+                  const platformFee = amountUsd * 0.10;
+                  const iva = platformFee * 0.16;
+                  ownerDisplayAmount = amountUsd - platformFee - iva;
+                  description = 'Net payout after 10% platform fee and 16% IVA';
+                }
               }
 
               return (
@@ -419,7 +441,7 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
                   </td>
                   <td className="px-4 py-3">
                     <div className="font-semibold text-emerald-600">
-                      ${(amountUsd * ownerPct).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {p.currency?.toUpperCase() || 'USD'}
+                      ${ownerDisplayAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
                       {description}
@@ -1042,7 +1064,12 @@ export default function OwnerDashboard() {
                                       {b.lease_duration_months || 12} mo
                                     </td>
                                     <td className="px-4 py-3 align-top text-muted-foreground">
-                                      {b.monthly_budget_usd ? `$${b.monthly_budget_usd.toLocaleString()}` : '—'}
+                                       {b.monthly_budget_usd ? (
+                                         <>
+                                           ${b.monthly_budget_usd.toLocaleString()}
+                                           <span className="text-[10px] font-normal text-muted-foreground ml-0.5"> MXN</span>
+                                         </>
+                                       ) : '—'}
                                     </td>
                                     <td className="px-4 py-3 align-top text-muted-foreground">
                                       {b.agent_email || '—'}

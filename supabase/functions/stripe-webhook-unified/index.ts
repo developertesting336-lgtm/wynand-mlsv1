@@ -99,7 +99,7 @@ serve(async (req: any) => {
       const metadata = session.metadata || {};
       const stripeSessionId = session.id || null;
       const amountCents = session.amount_total || null;
-      const currency = session.currency || null;
+      const currency = (session.currency || 'mxn').toLowerCase();
       const paymentMode = metadata.mode || session.mode || null;
       const isBookingPayment = metadata.type === 'booking' || !!metadata.bookingId;
       const isSubscriptionPayment = paymentMode === 'subscription' || metadata.type === 'subscription' || metadata.subscription === 'true';
@@ -145,7 +145,7 @@ serve(async (req: any) => {
                   stripe_customer_id: session.customer || null,
                   stripe_subscription_id: stripeSubscriptionId,
                   plan: plan,
-                  amount_cents: amountCents,
+                  amount_centavos: amountCents,
                   amount: amountCents ? amountCents / 100 : null,
                   status: 'active',
                   current_period_end: session.current_period_end ? new Date(session.current_period_end * 1000).toISOString() : null,
@@ -159,7 +159,7 @@ serve(async (req: any) => {
                 stripe_customer_id: session.customer || null,
                 stripe_subscription_id: stripeSubscriptionId,
                 plan: plan,
-                amount_cents: amountCents,
+                amount_centavos: amountCents,
                 amount: amountCents ? amountCents / 100 : null,
                 status: 'active',
                 current_period_end: session.current_period_end ? new Date(session.current_period_end * 1000).toISOString() : null,
@@ -175,18 +175,7 @@ serve(async (req: any) => {
             }
           }
 
-          if (agentProfile) {
-            await supabase.from('agent_payments').insert({
-              agent_id: agentProfile.id,
-              amount_cents: amountCents,
-              currency: currency,
-              plan: plan,
-              stripe_session_id: stripeSessionId,
-              stripe_payment_intent_id: session.payment_intent || null,
-              status: 'succeeded',
-            });
-            console.log('Recorded agent payment for subscription:', agentEmail);
-          }
+
 
           await supabase
             .from('profiles')
@@ -230,7 +219,7 @@ serve(async (req: any) => {
                   stripe_customer_id: stripeCustomerId,
                   stripe_subscription_id: stripeSubscriptionId,
                   plan: plan,
-                  amount_cents: amountCents,
+                  amount_centavos: amountCents,
                   amount: amountCents ? amountCents / 100 : null,
                   status: 'active',
                   current_period_end: currentPeriodEnd,
@@ -244,7 +233,7 @@ serve(async (req: any) => {
                 stripe_customer_id: stripeCustomerId,
                 stripe_subscription_id: stripeSubscriptionId,
                 plan: plan,
-                amount_cents: amountCents,
+                amount_centavos: amountCents,
                 amount: amountCents ? amountCents / 100 : null,
                 status: 'active',
                 current_period_end: currentPeriodEnd,
@@ -321,18 +310,7 @@ serve(async (req: any) => {
             }
           }
 
-          if (agentProfile) {
-            await supabase.from('agent_payments').insert({
-              agent_id: agentProfile.id,
-              amount_cents: amountCents,
-              currency: currency,
-              plan: 'feature_boost',
-              stripe_session_id: stripeSessionId,
-              stripe_payment_intent_id: session.payment_intent || null,
-              status: 'succeeded',
-            });
-            console.log('Recorded agent payment for feature boost:', agentEmail, listingId);
-          }
+
         }
       }
 
@@ -394,10 +372,10 @@ serve(async (req: any) => {
             payer_id: payerId,
             payee_id: ownerId,
             payee_stripe_connect_id: ownerStripeId,
-            amount_cents: amountCents,
-            amount_usd: amountCents ? (amountCents / 100) : null,
+            amount_centavos: amountCents,
+            amount_mxn: amountCents ? (amountCents / 100) : null,
             payout_status: 'pending',
-            currency: currency,
+            currency: 'mxn',
             stripe_event_id: event.id,
             stripe_session_id: stripeSessionId,
             stripe_payment_intent_id: paymentIntentId,

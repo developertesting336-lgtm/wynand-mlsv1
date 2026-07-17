@@ -18,7 +18,7 @@ export default function MobileCtaBar({ listing, ownerRole = 'owner', refCode = '
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-2xl px-4 py-3 flex gap-3">
         <div className="flex-1 min-w-0">
           <p className="font-bold text-lg text-foreground">
-            ${listing.price_usd?.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/mo</span>
+            MXN ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/mo</span>
           </p>
         </div>
         <Button

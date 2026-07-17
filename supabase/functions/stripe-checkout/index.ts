@@ -112,14 +112,14 @@ serve(async (req) => {
       });
     }
 
-    // Charge the renter for deposit + first month rent only.
+    // Charge the renter for deposit + first month rent + last month rent.
     // Platform fee is taken from the amount paid to the connected account.
     // Use agreement_conditions from booking for deposit and rent
     const agreement = booking.agreement_conditions || {};
     const depositAmount = parseFloat(agreement.securityDepositAmount) || 0;
-    const rentAmount = parseFloat((agreement.monthlyRent || '').replace(/[^0-9.]/g, '')) || 0;
+    const rentAmount = parseFloat((agreement.monthlyRent || '').toString().replace(/[^0-9.]/g, '')) || 0;
     const platformFeeAmount = Math.round(rentAmount * 0.10 * 100) / 100;
-    const amountToCharge = depositAmount + rentAmount;
+    const amountToCharge = depositAmount + (rentAmount * 2);
     const amountCents = Math.round(amountToCharge * 100);
     const platformFeeCents = Math.round(platformFeeAmount * 100);
 
@@ -129,7 +129,7 @@ serve(async (req) => {
     if (depositAmount > 0) {
       lineItems.push({
         price_data: {
-          currency: 'usd',
+          currency: 'mxn',
           product_data: {
             name: 'Deposit',
             description: `Deposit for ${listing.title}`,
@@ -142,10 +142,21 @@ serve(async (req) => {
     if (rentAmount > 0) {
       lineItems.push({
         price_data: {
-          currency: 'usd',
+          currency: 'mxn',
           product_data: {
             name: 'First Month Rent',
             description: `First month rent for ${listing.title} · platform fee is added on rent`,
+          },
+          unit_amount: Math.round(rentAmount * 100),
+        },
+        quantity: 1,
+      });
+      lineItems.push({
+        price_data: {
+          currency: 'mxn',
+          product_data: {
+            name: 'Last Month Rent',
+            description: `Last month rent for ${listing.title}`,
           },
           unit_amount: Math.round(rentAmount * 100),
         },
@@ -176,10 +187,10 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       url: session.url,
-      amount_usd: amountToCharge,
-      amount_cents: amountCents,
+      amount_mxn: amountToCharge,
+      amount_centavos: amountCents,
       platform_fee_cents: platformFeeCents,
-      currency: 'USD',
+      currency: 'MXN',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

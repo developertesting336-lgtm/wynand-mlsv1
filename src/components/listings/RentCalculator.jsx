@@ -38,12 +38,12 @@ export default function RentCalculator({ baseRent = 0 }) {
           {/* Base rent (read-only) */}
           <div className="flex items-center justify-between py-3 border-b">
             <span className="text-sm font-medium">Base Rent</span>
-            <span className="font-bold">${(parseFloat(baseRent) || 0).toLocaleString()}/mo</span>
+            <span className="font-bold">MXN ${(parseFloat(baseRent) || 0).toLocaleString()}/mo</span>
           </div>
 
           {/* Utility inputs */}
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Estimated Utilities (USD/mo)</p>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Estimated Utilities (MXN/mo)</p>
             {UTILITIES.map(u => (
               <div key={u.key} className="flex items-center gap-3">
                 <Label className="text-sm w-36 shrink-0 text-muted-foreground">{u.label}</Label>
@@ -66,15 +66,15 @@ export default function RentCalculator({ baseRent = 0 }) {
           <div className="rounded-xl bg-muted/60 p-4 space-y-2">
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Rent</span>
-              <span>${(parseFloat(baseRent) || 0).toLocaleString()}</span>
+              <span>MXN ${(parseFloat(baseRent) || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Utilities</span>
-              <span>+${utilsTotal.toLocaleString()}</span>
+              <span>+MXN {utilsTotal.toLocaleString()}</span>
             </div>
             <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
               <span>Estimated Total</span>
-              <span className="text-primary">${total.toLocaleString()}/mo</span>
+              <span className="text-primary">MXN {total.toLocaleString()}/mo</span>
             </div>
           </div>
 

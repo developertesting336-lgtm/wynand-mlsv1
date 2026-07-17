@@ -70,7 +70,7 @@ function BookingRow({ booking, listing, onPay }) {
   };
   const { label, icon: Icon, cls } = statusConfig[booking.status] || statusConfig.pending;
   const depositAmount = listing?.deposit_amount || 0;
-  const rentAmount = listing?.price_usd || 0;
+  const rentAmount = listing?.price_mxn || listing?.price_usd || 0;
   const subtotal = depositAmount + rentAmount;
   const totalAmount = subtotal;
 
@@ -99,7 +99,7 @@ function BookingRow({ booking, listing, onPay }) {
               <p className="text-xs text-slate-500">Deposit and first month rent.</p>
             </div>
             <p className="text-sm font-semibold text-slate-900">
-              ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
             </p>
           </div>
 
@@ -107,13 +107,13 @@ function BookingRow({ booking, listing, onPay }) {
             <li className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
               <span>Deposit</span>
               <span className="font-semibold text-slate-900">
-                ${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
               </span>
             </li>
             <li className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
               <span>First Month Rent</span>
               <span className="font-semibold text-slate-900">
-                ${rentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${rentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
               </span>
             </li>
           </ul>
@@ -125,7 +125,7 @@ function BookingRow({ booking, listing, onPay }) {
               onClick={() => onPay(booking.id)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm transition-transform active:scale-[0.98]"
             >
-              Pay USD ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Pay ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal opacity-90 ml-0.5"> MXN</span>
             </Button>
           </div>
         </div>
@@ -368,8 +368,8 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
               // Use agreement_conditions for payment amounts
               const conditions = b.agreement_conditions || {};
               const depositAmount = parseFloat(conditions.securityDepositAmount) || 0;
-              const rentAmount = parseFloat(conditions.monthlyRent?.replace(/[^0-9.]/g, '')) || 0;
-              const totalAmount = depositAmount + rentAmount;
+              const rentAmount = parseFloat(conditions.monthlyRent?.toString().replace(/[^0-9.]/g, '')) || 0;
+              const totalAmount = depositAmount + (rentAmount * 2);
 
               return (
                 <tr key={b.id} className="hover:bg-muted/30 transition-colors">
@@ -432,9 +432,16 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
                         className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-transform active:scale-[0.98] py-1 px-2.5 h-auto whitespace-nowrap disabled:opacity-70 disabled:cursor-not-allowed"
                       >
                         {payingId === b.id ? (
-                          <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Pay $${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="flex items-center gap-1.5">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Pay ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
+                          </span>
                         ) : (
-                          `Pay $${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          <>
+                            Pay ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
+                          </>
                         )}
                       </Button>
                     ) : b.status === 'confirmed' ? (
@@ -567,7 +574,7 @@ function PaymentsTab({ payments = [], bookings = [], listings = [], isLoading })
                 const listing = listingMap[p.listing_id];
                 const ownerEmail = booking?.owner_email || listing?.owner_email || '—';
                 const ownerName = listing?.owner_name || 'Owner';
-                const amountUsd = p.amount_cents ? (p.amount_cents / 100) : 0;
+                const amountUsd = p.amount_centavos ? (p.amount_centavos / 100) : 0;
                 const datePart = p.created_date ? format(new Date(p.created_date), 'MMMM d, yyyy') : 'N/A';
                 const timePart = p.created_date ? format(new Date(p.created_date), 'h:mm a') : '';
 
@@ -586,7 +593,7 @@ function PaymentsTab({ payments = [], bookings = [], listings = [], isLoading })
                       <div className="text-sm font-medium">{ownerName}</div>
                     </td>
                     <td className="px-4 py-3 font-semibold text-emerald-600">
-                      ${amountUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {p.currency?.toUpperCase() || 'USD'}
+                      ${amountUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       <div>{datePart}</div>

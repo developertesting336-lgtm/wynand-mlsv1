@@ -83,7 +83,7 @@ export default function PayoutRequestPanel({ agentId, agentEmail }) {
 
   return (
     <div className="space-y-5">
-      {/* Summary */}
+      {/* Summary commented out
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
@@ -113,6 +113,7 @@ export default function PayoutRequestPanel({ agentId, agentEmail }) {
           </CardContent>
         </Card>
       </div>
+      */}
 
       {/* Eligible for payout */}
       {eligibleReferrals.length > 0 && (

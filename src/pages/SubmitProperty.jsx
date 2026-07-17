@@ -225,8 +225,8 @@ export default function SubmitProperty() {
 
       await base44.entities.Listing.create({
         ...form,
-        price_usd: Number(form.price_usd),
-        price_mxn: form.price_mxn ? Number(form.price_mxn) : undefined,
+        price_mxn: Number(form.price_mxn),
+        price_usd: form.price_usd ? Number(form.price_usd) : Math.round(Number(form.price_mxn) / 17.5),
         bedrooms: Number(form.bedrooms),
         bathrooms: Number(form.bathrooms),
         deposit_amount: form.deposit_amount ? Number(form.deposit_amount) : undefined,
@@ -290,15 +290,15 @@ export default function SubmitProperty() {
               <Label>Description</Label>
               <Textarea value={form.description} onChange={e => update('description', e.target.value)} rows={4} placeholder="Describe the property, amenities, and what makes it special..." />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
-                <Label>Monthly Rent (USD) *</Label>
-                <Input required type="number" value={form.price_usd} onChange={e => update('price_usd', e.target.value)} />
+                <Label>Monthly Rent (MXN) *</Label>
+                <Input required type="number" value={form.price_mxn} onChange={e => update('price_mxn', e.target.value)} />
               </div>
-              <div>
-                <Label>Monthly Rent (MXN)</Label>
-                <Input type="number" value={form.price_mxn} onChange={e => update('price_mxn', e.target.value)} />
-              </div>
+              {/* <div>
+                <Label>Monthly Rent (USD)</Label>
+                <Input type="number" value={form.price_usd} onChange={e => update('price_usd', e.target.value)} />
+              </div> */}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -363,7 +363,7 @@ export default function SubmitProperty() {
                 <Input type="date" value={form.availability_date} onChange={e => update('availability_date', e.target.value)} />
               </div>
               <div>
-                <Label>Deposit (USD)</Label>
+                <Label>Deposit (MXN)</Label>
                 <Input type="number" value={form.deposit_amount} onChange={e => update('deposit_amount', e.target.value)} />
               </div>
             </div>

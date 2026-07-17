@@ -12,7 +12,7 @@ import {
 import { auth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { Mail, ShieldCheck, RefreshCw, ArrowLeft } from 'lucide-react'
+import { Mail, ShieldCheck, RefreshCw, ArrowLeft, X } from 'lucide-react'
 
 // ─── OTP digit input component ──────────────────────────────────────────────
 function OtpInput({ value, onChange }) {
@@ -324,7 +324,15 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   if (mode === 'reset-password') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8 relative">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
           {/* Header */}
           <div className="flex flex-col items-center mb-6 text-center">
             <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center mb-3">
@@ -377,7 +385,15 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   if (mode === 'reset-otp') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8 relative">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
           {/* Header */}
           <div className="flex flex-col items-center mb-6 text-center">
             <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center mb-3">
@@ -469,7 +485,15 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   if (mode === 'reset-success') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8 text-center">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8 text-center relative">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
           <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4 mx-auto">
             <ShieldCheck className="w-8 h-8 text-green-500" />
           </div>
@@ -492,7 +516,15 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   if (mode === 'otp') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8 relative">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
           {/* Header */}
           <div className="flex flex-col items-center mb-6 text-center">
             <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center mb-3">
@@ -554,7 +586,15 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   // ── Login / Signup Step ──────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-8">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-8 relative">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          aria-label="Close modal"
+        >
+          <X className="w-5 h-5" />
+        </button>
         <div className="mb-6">
           <h2 className="text-2xl font-bold">
             {mode === 'login' ? 'Sign In' : 'Create Account'}

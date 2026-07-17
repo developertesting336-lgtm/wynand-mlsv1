@@ -422,7 +422,7 @@ create table public.sale_referrals (
   status text null default 'pending'::text,
   commission_pct numeric null default 15,
   commission_amount numeric null,
-  sale_price_usd numeric null,
+  sale_price_mxn numeric null,
   admin_notes text null,
   paid_date timestamp with time zone null,
   created_date timestamp with time zone null default now(),

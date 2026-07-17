@@ -257,12 +257,12 @@ export default function ListingDetail() {
             </div>
             <div className="shrink-0">
               <div className="text-2xl md:text-3xl font-bold text-foreground">
-                ${listing.price_usd?.toLocaleString()}
+                MXN ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}
                 <span className="text-base font-normal text-muted-foreground">/mo</span>
               </div>
-              {listing.price_mxn && (
-                <p className="text-xs text-muted-foreground text-right">MXN ${listing.price_mxn?.toLocaleString()}</p>
-              )}
+              {/* {listing.price_mxn && listing.price_usd && (
+                <p className="text-xs text-muted-foreground text-right">USD ${listing.price_usd?.toLocaleString()}</p>
+              )} */}
             </div>
           </div>
 
@@ -381,7 +381,7 @@ export default function ListingDetail() {
               {listing.deposit_amount && (
                 <div className="rounded-xl border bg-card p-4">
                   <p className="text-xs text-muted-foreground flex items-center gap-1"><DollarSign className="w-3 h-3" /> Deposit (one-time)</p>
-                  <p className="font-semibold mt-1 text-sm">${listing.deposit_amount?.toLocaleString()}</p>
+                  <p className="font-semibold mt-1 text-sm">MXN ${listing.deposit_amount?.toLocaleString()}</p>
                 </div>
               )}
               {listing.lease_terms && (
@@ -394,7 +394,7 @@ export default function ListingDetail() {
           </div>
 
           {/* Rent Calculator */}
-          <RentCalculator baseRent={listing.price_usd} />
+          <RentCalculator baseRent={listing.price_mxn || listing.price_usd} />
 
           {/* Availability Calendar — main column (mobile/tablet; desktop sees sidebar version) */}
           {/* <div>
@@ -435,17 +435,17 @@ export default function ListingDetail() {
           {/* Price summary */}
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="text-3xl font-bold">
-              ${listing.price_usd?.toLocaleString()}
+              MXN ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}
               <span className="text-base font-normal text-muted-foreground">/mo</span>
             </div>
-            {listing.price_mxn && (
-              <p className="text-sm text-muted-foreground">≈ MXN ${listing.price_mxn?.toLocaleString()}</p>
-            )}
+            {/* {listing.price_mxn && listing.price_usd && (
+              <p className="text-sm text-muted-foreground">≈ USD ${listing.price_usd?.toLocaleString()}</p>
+            )} */}
             {listing.deposit_amount && (
               <div>
-                <p className="text-sm text-muted-foreground mt-1">Deposit (one-time): ${listing.deposit_amount?.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground mt-1">Deposit (one-time): MXN ${listing.deposit_amount?.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1 p-2 bg-blue-50 rounded border border-blue-200">
-                  ℹ️ On first booking, you'll pay: Deposit (one-time) + First Month Rent
+                  ℹ️ On first booking, you'll pay: Deposit (one-time) + First Month Rent + Last Month Rent (Total: MXN ${(Number(listing.deposit_amount || 0) + (Number(listing.price_mxn || listing.price_usd || 0) * 2))?.toLocaleString()})
                 </p>
               </div>
             )}

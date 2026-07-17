@@ -67,7 +67,7 @@ serve(async (req: any) => {
       sessionParams.line_items = [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'mxn',
             product_data: {
               name: 'Listing Feature Boost',
               description: 'Feature your listing at the top of search results for 30 days',
@@ -86,7 +86,7 @@ serve(async (req: any) => {
           pro: { amount: 7900, name: 'Pro Agent Plan' },
         }
         : {
-          basic: { amount: 999, name: 'Premium Membership' },
+          basic: { amount: 1999, name: 'Premium Membership' },
         };
 
       const planInfo = planPrices[plan] || planPrices[normalizedRole === 'agent' ? 'basic' : 'basic'];
@@ -94,7 +94,7 @@ serve(async (req: any) => {
       sessionParams.line_items = [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'mxn',
             recurring: { interval: 'month' },
             product_data: {
               name: planInfo.name,

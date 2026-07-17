@@ -43,8 +43,8 @@ const PLANS = [
   },
 ];
 
-const FEATURE_BOOST_PRICE = 19;
-const FEATURE_BOOST_PRICE_ID = 'price_feature_boost_placeholder';
+
+
 
 export default function AgentBilling() {
   const queryClient = useQueryClient();
@@ -100,34 +100,7 @@ export default function AgentBilling() {
     setLoadingPlan(null);
   };
 
-  const handleFeatureBoost = async (listingId) => {
-    setLoadingBoost(listingId);
-    const successUrl = `${window.location.origin}/listings/${listingId}?featured=true`;
-    const cancelUrl = window.location.href;
-    try {
-      const { data, error } = await supabase.functions.invoke('subscriptions', {
-        body: JSON.stringify({
-          role: user?.role || 'agent',
-          mode: 'payment',
-          type: 'feature_boost',
-          userEmail: user.email,
-          listingId,
-          successUrl,
-          cancelUrl,
-        }),
-      });
-      if (error) throw error;
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
-        toast.error('Failed to create checkout session. Please try again.');
-      }
-    } catch (err) {
-      console.error('Feature boost error:', err);
-      toast.error(err?.message || 'Failed to start checkout. Please try again.');
-    }
-    setLoadingBoost(null);
-  };
+
 
   const handleFeatureSubscription = async (listingId) => {
     const maxFeatured = activeSub?.plan === 'pro' ? 3 : 0;
@@ -229,6 +202,7 @@ export default function AgentBilling() {
                 </div>
                 <div className="mt-3">
                   <span className="text-4xl font-bold">${plan.price}</span>
+                  <span className="text-xs font-normal text-muted-foreground ml-1">MXN</span>
                   <span className="text-muted-foreground">/month</span>
                 </div>
               </CardHeader>
@@ -267,7 +241,7 @@ export default function AgentBilling() {
             ? activeSub.plan === 'pro'
               ? `You have ${Math.max(0, 3 - myListings.filter(l => l.is_featured).length)} of 3 featured slots remaining this month.`
               : `You have ${Math.max(0, 5 - myListings.length)} of 5 active listings remaining.`
-            : `Pay $${FEATURE_BOOST_PRICE} once to feature a listing for 30 days — it appears at the top of search results.`}
+            : 'Subscribe to the Pro plan to feature listings at the top of search results.'}
         </p>
 
         {myListings.length === 0 ? (
@@ -294,7 +268,9 @@ export default function AgentBilling() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm line-clamp-1">{listing.title}</p>
-                      <p className="text-xs text-muted-foreground">${listing.price_usd?.toLocaleString()}/mo</p>
+                      <p className="text-xs text-muted-foreground">
+                        ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}<span className="text-[10px] font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
+                      </p>
                     </div>
                     {isFeatured ? (
                       <Badge className="bg-yellow-100 text-yellow-800 gap-1">
@@ -322,7 +298,7 @@ export default function AgentBilling() {
             })}
           </div>
         ) : (
-          /* No subscription: show $19 boost option */
+          /* No subscription: show listings but require subscription to feature */
           <div className="space-y-3">
             {myListings.map(listing => (
               <Card key={listing.id}>
@@ -332,23 +308,18 @@ export default function AgentBilling() {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm line-clamp-1">{listing.title}</p>
-                    <p className="text-xs text-muted-foreground">${listing.price_usd?.toLocaleString()}/mo</p>
+                    <p className="text-xs text-muted-foreground">
+                      ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}<span className="text-[10px] font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
+                    </p>
                   </div>
                   {listing.is_featured ? (
                     <Badge className="bg-yellow-100 text-yellow-800 gap-1">
                       <Star className="w-3 h-3" /> Featured
                     </Badge>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5 shrink-0"
-                      disabled={loadingBoost === listing.id}
-                      onClick={() => handleFeatureBoost(listing.id)}
-                    >
-                      {loadingBoost === listing.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
-                      Boost — ${FEATURE_BOOST_PRICE}
-                    </Button>
+                    <Badge variant="outline" className="text-muted-foreground">
+                      Pro Plan Required
+                    </Badge>
                   )}
                 </CardContent>
               </Card>

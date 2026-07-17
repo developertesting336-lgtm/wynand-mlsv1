@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function LeaseDetailsForm({ 
   booking, 
@@ -28,6 +29,27 @@ export default function LeaseDetailsForm({
     return defaultValue;
   };
 
+  // Parse address if it exists to prefill city and state
+  const getParsedAddressInfo = () => {
+    const address = listing?.address || '';
+    let city = listing?.city || '';
+    let state = listing?.state || '';
+    
+    if (address && (!city || !state)) {
+      const parts = address.split(',').map(p => p.trim());
+      if (parts.length >= 3) {
+        state = parts[parts.length - 1] || '';
+        city = parts[parts.length - 2] || '';
+      } else if (parts.length === 2) {
+        state = parts[1] || '';
+        city = parts[0] || '';
+      }
+    }
+    return { address, city, state };
+  };
+
+  const parsedAddress = getParsedAddressInfo();
+
   const [formData, setFormData] = useState({
     landlordName: getInitialValue('landlordName', ownerProfile?.full_name || ''),
     tenantName: getInitialValue('tenantName', renterProfile?.full_name || ''),
@@ -37,7 +59,7 @@ export default function LeaseDetailsForm({
     leaseStartDate: getInitialValue('leaseStartDate', booking?.move_in_date || ''),
     leaseDuration: getInitialValue('leaseDuration', booking?.lease_duration_months || 12),
     leaseEndDate: getInitialValue('leaseEndDate', ''),
-    monthlyRent: getInitialValue('monthlyRent', ''),
+    monthlyRent: getInitialValue('monthlyRent', listing?.price_mxn || listing?.price_usd || ''),
     rentDueDateDay: getInitialValue('rentDueDateDay', '1'),
     lateFee: getInitialValue('lateFee', ''),
     gracePeriodDays: getInitialValue('gracePeriodDays', '5'),
@@ -73,9 +95,9 @@ export default function LeaseDetailsForm({
     emergencyContact: getInitialValue('emergencyContact', ''),
     emergencyResponseTimeHours: getInitialValue('emergencyResponseTimeHours', ''),
     additionalTermsConditions: getInitialValue('additionalTermsConditions', ''),
-    propertyAddress: getInitialValue('propertyAddress', listing?.address || ''),
-    propertyCity: getInitialValue('propertyCity', listing?.city || ''),
-    propertyState: getInitialValue('propertyState', listing?.state || ''),
+    propertyAddress: getInitialValue('propertyAddress', parsedAddress.address),
+    propertyCity: getInitialValue('propertyCity', parsedAddress.city),
+    propertyState: getInitialValue('propertyState', parsedAddress.state),
     propertyUnit: getInitialValue('propertyUnit', listing?.unit || '')
   });
 
@@ -85,6 +107,19 @@ export default function LeaseDetailsForm({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!formData.propertyCity || !formData.propertyCity.trim()) {
+      toast.error('City is required.');
+      return;
+    }
+    if (!formData.propertyState || !formData.propertyState.trim()) {
+      toast.error('State is required.');
+      return;
+    }
+    if (!formData.propertyUnit || !formData.propertyUnit.trim()) {
+      toast.error('Unit number is required.');
+      return;
+    }
+
     // Transform radio selections into boolean fields for PDF
     const transformedData = {
       ...formData,
@@ -184,11 +219,11 @@ export default function LeaseDetailsForm({
             <h3 className="text-sm font-semibold text-muted-foreground uppercase">4. Rent & Payment</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="monthlyRent">Monthly Rent ($)</Label>
+                <Label htmlFor="monthlyRent">Monthly Rent (MXN $)</Label>
                 <Input id="monthlyRent" type="number" step="0.01" value={formData.monthlyRent} onChange={(e) => handleChange('monthlyRent', e.target.value)} required />
               </div>
               <div>
-                <Label htmlFor="securityDepositAmount">Security Deposit ($)</Label>
+                <Label htmlFor="securityDepositAmount">Security Deposit (MXN $)</Label>
                 <Input id="securityDepositAmount" type="number" step="0.01" value={formData.securityDepositAmount} onChange={(e) => handleChange('securityDepositAmount', e.target.value)} required />
               </div>
               <div>
@@ -196,8 +231,8 @@ export default function LeaseDetailsForm({
                 <Input id="rentDueDateDay" type="number" min="1" max="31" value={formData.rentDueDateDay} onChange={(e) => handleChange('rentDueDateDay', e.target.value)} required />
               </div>
               <div>
-                <Label htmlFor="lateFee">Late Fee ($)</Label>
-                <Input id="lateFee" value={formData.lateFee} onChange={(e) => handleChange('lateFee', e.target.value)} placeholder="e.g., 50" />
+                <Label htmlFor="lateFee">Late Fee (MXN $)</Label>
+                <Input id="lateFee" value={formData.lateFee} onChange={(e) => handleChange('lateFee', e.target.value)} placeholder="e.g., 1000" />
               </div>
               <div>
                 <Label htmlFor="gracePeriodDays">Grace Period (days)</Label>

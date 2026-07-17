@@ -7,7 +7,7 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
-const PRICE_USD = 9.99;
+const PRICE_USD = 19.99;
 
 export default function Pricing() {
   const [user, setUser] = useState(null);
@@ -129,14 +129,14 @@ export default function Pricing() {
             <p className="text-sm uppercase tracking-[0.24em] text-primary font-semibold">Pricing</p>
             <h1 className="text-4xl font-bold mt-3">Premium membership</h1>
             <p className="max-w-2xl text-muted-foreground mt-4 leading-7">
-              Unlock access to prioritized customer support, subscription benefits, and a smoother renting experience for just ${PRICE_USD.toFixed(2)} per month.
+              Unlock access to prioritized customer support, subscription benefits, and a smoother renting experience for just ${PRICE_USD.toFixed(2)}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span> per month.
             </p>
           </div>
 
           <div className="grid gap-4">
             <Card className="border border-border/80">
               <CardHeader>
-                <CardTitle className="text-2xl">${PRICE_USD.toFixed(2)} / month</CardTitle>
+                <CardTitle className="text-2xl">${PRICE_USD.toFixed(2)}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span> / month</CardTitle>
                 {/* <CardDescription>Recurring subscription for renters and property owners.</CardDescription> */}
               </CardHeader>
               <CardContent className="space-y-4">
@@ -188,7 +188,7 @@ export default function Pricing() {
                     onClick={handleSubscribe}
                     disabled={subscribing || loadingUser}
                   >
-                    {loadingUser ? 'Checking account…' : subscribing ? 'Starting checkout…' : 'Subscribe for $9.99'}
+                    {loadingUser ? 'Checking account…' : subscribing ? 'Starting checkout…' : `Subscribe for $${PRICE_USD.toFixed(2)} MXN`}
                   </Button>
                   {!user && !loadingUser && (
                     <p className="text-sm text-muted-foreground">Please sign in to subscribe.</p>
@@ -217,7 +217,7 @@ export default function Pricing() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <div className="rounded-2xl bg-muted p-4">
-                <p className="font-semibold">$9.99 / month</p>
+                <p className="font-semibold">${PRICE_USD.toFixed(2)} / month</p>
                 {/* <p>Recurring subscription billed to your payment method.</p> */}
               </div>
               <ul className="space-y-2">

@@ -470,11 +470,16 @@ export default function AdminDashboard() {
   const paginatedAuditLogs = filteredAuditLogs.slice((auditLogsPage - 1) * auditLogsPageSize, auditLogsPage * auditLogsPageSize);
   const auditLogsTotalPages = Math.max(1, Math.ceil(filteredAuditLogs.length / auditLogsPageSize));
 
-  const totalPlatformFees = platformEarnings.reduce((sum, item) => sum + (item.amount_cents || 0), 0);
-  const totalSubscriptionRevenue = allSubscriptions.reduce((sum, item) => sum + (item.amount_cents || 0), 0);
+  const totalPlatformFees = platformEarnings.reduce((sum, item) => sum + (item.amount_centavos || 0), 0);
+  const totalSubscriptionRevenue = allSubscriptions.reduce((sum, item) => sum + (item.amount_centavos || 0), 0);
   const totalEarnings = totalPlatformFees + totalSubscriptionRevenue;
 
-  const formatCurrency = (value) => `$${(value / 100).toFixed(2)}`;
+  const formatCurrency = (value) => (
+    <>
+      ${(value / 100).toFixed(2)}
+      <span className="text-xs font-normal text-muted-foreground ml-1">MXN</span>
+    </>
+  );
 
   const {
     data: paginatedResult = { data: [], count: 0 },
@@ -887,7 +892,10 @@ export default function AdminDashboard() {
                         <div className="text-sm">{listing.owner_name || 'Unknown'}</div>
                         <div className="text-xs text-muted-foreground">{listing.owner_email || ''}</div>
                       </td>
-                      <td className="px-4 py-3 font-semibold">${listing.price_usd}/mo</td>
+                      <td className="px-4 py-3 font-semibold">
+                        ${listing.price_mxn || listing.price_usd}
+                        <span className="text-xs font-normal text-muted-foreground ml-1">MXN</span>/mo
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
                           <Badge>{listing.status}</Badge>
@@ -991,7 +999,6 @@ export default function AdminDashboard() {
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Date</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Source</th>
-                        <th className="px-4 py-3 font-semibold text-muted-foreground">Fee %</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Amount</th>
                       </tr>
                     </thead>
@@ -1000,14 +1007,23 @@ export default function AdminDashboard() {
                         <tr key={item.id} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{item.created_date ? format(new Date(item.created_date), 'MMM d, yyyy') : 'N/A'}</td>
                           <td className="px-4 py-3 font-medium">
-                            {listingMap[item.listing_id]?.title
-                              || listingMap[bookingMap[item.booking_id]?.listing_id]?.title
-                              || item.listing_id?.slice(0, 8)
-                              || 'Platform fee'}
+                            {(() => {
+                              const listingId = item.listing_id || bookingMap[item.booking_id]?.listing_id;
+                              const title = listingMap[item.listing_id]?.title
+                                || listingMap[bookingMap[item.booking_id]?.listing_id]?.title
+                                || item.listing_id?.slice(0, 8)
+                                || 'Platform fee';
+                              return listingId ? (
+                                <Link to={`/listings/${listingId}`} className="hover:text-primary transition-colors inline-flex items-center gap-1 font-semibold">
+                                  {title} <ExternalLink className="w-3 h-3 opacity-60" />
+                                </Link>
+                              ) : (
+                                title
+                              );
+                            })()}
                           </td>
-                          <td className="px-4 py-3 font-medium">Platform fees</td>
-                          <td className="px-4 py-3 font-medium">{item.fee_percentage != null ? `${item.fee_percentage}%` : '—'}</td>
-                          <td className="px-4 py-3 font-semibold text-emerald-600">{formatCurrency(item.amount_cents || 0)}</td>
+                          <td className="px-4 py-3 font-medium">Platform fees + Tax (16%)</td>
+                          <td className="px-4 py-3 font-semibold text-emerald-600">{formatCurrency(item.amount_centavos || 0)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1051,7 +1067,7 @@ export default function AdminDashboard() {
                             <div className="text-xs text-muted-foreground">{userMap[item.user_id]?.email || item.user_email || ''}</div>
                           </td>
                           <td className="px-4 py-3"><Badge variant="outline">{item.status || 'active'}</Badge></td>
-                          <td className="px-4 py-3 font-semibold text-emerald-600">{formatCurrency(item.amount_cents || 0)}</td>
+                          <td className="px-4 py-3 font-semibold text-emerald-600">{formatCurrency(item.amount_centavos || 0)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1304,7 +1320,7 @@ export default function AdminDashboard() {
                   {paginatedPayments.map(p => {
                     const payer = paymentPayerMap[p.payer_id];
                     const payee = paymentPayerMap[p.payee_id];
-                    const amount = p.amount_cents ? (p.amount_cents / 100).toFixed(2) : (p.amount_usd || 0).toFixed(2);
+                    const amount = p.amount_centavos ? (p.amount_centavos / 100).toFixed(2) : (p.amount_mxn || 0).toFixed(2);
                     return (
                       <tr key={p.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{p.stripe_payment_intent_id?.slice(-8) || '—'}</td>
@@ -1316,7 +1332,10 @@ export default function AdminDashboard() {
                           <div className="font-medium">{payee?.full_name || 'Unknown'}</div>
                           <div className="text-xs text-muted-foreground">{payee?.email || ''}</div>
                         </td>
-                        <td className="px-4 py-3 font-semibold text-emerald-600">${amount}</td>
+                        <td className="px-4 py-3 font-semibold text-emerald-600">
+                          ${amount}
+                          <span className="text-xs font-normal text-muted-foreground ml-1">MXN</span>
+                        </td>
                         <td className="px-4 py-3"><Badge variant="outline">{p.status || 'succeeded'}</Badge></td>
                         <td className="px-4 py-3">
                           <Badge variant={p.payout_status === 'paid' ? 'default' : 'secondary'}>{p.payout_status || 'pending'}</Badge>

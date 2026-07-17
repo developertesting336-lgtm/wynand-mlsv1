@@ -53,7 +53,7 @@ export default function SaleReferralsAdmin() {
       id: selected.id,
       data: {
         status: 'closed_won',
-        sale_price_usd: price,
+        sale_price_mxn: price,
         commission_amount: commissionAmount,
         admin_notes: adminNotes,
       },

@@ -8,6 +8,7 @@ export function useStripeOnboarding(user) {
   // Handle Stripe onboarding redirect check
   useEffect(() => {
     if (!user) return;
+
     const params = new URLSearchParams(window.location.search);
     if (params.get('stripe') === 'success' && user?.email) {
       setOnboardingLoading(true);
@@ -36,6 +37,7 @@ export function useStripeOnboarding(user) {
   }, [user]);
 
   const handleStripeOnboard = async () => {
+
     if (!user?.email) {
       toast.error('Unable to start Stripe onboarding: email is missing.');
       return;
