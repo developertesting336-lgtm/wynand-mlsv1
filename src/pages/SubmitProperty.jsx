@@ -204,17 +204,36 @@ export default function SubmitProperty() {
 
       // Check subscription limits for agents
       if (user.role === 'agent') {
-        const { data: subscriptions } = await base44.entities.Subscription.filter({ user_id: user.id });
+        const subscriptions = await base44.entities.Subscription.filter({ user_id: user.id });
         const activeSub = subscriptions.find(s => s.status === 'active');
         
         if (activeSub) {
           // Count current active listings for this agent
-          const { data: myListings } = await base44.entities.Listing.filter({ owner_email: user.email });
+          const myListings = await base44.entities.Listing.filter({ owner_email: user.email });
           const activeListings = myListings.filter(l => l.status !== 'archived').length;
           
           if (activeSub.plan === 'basic' && activeListings >= 5) {
             throw new Error('Basic plan allows up to 5 active listings. Please upgrade to Pro for unlimited listings.');
           }
+        }
+
+        // Verify that the owner has an existing profile in the system
+        if (!form.contact_email) {
+          throw new Error('Please enter the owner\'s email address.');
+        }
+        const trimmedOwnerEmail = form.contact_email.trim();
+        const { data: ownerProfiles, error: ownerError } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('email', trimmedOwnerEmail);
+
+        if (ownerError) {
+          throw new Error('Failed to verify owner email: ' + ownerError.message);
+        }
+
+        const ownerUser = ownerProfiles?.[0];
+        if (!ownerUser) {
+          throw new Error(`Owner email "${form.contact_email}" not found. The owner must have an existing profile in the system.`);
         }
       }
 
@@ -455,21 +474,21 @@ export default function SubmitProperty() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Agent Contact (Optional)</CardTitle>
-            <CardDescription>Choose your agent representing your property</CardDescription>
+            <CardTitle>{user?.role === 'agent' ? 'Agent Contact' : 'Agent Contact (Optional)'}</CardTitle>
+            <CardDescription>{user?.role === 'agent' ? 'Your details representing this listing' : 'Choose your agent representing your property'}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <Label>Agent Name</Label>
-              <Input value={form.agent_name} onChange={e => update('agent_name', e.target.value)} placeholder="e.g., Juan Perez" />
+              <Input disabled={user?.role === 'agent'} value={form.agent_name} onChange={e => update('agent_name', e.target.value)} placeholder="e.g., Juan Perez" />
             </div>
             <div>
               <Label>Agent Email</Label>
-              <Input type="email" value={form.agent_email} onChange={e => update('agent_email', e.target.value)} placeholder="agent@example.com" />
+              <Input disabled={user?.role === 'agent'} type="email" value={form.agent_email} onChange={e => update('agent_email', e.target.value)} placeholder="agent@example.com" />
             </div>
             <div>
               <Label>Agent Phone</Label>
-              <Input value={form.agent_phone} onChange={e => update('agent_phone', e.target.value)} placeholder="+52 322 123 4567" />
+              <Input disabled={user?.role === 'agent'} value={form.agent_phone} onChange={e => update('agent_phone', e.target.value)} placeholder="+52 322 123 4567" />
             </div>
           </CardContent>
         </Card>

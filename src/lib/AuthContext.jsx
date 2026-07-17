@@ -17,8 +17,31 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let mounted = true
 
+    // Safety fallback timeout: under no circumstances should the loader stay up for more than 3 seconds
+    const safetyTimeoutId = setTimeout(() => {
+      if (mounted) {
+        console.warn('Auth initialization safety timeout reached; ending loading state.');
+        setIsLoadingAuth(false);
+      }
+    }, 3000);
+
     // Retrieve active session immediately on mount to avoid stuck loading states
     const initializeAuth = async () => {
+      // Optimistic load: check if we have cached profile in localStorage for instant render
+      try {
+        const cachedUserStr = localStorage.getItem('app_user_data');
+        if (cachedUserStr) {
+          const cachedUser = JSON.parse(cachedUserStr);
+          if (cachedUser) {
+            setUser(cachedUser);
+            setIsAuthenticated(true);
+            setIsLoadingAuth(false);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load optimistic cached user:', e);
+      }
+
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (mounted) {
@@ -46,6 +69,7 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error('Failed to get initial session:', error)
       } finally {
+        clearTimeout(safetyTimeoutId);
         if (mounted) {
           setIsLoadingAuth(false)
         }
@@ -107,6 +131,7 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       mounted = false
+      clearTimeout(safetyTimeoutId)
       subscription.unsubscribe()
       window.removeEventListener('app:open-auth-modal', handler)
     }

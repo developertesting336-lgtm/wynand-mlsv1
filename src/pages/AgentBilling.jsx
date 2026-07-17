@@ -170,8 +170,28 @@ export default function AgentBilling() {
               </p>
               <p className="text-sm text-muted-foreground">
                 Your subscription is active
-                {activeSub.current_period_end ? ` · renews ${new Date(activeSub.current_period_end).toLocaleDateString()}` : ''}
               </p>
+              {(() => {
+                let nextPaymentDate = null;
+                if (activeSub.current_period_end) {
+                  nextPaymentDate = new Date(activeSub.current_period_end);
+                } else {
+                  const baseDate = activeSub.last_payment_date || activeSub.created_date;
+                  if (baseDate) {
+                    const d = new Date(baseDate);
+                    d.setMonth(d.getMonth() + 1);
+                    nextPaymentDate = d;
+                  }
+                }
+                if (nextPaymentDate) {
+                  return (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Next payment date: <span className="font-semibold text-foreground">{nextPaymentDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </p>
+                  );
+                }
+                return null;
+              })()}
             </div>
             <Badge className="ml-auto bg-accent text-accent-foreground">Active</Badge>
           </CardContent>
