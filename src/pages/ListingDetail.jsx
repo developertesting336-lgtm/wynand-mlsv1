@@ -1,4 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+
+function getVideoEmbedUrl(url) {
+  if (!url) return null;
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  return null;
+}
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Badge } from '@/components/ui/badge';
@@ -404,19 +413,51 @@ export default function ListingDetail() {
           <AvailabilityCalendar listing={listing} currentUser={user} refCode={refCode} />
           </div> */}
 
+          {/* Video Walkthrough */}
+          {listing.video_url && (() => {
+            const embedUrl = getVideoEmbedUrl(listing.video_url);
+            const isDirectVideo = /\.(mp4|webm|ogg)(\?.*)?$/i.test(listing.video_url);
+            return (
+              <div>
+                <h2 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                  <Video className="w-5 h-5 text-muted-foreground" /> Video Walkthrough
+                </h2>
+                {embedUrl ? (
+                  <div className="rounded-2xl overflow-hidden border bg-black aspect-video shadow-md">
+                    <iframe
+                      src={embedUrl}
+                      title="Property video tour"
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : isDirectVideo ? (
+                  <div className="rounded-2xl overflow-hidden border bg-black aspect-video shadow-md">
+                    <video
+                      src={listing.video_url}
+                      controls
+                      className="w-full h-full"
+                      title="Property video tour"
+                    />
+                  </div>
+                ) : (
+                  <a href={listing.video_url} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" className="gap-2">
+                      <Video className="w-4 h-4" /> Watch Video Tour
+                      <ExternalLink className="w-3.5 h-3.5 ml-1 text-muted-foreground" />
+                    </Button>
+                  </a>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Reviews */}
           <ReviewsSection listingId={listing.id} />
 
-
           {/* Video & WhatsApp — desktop only (mobile has the CTA bar) */}
           <div className="flex flex-wrap gap-3">
-            {listing.video_url && (
-              <a href={listing.video_url} target="_blank" rel="noopener noreferrer">
-                <Button variant="outline" className="gap-2">
-                  <Video className="w-4 h-4" /> Watch Video Tour
-                </Button>
-              </a>
-            )}
             {/* {listing.whatsapp && (
               <a
                 href={`https://wa.me/${listing.whatsapp.replace(/\D/g, '')}?text=Hi, I'm interested in ${encodeURIComponent(listing.title)}`}

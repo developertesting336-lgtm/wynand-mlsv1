@@ -655,8 +655,14 @@ function ReviewsTab({ user, listings }) {
   const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
   const reviewedListingIds = new Set(existingReviews.map(r => r.listing_id));
 
-  // Deduplicate: one entry per listing that has at least one approved or confirmed booking
-  const approvedBookings = allBookings.filter(b => b.status === 'approved' || b.status === 'confirmed');
+  // Deduplicate: one entry per listing that has at least one approved, confirmed, OR ended/resolved booking
+  const approvedBookings = allBookings.filter(b =>
+    b.status === 'approved' ||
+    b.status === 'confirmed' ||
+    b.status === 'resolved' ||
+    b.status === 'ended' ||
+    b.end_lease === true
+  );
   const reviewableListingIds = [...new Set(approvedBookings.map(b => b.listing_id))];
   const filteredReviewableListingIds = reviewableListingIds.filter(listingId => {
     const query = debouncedSearch.trim().toLowerCase();
@@ -720,7 +726,7 @@ function ReviewsTab({ user, listings }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">You can review properties where your booking was approved.</p>
+      <p className="text-sm text-muted-foreground">You can review properties where your booking was approved or your lease has ended.</p>
       {searchAndPaginationControls}
       {paginatedReviewableListingIds.map(listingId => {
         const listing = listingMap[listingId];

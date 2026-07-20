@@ -30,6 +30,29 @@ export default function SubmitProperty() {
   const [submitted, setSubmitted] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [ownerEmailError, setOwnerEmailError] = useState('');
+  const [ownerEmailChecking, setOwnerEmailChecking] = useState(false);
+  const ownerEmailCheckRef = React.useRef(null);
+  const [videoUrlError, setVideoUrlError] = useState('');
+
+  const validateVideoUrl = (url) => {
+    if (!url) return '';
+    const trimmed = url.trim();
+    const youtubeRe = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)/i;
+    const vimeoRe = /^(https?:\/\/)?(www\.)?vimeo\.com\//i;
+    const directVideoRe = /\.(mp4|webm|ogg)(\?.*)?$/i;
+    if (youtubeRe.test(trimmed) || vimeoRe.test(trimmed) || directVideoRe.test(trimmed)) return '';
+    return 'Please enter a valid YouTube, Vimeo, or direct video URL (.mp4, .webm, .ogg).';
+  };
+
+  const getVideoEmbedUrl = (url) => {
+    if (!url) return null;
+    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
+    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    return null;
+  };
 
   const { data: subscription = null, isLoading: isLoadingSubscription } = useQuery({
     queryKey: ['subscription', user?.id],
@@ -217,14 +240,14 @@ export default function SubmitProperty() {
           }
         }
 
-        // Verify that the owner has an existing profile in the system
+        // Validate: owner email must not belong to any agent-role user
         if (!form.contact_email) {
           throw new Error('Please enter the owner\'s email address.');
         }
         const trimmedOwnerEmail = form.contact_email.trim();
         const { data: ownerProfiles, error: ownerError } = await supabase
           .from('profiles')
-          .select('id')
+          .select('id, role')
           .ilike('email', trimmedOwnerEmail);
 
         if (ownerError) {
@@ -234,6 +257,9 @@ export default function SubmitProperty() {
         const ownerUser = ownerProfiles?.[0];
         if (!ownerUser) {
           throw new Error(`Owner email "${form.contact_email}" not found. The owner must have an existing profile in the system.`);
+        }
+        if (ownerUser.role === 'agent') {
+          throw new Error(`The email "${form.contact_email}" belongs to an agent. Please enter a valid property owner email.`);
         }
       }
 
@@ -444,7 +470,31 @@ export default function SubmitProperty() {
             )}
             <div>
               <Label>Video Walkthrough URL</Label>
-              <Input value={form.video_url} onChange={e => update('video_url', e.target.value)} placeholder="YouTube, Vimeo, or other video link" />
+              <Input
+                value={form.video_url}
+                onChange={e => {
+                  const val = e.target.value;
+                  update('video_url', val);
+                  setVideoUrlError(validateVideoUrl(val));
+                }}
+                placeholder="YouTube, Vimeo, or direct video link (.mp4, .webm)"
+              />
+              {videoUrlError && (
+                <p className="text-xs text-red-600 mt-1 font-medium">{videoUrlError}</p>
+              )}
+              {form.video_url && !videoUrlError && (() => {
+                const embedUrl = getVideoEmbedUrl(form.video_url);
+                if (embedUrl) return (
+                  <div className="mt-2 rounded-xl overflow-hidden border aspect-video">
+                    <iframe src={embedUrl} title="Video preview" className="w-full h-full" allow="fullscreen" />
+                  </div>
+                );
+                return (
+                  <p className="text-xs text-emerald-600 mt-1 font-medium flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" /> Valid video URL
+                  </p>
+                );
+              })()}
             </div>
           </CardContent>
         </Card>
@@ -467,7 +517,50 @@ export default function SubmitProperty() {
             </div>
             <div>
               <Label>Email</Label>
-              <Input type="email" value={form.contact_email} onChange={e => update('contact_email', e.target.value)} />
+              <Input
+                type="email"
+                value={form.contact_email}
+                onChange={e => {
+                  const val = e.target.value;
+                  update('contact_email', val);
+                  setOwnerEmailError('');
+
+                  if (user?.role !== 'agent') return;
+
+                  // Debounced Supabase check
+                  if (ownerEmailCheckRef.current) clearTimeout(ownerEmailCheckRef.current);
+                  const trimmed = val.trim();
+                  if (!trimmed || !trimmed.includes('@')) return;
+
+                  ownerEmailCheckRef.current = setTimeout(async () => {
+                    setOwnerEmailChecking(true);
+                    try {
+                      const { data } = await supabase
+                        .from('profiles')
+                        .select('role')
+                        .ilike('email', trimmed)
+                        .maybeSingle();
+                      if (data?.role === 'agent') {
+                        setOwnerEmailError('This email belongs to an agent. Owner email must belong to a property owner, not an agent.');
+                      } else {
+                        setOwnerEmailError('');
+                      }
+                    } catch (_) {
+                      // silently ignore lookup errors
+                    } finally {
+                      setOwnerEmailChecking(false);
+                    }
+                  }, 600);
+                }}
+              />
+              {ownerEmailChecking && (
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Checking email...
+                </p>
+              )}
+              {ownerEmailError && !ownerEmailChecking && (
+                <p className="text-xs text-red-600 mt-1 font-medium">{ownerEmailError}</p>
+              )}
             </div>
           </CardContent>
         </Card>

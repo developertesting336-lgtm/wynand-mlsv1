@@ -504,6 +504,11 @@ export default function OwnerDashboard() {
 
   const openEditModal = (listing) => setEditingListing(listing);
   const closeEditModal = () => setEditingListing(null);
+  const openAgreementEdit = (booking) => {
+    const conditions = booking.agreement_conditions || {};
+    setEditingAgreementId(booking.id);
+    setEditingAgreementData({ ...conditions });
+  };
 
   const getLeaseEndDate = (moveInDateStr, durationMonths) => {
     if (!moveInDateStr) return null;
@@ -602,7 +607,6 @@ export default function OwnerDashboard() {
   const [updatingState, setUpdatingState] = useState({ id: null, action: null });
   const [editingBookingId, setEditingBookingId] = useState(null);
   const [agreementData, setAgreementData] = useState(null);
-  const [ownerSignature, setOwnerSignature] = useState(null);
   const [editingAgreementId, setEditingAgreementId] = useState(null);
   const [editingAgreementData, setEditingAgreementData] = useState(null);
 
@@ -1244,19 +1248,16 @@ export default function OwnerDashboard() {
                                                 }
                                               }
                                               
-                                              setOwnerSignature(signatureUrl);
                                               const finalAgreementData = {
                                                 ...agreementData,
                                                 landlordSignature: signatureUrl,
                                                 landlordSignatureDate: new Date().toISOString().split('T')[0],
-                                                tenantSignature: undefined,
-                                                tenantSignatureDate: undefined
                                               };
-                                              
                                               await approveAndSendLease.mutateAsync({
                                                 bookingId: b.id,
-                                                agreementConditions: finalAgreementData
+                                                agreementConditions: finalAgreementData,
                                               });
+
                                             } catch (err) {
                                               toast.error(`Signature upload or approval failed: ${err.message}`);
                                               setUpdatingState({ id: null, action: null });
@@ -1267,6 +1268,7 @@ export default function OwnerDashboard() {
                                             setEditingBookingId(null);
                                           }}
                                           isSubmitting={updatingState?.id === b.id}
+                                          disableSubmit={!agreementData?.landlordName}
                                         />
                                       </td>
                                     </tr>
@@ -1363,6 +1365,22 @@ export default function OwnerDashboard() {
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                     {(() => {
+                                      const canEditAgreement = b.agreement_conditions && !b.agreement_conditions?.tenantSignature;
+
+                                      if (canEditAgreement) {
+                                        return (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-xs font-semibold py-1 px-2.5 h-auto whitespace-nowrap"
+                                            onClick={() => openAgreementEdit(b)}
+                                            disabled={updatingState?.id === b.id}
+                                          >
+                                            Edit Agreement
+                                          </Button>
+                                        );
+                                      }
+
                                       if (b.end_lease) {
                                         return (
                                           <span className="text-xs text-muted-foreground font-semibold">Lease Ended</span>
@@ -1547,55 +1565,88 @@ export default function OwnerDashboard() {
                   onSubmit={(formData) => {
                     setEditingAgreementData(formData);
                   }}
+                  onChange={(formData) => setEditingAgreementData(formData)}
                   onCancel={() => { setEditingAgreementId(null); setEditingAgreementData(null); }}
                   isSubmitting={updatingState?.id === editingAgreementId}
+                  hideSubmitButton={true}
                 />
                 
-                {editingAgreementData && editingAgreementData.landlordName && (
-                  <SignaturePad
-                    title="Owner Signature (required to update)"
-                    savedSignatures={user?.signatures || []}
-                    onSave={async (signature) => {
-                      try {
-                        let signatureUrl = signature;
-                        if (!signature.startsWith('http')) {
-                          const arr = signature.split(',');
-                          const mime = arr[0].match(/:(.*?);/)[1];
-                          const bstr = atob(arr[1]);
-                          let n = bstr.length;
-                          const u8arr = new Uint8Array(n);
-                          while (n--) {
-                            u8arr[n] = bstr.charCodeAt(n);
+                {editingAgreementData && (
+                  <div className="space-y-4">
+                    {editingAgreementData.landlordSignature ? (
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">Saved Owner Signature</p>
+                          <img
+                            src={editingAgreementData.landlordSignature}
+                            alt="Owner signature"
+                            className="mt-2 h-24 rounded-md border border-slate-200 object-contain"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            className="gap-1"
+                            onClick={async () => {
+                              const finalAgreementData = {
+                                ...editingAgreementData,
+                                landlordSignatureDate: editingAgreementData.landlordSignatureDate || new Date().toISOString().split('T')[0],
+                              };
+                              await updateAndResendLease.mutateAsync({
+                                bookingId: editingAgreementId,
+                                agreementConditions: finalAgreementData,
+                              });
+                            }}
+                            disabled={updatingState?.id === editingAgreementId || !editingAgreementData.landlordName}
+                          >
+                            {updatingState?.id === editingAgreementId ? 'Submitting...' : 'Submit Changes'}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <SignaturePad
+                        title="Owner Signature (required to update)"
+                        savedSignatures={user?.signatures || []}
+                        submitLabel="Submit Changes"
+                        onSave={async (signature) => {
+                          try {
+                            let signatureUrl = signature;
+                            if (!signature.startsWith('http')) {
+                              const arr = signature.split(',');
+                              const mime = arr[0].match(/:(.*?);/)[1];
+                              const bstr = atob(arr[1]);
+                              let n = bstr.length;
+                              const u8arr = new Uint8Array(n);
+                              while (n--) {
+                                u8arr[n] = bstr.charCodeAt(n);
+                              }
+                              const file = new File([u8arr], `signs/signature_owner_${editingAgreementId}.png`, { type: mime });
+                              const uploadResult = await base44.integrations.Core.UploadFile({ file });
+                              signatureUrl = uploadResult?.file_url;
+                              if (!signatureUrl) {
+                                throw new Error('Failed to obtain signature public URL from storage.');
+                              }
+                            }
+                            const finalAgreementData = {
+                              ...editingAgreementData,
+                              landlordSignature: signatureUrl,
+                              landlordSignatureDate: new Date().toISOString().split('T')[0],
+                            };
+                            await updateAndResendLease.mutateAsync({
+                              bookingId: editingAgreementId,
+                              agreementConditions: finalAgreementData,
+                            });
+                          } catch (err) {
+                            toast.error(`Update failed: ${err.message}`);
+                            setUpdatingState({ id: null, action: null });
                           }
-                          const file = new File([u8arr], `signs/signature_owner_${editingAgreementId}.png`, { type: mime });
-                          
-                          const uploadResult = await base44.integrations.Core.UploadFile({ file });
-                          signatureUrl = uploadResult?.file_url;
-                          
-                          if (!signatureUrl) {
-                            throw new Error('Failed to obtain signature public URL from storage.');
-                          }
-                        }
-                        
-                        const finalAgreementData = {
-                          ...editingAgreementData,
-                          landlordSignature: signatureUrl,
-                          landlordSignatureDate: new Date().toISOString().split('T')[0],
-                        };
-                        
-                        await updateAndResendLease.mutateAsync({
-                          bookingId: editingAgreementId,
-                          agreementConditions: finalAgreementData
-                        });
-                      } catch (err) {
-                        toast.error(`Update failed: ${err.message}`);
-                        setUpdatingState({ id: null, action: null });
-                      }
-                    }}
-                    onCancel={() => { setEditingAgreementId(null); setEditingAgreementData(null); }}
-                    isSubmitting={updatingState?.id === editingAgreementId}
-                    hideButtons={true}
-                  />
+                        }}
+                        onCancel={() => { setEditingAgreementId(null); setEditingAgreementData(null); }}
+                        isSubmitting={updatingState?.id === editingAgreementId}
+                        disableSubmit={!editingAgreementData.landlordName}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             )}

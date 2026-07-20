@@ -188,7 +188,7 @@ export default function Navbar() {
   const navLinks = [
     { to: '/pricing', icon: DollarSign, label: 'Pricing', roles: ['renter', 'owner'], requiresAuth: false },
     { to: '/listings', icon: Search, label: 'Browse', roles: ['renter', 'agent', 'owner', 'admin'], requiresAuth: false },
-    { to: '/agents', icon: Users, label: 'Agents', roles: ['renter', 'agent', 'owner', 'admin'], requiresAuth: false },
+    { to: '/agents', icon: Users, label: 'Agents', roles: ['renter', 'owner', 'admin'], requiresAuth: false },
     { to: '/admin', icon: UserCog, label: 'Admin Panel', roles: ['admin'], requiresAuth: true },
     { to: '/refer', icon: Handshake, label: 'Refer & Earn', roles: ['renter', 'agent', 'owner'], requiresAuth: false },
     { to: '/dashboard', icon: UserCircle, label: 'My Dashboard', roles: ['renter'], requiresAuth: true },

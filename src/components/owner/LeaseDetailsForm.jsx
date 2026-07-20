@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,41 +16,22 @@ export default function LeaseDetailsForm({
   renterProfile, 
   onSubmit, 
   onCancel, 
+  onChange = () => {},
   isSubmitting,
-  initialData 
+  initialData,
+  hideSubmitButton = false,
 }) {
   // Determine if this is an edit (initialData provided) or a new form
   const isEdit = !!initialData;
 
   const getInitialValue = (field, defaultValue) => {
-    if (isEdit && initialData[field] !== undefined && initialData[field] !== null) {
+    if (initialData && initialData[field] !== undefined && initialData[field] !== null) {
       return initialData[field];
     }
     return defaultValue;
   };
 
-  // Parse address if it exists to prefill city and state
-  const getParsedAddressInfo = () => {
-    const address = listing?.address || '';
-    let city = listing?.city || '';
-    let state = listing?.state || '';
-    
-    if (address && (!city || !state)) {
-      const parts = address.split(',').map(p => p.trim());
-      if (parts.length >= 3) {
-        state = parts[parts.length - 1] || '';
-        city = parts[parts.length - 2] || '';
-      } else if (parts.length === 2) {
-        state = parts[1] || '';
-        city = parts[0] || '';
-      }
-    }
-    return { address, city, state };
-  };
-
-  const parsedAddress = getParsedAddressInfo();
-
-  const [formData, setFormData] = useState({
+  const buildInitialFormData = () => ({
     landlordName: getInitialValue('landlordName', ownerProfile?.full_name || ''),
     tenantName: getInitialValue('tenantName', renterProfile?.full_name || ''),
     totalRooms: getInitialValue('totalRooms', listing?.total_rooms || listing?.bedrooms || ''),
@@ -98,11 +79,41 @@ export default function LeaseDetailsForm({
     propertyAddress: getInitialValue('propertyAddress', parsedAddress.address),
     propertyCity: getInitialValue('propertyCity', parsedAddress.city),
     propertyState: getInitialValue('propertyState', parsedAddress.state),
-    propertyUnit: getInitialValue('propertyUnit', listing?.unit || '')
+    propertyUnit: getInitialValue('propertyUnit', listing?.unit || ''),
+    landlordSignature: getInitialValue('landlordSignature', ''),
   });
 
+  // Parse address if it exists to prefill city and state
+  const getParsedAddressInfo = () => {
+    const address = listing?.address || '';
+    let city = listing?.city || '';
+    let state = listing?.state || '';
+
+    if (address && (!city || !state)) {
+      const parts = address.split(',').map(p => p.trim());
+      if (parts.length >= 3) {
+        state = parts[parts.length - 1] || '';
+        city = parts[parts.length - 2] || '';
+      } else if (parts.length === 2) {
+        state = parts[1] || '';
+        city = parts[0] || '';
+      }
+    }
+    return { address, city, state };
+  };
+
+  const parsedAddress = getParsedAddressInfo();
+
+  const [formData, setFormData] = useState(buildInitialFormData());
+
+  useEffect(() => {
+    setFormData(buildInitialFormData());
+  }, [initialData, ownerProfile?.full_name, renterProfile?.full_name, listing?.total_rooms, listing?.bedrooms, listing?.bathrooms, listing?.price_mxn, listing?.price_usd, listing?.deposit_amount, listing?.unit, booking?.move_in_date, booking?.lease_duration_months, parsedAddress.address, parsedAddress.city, parsedAddress.state]);
+
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    const next = { ...formData, [field]: value };
+    setFormData(next);
+    onChange(next);
   };
 
   const handleSubmit = (e) => {
@@ -387,21 +398,18 @@ export default function LeaseDetailsForm({
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4 border-t">
-            {!isEdit && (
-              <>
-                <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="flex-1">Cancel</Button>
-                <Button type="submit" disabled={isSubmitting} className="flex-1 bg-green-600 hover:bg-green-700">
-                  {isSubmitting ? (
-                    <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Saving...</span>
-                  ) : (
-                    <span className="flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Save & Generate Lease</span>
-                  )}
-                </Button>
-              </>
-            )}
-          </div>
+          {!hideSubmitButton && (
+            <div className="flex gap-3 pt-4 border-t">
+              <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="flex-1">Cancel</Button>
+              <Button type="submit" disabled={isSubmitting} className="flex-1 bg-green-600 hover:bg-green-700">
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Saving...</span>
+                ) : (
+                  <span className="flex items-center gap-2"><CheckCircle className="w-4 h-4" /> {isEdit ? 'Save Changes' : 'Save & Generate Lease'}</span>
+                )}
+              </Button>
+            </div>
+          )}
 
         </form>
       </CardContent>
