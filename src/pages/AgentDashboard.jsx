@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Home, MessageSquare, Eye, PlusCircle, ShieldCheck,
-  Trash2, CreditCard, Star, Download, Users, Banknote, FileText, Calendar, Search
+  Trash2, CreditCard, Star, Download, Users, Banknote, FileText, Calendar, Search, Pencil
 } from 'lucide-react';
 import ReferralLinkCard from '@/components/referrals/ReferralLinkCard';
 import AddReferralForm from '@/components/referrals/AddReferralForm';
@@ -23,6 +23,7 @@ import StripeConnectBanner from '@/components/StripeConnectBanner';
 import { useStripeOnboarding } from '@/hooks/useStripeOnboarding';
 import TenantVerification from '@/components/profile/TenantVerification';
 import {Dialog,  DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import EditPropertyModal from '@/components/owner/EditPropertyModal';
 
 import { format } from 'date-fns';
 import { NEIGHBORHOOD_LABELS } from '@/lib/constants';
@@ -54,6 +55,10 @@ export default function AgentDashboard() {
   const [bookingsPageSize, setBookingsPageSize] = useState(10);
   const queryClient = useQueryClient();
   const { onboardingLoading, handleStripeOnboard } = useStripeOnboarding(user);
+
+  const [editingListing, setEditingListing] = useState(null);
+  const openEditModal = (listing) => setEditingListing(listing);
+  const closeEditModal = () => setEditingListing(null);
 
   useEffect(() => {
     base44.auth.me().then(setUser).catch(() => {});
@@ -378,6 +383,9 @@ export default function AgentDashboard() {
                                     </Button>
                                   </Link>
                                 )}
+                                <Button size="sm" variant="outline" onClick={() => openEditModal(listing)} className="gap-1">
+                                  <Pencil className="w-3.5 h-3.5" /> Edit
+                                </Button>
                                 <Button size="sm" variant="destructive" onClick={() => setDeleteTarget(listing.id)} className="gap-1">
                                   <Trash2 className="w-4 h-4" /> Delete
                                 </Button>
@@ -621,6 +629,13 @@ export default function AgentDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {editingListing && (
+        <EditPropertyModal
+          listing={editingListing}
+          isOpen={true}
+          onClose={closeEditModal}
+        />
+      )}
     </div>
   );
 }

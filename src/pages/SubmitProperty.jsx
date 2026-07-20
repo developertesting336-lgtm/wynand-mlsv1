@@ -387,8 +387,8 @@ export default function SubmitProperty() {
               </div>
             </div>
             <div>
-              <Label>Lease Terms</Label>
-              <Input value={form.lease_terms} onChange={e => update('lease_terms', e.target.value)} placeholder="e.g., 6-month minimum, 1 year preferred" />
+              <Label>Lease Terms (Months)</Label>
+              <Input type="number" min="1" value={form.lease_terms} onChange={e => update('lease_terms', e.target.value)} placeholder="e.g., 12" />
             </div>
           </CardContent>
         </Card>

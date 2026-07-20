@@ -387,7 +387,9 @@ export default function ListingDetail() {
               {listing.lease_terms && (
                 <div className="rounded-xl border bg-card p-4 col-span-2 sm:col-span-1">
                   <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> Lease</p>
-                  <p className="font-semibold mt-1 text-sm">{listing.lease_terms}</p>
+                  <p className="font-semibold mt-1 text-sm">
+                    {isNaN(listing.lease_terms) ? listing.lease_terms : `${listing.lease_terms} ${Number(listing.lease_terms) === 1 ? 'Month' : 'Months'}`}
+                  </p>
                 </div>
               )}
             </div>

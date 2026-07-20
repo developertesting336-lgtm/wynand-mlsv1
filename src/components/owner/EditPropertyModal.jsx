@@ -16,9 +16,11 @@ import {
 import { X, Plus, Loader2, Upload, Trash2 } from 'lucide-react';
 import { NEIGHBORHOODS, FURNISHED_OPTIONS, RENTAL_TYPES, NEIGHBORHOOD_LABELS } from '@/lib/constants';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function EditPropertyModal({ listing, isOpen, onClose }) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [form, setForm] = useState({
     title: listing.title || '',
     description: listing.description || '',
@@ -41,6 +43,8 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
     agent_name: listing.agent_name || '',
     agent_email: listing.agent_email || '',
     agent_phone: listing.agent_phone || '',
+    owner_name: listing.owner_name || '',
+    owner_phone: listing.owner_phone || '',
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -51,6 +55,7 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
     mutationFn: ({ id, data }) => base44.entities.Listing.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-listings'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-listings'] });
       toast.success('Property updated successfully!');
       onClose();
     },
@@ -134,6 +139,9 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
           agent_name: form.agent_name || null,
           agent_email: form.agent_email || null,
           agent_phone: form.agent_phone || null,
+          owner_name: form.owner_name || null,
+          owner_phone: form.owner_phone || null,
+          owner_email: user?.role === 'agent' ? (form.contact_email || form.agent_email) : user?.email,
         },
       });
     } catch {
@@ -253,8 +261,8 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
               </div>
             </div>
             <div>
-              <Label>Lease Terms</Label>
-              <Input value={form.lease_terms} onChange={e => update('lease_terms', e.target.value)} />
+              <Label>Lease Terms (Months)</Label>
+              <Input type="number" min="1" value={form.lease_terms} onChange={e => update('lease_terms', e.target.value)} placeholder="e.g., 12" />
             </div>
           </div>
 
@@ -298,13 +306,27 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
 
           {/* Contact */}
           <div className="space-y-4 pt-4 border-t">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Contact</h3>
+            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+              {user?.role === 'agent' ? 'Owner & Agent Contact' : 'Contact'}
+            </h3>
+            {user?.role === 'agent' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Owner Name *</Label>
+                  <Input value={form.owner_name} onChange={e => update('owner_name', e.target.value)} placeholder="e.g., Maria Garcia" />
+                </div>
+                <div>
+                  <Label>Owner Phone</Label>
+                  <Input value={form.owner_phone} onChange={e => update('owner_phone', e.target.value)} placeholder="+52 322 123 4567" />
+                </div>
+              </div>
+            )}
             <div>
-              <Label>WhatsApp</Label>
+              <Label>{user?.role === 'agent' ? 'Owner WhatsApp' : 'WhatsApp'}</Label>
               <Input value={form.whatsapp} onChange={e => update('whatsapp', e.target.value)} />
             </div>
             <div>
-              <Label>Contact Email</Label>
+              <Label>{user?.role === 'agent' ? 'Owner Email' : 'Contact Email'}</Label>
               <Input type="email" value={form.contact_email} onChange={e => update('contact_email', e.target.value)} />
             </div>
             <div>
@@ -314,15 +336,15 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
               <div>
                 <Label>Agent Name</Label>
-                <Input value={form.agent_name} onChange={e => update('agent_name', e.target.value)} />
+                <Input disabled={user?.role === 'agent'} value={form.agent_name} onChange={e => update('agent_name', e.target.value)} />
               </div>
               <div>
                 <Label>Agent Email</Label>
-                <Input type="email" value={form.agent_email} onChange={e => update('agent_email', e.target.value)} />
+                <Input disabled={user?.role === 'agent'} type="email" value={form.agent_email} onChange={e => update('agent_email', e.target.value)} />
               </div>
               <div>
                 <Label>Agent Phone</Label>
-                <Input value={form.agent_phone} onChange={e => update('agent_phone', e.target.value)} />
+                <Input disabled={user?.role === 'agent'} value={form.agent_phone} onChange={e => update('agent_phone', e.target.value)} />
               </div>
             </div>
           </div>

@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { ShieldCheck, Bed, Bath, MapPin, Star, Heart, ArrowLeftRight, CheckCircle } from 'lucide-react';
 import { NEIGHBORHOOD_LABELS } from '@/lib/constants';
+import { useAuth } from '@/lib/AuthContext';
 export default function ListingCard({ listing, favoriteIds, onToggleFavorite, compareIds, onToggleCompare, hasBookingRequest, refCode = '' }) {
+  const { user } = useAuth();
+  const isAgent = user?.role === 'agent';
   const photo = listing.photos?.[0] || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&q=80';
   const isFavorited = favoriteIds?.has(listing.id);
   const isComparing = compareIds?.has(listing.id);
@@ -30,8 +33,8 @@ export default function ListingCard({ listing, favoriteIds, onToggleFavorite, co
               {isComparing ? 'Selected' : 'Compare'}
             </button>
           )}
-          {/* Heart / favorite button */}
-          {onToggleFavorite && (
+          {/* Heart / favorite button – hidden for agents */}
+          {onToggleFavorite && !isAgent && (
             <button
               onClick={e => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(listing.id); }}
               className="absolute top-2.5 right-2.5 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors"

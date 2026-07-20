@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Rectangle, useMapEvents, useMap } from 'react-leaflet';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Bed, Bath, Star, X, MapPin, SlidersHorizontal } from 'lucide-react';
@@ -160,6 +160,28 @@ function SidePanel({ listings, activeId, onHover, onClose }) {
   );
 }
 
+const NEIGHBORHOOD_COORDS = {
+  romantica: [20.6025, -105.2372],
+  marina_vallarta: [20.6653, -105.2536],
+  nuevo_vallarta: [20.6922, -105.2891],
+  centro: [20.6120, -105.2335],
+  amapas: [20.5960, -105.2355],
+  conchas_chinas: [20.5878, -105.2311],
+  fluvial: [20.6405, -105.2285],
+  versalles: [20.6355, -105.2315],
+  pitillal: [20.6489, -105.2132],
+  las_juntas: [20.6865, -105.2325],
+  hotel_zone: [20.6300, -105.2410],
+  south_side: [20.6010, -105.2375],
+  bucerias: [20.7554, -105.3323],
+  la_cruz: [20.7297, -105.3789],
+  punta_mita: [20.7681, -105.5264],
+  sayulita: [20.8689, -105.4408],
+  cinco_de_diciembre: [20.6225, -105.2320],
+  alta_vista: [20.6045, -105.2310],
+  lazaro_cardenas: [20.6200, -105.2280],
+};
+
 export default function ListingsMap({ listings }) {
   const [activeId, setActiveId] = useState(null);
   const [mapBounds, setMapBounds] = useState(null);
@@ -168,7 +190,39 @@ export default function ListingsMap({ listings }) {
   const [showPanel, setShowPanel] = useState(true);
   const mapRef = useRef(null);
 
-  const withCoords = listings.filter(l => l.latitude && l.longitude);
+  const withCoords = useMemo(() => {
+    // Generate a deterministic offset or random offset based on listing id or seed to avoid re-shifting on every render
+    return listings.map(l => {
+      if (l.latitude && l.longitude) {
+        return { ...l, latitude: Number(l.latitude), longitude: Number(l.longitude) };
+      }
+      
+      const defaultCoords = NEIGHBORHOOD_COORDS[l.neighborhood];
+      // Create a deterministic offset from listing id to prevent continuous shifts on map re-renders
+      let hash = 0;
+      if (l.id) {
+        for (let i = 0; i < l.id.length; i++) {
+          hash = l.id.charCodeAt(i) + ((hash << 5) - hash);
+        }
+      }
+      const latOffset = ((hash & 0xFF) / 255 - 0.5) * 0.004;
+      const lngOffset = (((hash >> 8) & 0xFF) / 255 - 0.5) * 0.004;
+
+      if (defaultCoords) {
+        return {
+          ...l,
+          latitude: defaultCoords[0] + latOffset,
+          longitude: defaultCoords[1] + lngOffset,
+        };
+      }
+      // PV Center fallback
+      return {
+        ...l,
+        latitude: 20.6534 + latOffset,
+        longitude: -105.2253 + lngOffset,
+      };
+    });
+  }, [listings]);
 
   // Filter by drawn bounds or map bounds
   const visibleListings = withCoords.filter(l => {

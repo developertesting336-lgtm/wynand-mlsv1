@@ -34,6 +34,13 @@ export default function RoleBasedRoute({ children, allowedRoles = [], fallbackPa
 
   // Check if user's role is in allowed list
   if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
+    // If a renter is redirected from Stripe to /owner-dashboard, route them to /dashboard preserving stripe params
+    if (userRole === 'renter' && location.pathname === '/owner-dashboard') {
+      const params = new URLSearchParams(location.search);
+      if (params.has('stripe')) {
+        return <Navigate to={`/dashboard${location.search}`} replace />;
+      }
+    }
     return <Navigate to={fallbackPath} replace />
   }
 

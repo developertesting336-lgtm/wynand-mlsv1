@@ -30,10 +30,14 @@ serve(async (req) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
+
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') || '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     );
+
+
 
     const { email, origin } = await req.json();
     if (!email) {
@@ -42,6 +46,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+
 
     // Find profile
     let { data: profile, error } = await supabase
@@ -57,9 +63,22 @@ serve(async (req) => {
       });
     }
 
-    let stripeConnectId = profile.stripe_connect_id;
 
-    if (!stripeConnectId) {
+
+
+    let stripeConnectId = profile.stripe_connect_id;
+    let accountExists = false;
+
+    if (stripeConnectId) {
+      try {
+        await stripe.accounts.retrieve(stripeConnectId);
+        accountExists = true;
+      } catch (err) {
+        console.log(`Account ${stripeConnectId} retrieve failed: ${err.message}. Creating a new one.`);
+      }
+    }
+
+    if (!stripeConnectId || !accountExists) {
       const account = await stripe.accounts.create({
         type: 'express',
         email: email,
@@ -72,14 +91,24 @@ serve(async (req) => {
 
       await supabase
         .from('profiles')
-        .update({ stripe_connect_id: stripeConnectId })
+        .update({
+          stripe_connect_id: stripeConnectId,
+          stripe_onboarding_complete: false
+        })
         .eq('id', profile.id);
+    }
+
+    let dashboardPath = '/owner-dashboard';
+    if (profile.role === 'renter') {
+      dashboardPath = '/dashboard';
+    } else if (profile.role === 'agent') {
+      dashboardPath = '/agent-dashboard';
     }
 
     const accountLink = await stripe.accountLinks.create({
       account: stripeConnectId,
-      refresh_url: `${origin}/owner-dashboard?stripe=refresh`,
-      return_url: `${origin}/owner-dashboard?stripe=success`,
+      refresh_url: `${origin}${dashboardPath}?stripe=refresh`,
+      return_url: `${origin}${dashboardPath}?stripe=success`,
       type: 'account_onboarding',
     });
 
