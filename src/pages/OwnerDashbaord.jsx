@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { NEIGHBORHOOD_LABELS } from '@/lib/constants';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { sendPushNotification } from '@/utils/pushNotification';
 import AvailabilityManager from '@/components/owner/AvailabilityManager';
 import EditPropertyModal from '@/components/owner/EditPropertyModal';
 import StripeConnectBanner from '@/components/StripeConnectBanner';
@@ -638,11 +639,31 @@ export default function OwnerDashboard() {
       setUpdatingState({ id, action: status });
       if (status === 'declined') {
         // When declining, also mark end_lease=true so the listing becomes available
-        const { error } = await supabase
+        const { data: updatedBooking, error } = await supabase
           .from('bookings')
           .update({ status: 'declined', end_lease: true, updated_date: new Date().toISOString() })
-          .eq('id', id);
+          .eq('id', id)
+          .select('id, renter_id, listing_id')
+          .maybeSingle();
         if (error) throw new Error(error.message);
+
+        if (updatedBooking?.renter_id) {
+          const listingTitle = myListings.find((listing) => listing.id === updatedBooking.listing_id)?.title;
+          const body = listingTitle
+            ? `The owner declined your booking request for "${listingTitle}".`
+            : 'The owner declined your booking request.';
+
+          sendPushNotification(
+            updatedBooking.renter_id,
+            'Booking Request Declined',
+            body,
+            '/user-dashboard',
+            'booking_declined'
+          ).catch((notificationError) => {
+            console.error('Booking decline push notification error:', notificationError);
+          });
+        }
+
         return { success: true };
       }
       return base44.entities.Booking.update(id, { status });
