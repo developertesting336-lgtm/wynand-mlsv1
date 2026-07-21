@@ -34,10 +34,10 @@ const LISTING_STATUS = {
 };
 
 const BOOKING_STATUS = {
-  pending:  { label: 'Pending',  icon: Hourglass,     cls: 'bg-amber-100 text-amber-700' },
+  pending: { label: 'Pending', icon: Hourglass, cls: 'bg-amber-100 text-amber-700' },
   lease_pending: { label: 'Lease Pending', icon: Hourglass, cls: 'bg-blue-100 text-blue-700 animate-pulse' },
-  approved: { label: 'Approved & Signed', icon: CheckCircle,   cls: 'bg-green-100 text-green-700' },
-  declined: { label: 'Declined', icon: XCircle,       cls: 'bg-red-100 text-red-700' },
+  approved: { label: 'Approved & Signed', icon: CheckCircle, cls: 'bg-green-100 text-green-700' },
+  declined: { label: 'Declined', icon: XCircle, cls: 'bg-red-100 text-red-700' },
 };
 
 function useDebouncedValue(value, delay = 500) {
@@ -265,7 +265,7 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
   const bookingMap = Object.fromEntries(bookings.map(b => [b.id, b]));
   const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
   const debouncedSearch = useDebouncedValue(search, 500);
-  
+
   const { data: referralPayments = [] } = useQuery({
     queryKey: ['referral-payments-for-bookings', payments.map(p => p.booking_id).filter(Boolean)],
     queryFn: async () => {
@@ -390,7 +390,7 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
               const amountUsd = p.amount_centavos ? (p.amount_centavos / 100) : 0;
               const datePart = p.created_date ? format(new Date(p.created_date), 'MMMM d, yyyy') : 'N/A';
               const timePart = p.created_date ? format(new Date(p.created_date), 'h:mm a') : '';
-              
+
               const dbCommissionPct = p.commission_paid_percentage ?? p.commision_paid_percentage;
               const hasAgentOrReferral = !!booking?.agent_id || (dbCommissionPct != null ? Number(dbCommissionPct) > 0 : referralBookingIds.has(p.booking_id));
 
@@ -521,7 +521,7 @@ export default function OwnerDashboard() {
   useEffect(() => {
     base44.auth.me().then(async (u) => {
       setUser(u);
-    }).catch(() => {}).finally(() => setAuthLoading(false));
+    }).catch(() => { }).finally(() => setAuthLoading(false));
   }, []);
 
   const { data: myListings = [], isLoading: listingsLoading } = useQuery({
@@ -558,7 +558,7 @@ export default function OwnerDashboard() {
     },
     enabled: allBookings.length > 0,
   });
-  
+
   const renterProfileMap = Object.fromEntries(renterProfiles.map(p => [p.id, p]));
 
   const { data: agentProfiles = [] } = useQuery({
@@ -636,6 +636,15 @@ export default function OwnerDashboard() {
   const updateBooking = useMutation({
     mutationFn: async ({ id, status }) => {
       setUpdatingState({ id, action: status });
+      if (status === 'declined') {
+        // When declining, also mark end_lease=true so the listing becomes available
+        const { error } = await supabase
+          .from('bookings')
+          .update({ status: 'declined', end_lease: true, updated_date: new Date().toISOString() })
+          .eq('id', id);
+        if (error) throw new Error(error.message);
+        return { success: true };
+      }
       return base44.entities.Booking.update(id, { status });
     },
     onSuccess: () => {
@@ -818,7 +827,7 @@ export default function OwnerDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-4">
         <div className="h-9 w-64 bg-muted animate-pulse rounded-lg" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />)}
         </div>
       </div>
     );
@@ -846,9 +855,9 @@ export default function OwnerDashboard() {
         </Link>
       </div>
 
-      <StripeConnectBanner 
-        user={user} 
-        onboardingLoading={onboardingLoading} 
+      <StripeConnectBanner
+        user={user}
+        onboardingLoading={onboardingLoading}
         handleStripeOnboard={handleStripeOnboard}
         title="Set up Stripe Payments"
         description="Connect your Stripe account to PV Verified Rentals. This enables tenants to pay rent or deposits directly to your bank account securely."
@@ -897,7 +906,7 @@ export default function OwnerDashboard() {
         <TabsContent value="properties" className="pt-6">
           {listingsLoading ? (
             <div className="space-y-2">
-              {[1,2,3].map(i => <div key={i} className="h-14 bg-muted animate-pulse rounded-xl" />)}
+              {[1, 2, 3].map(i => <div key={i} className="h-14 bg-muted animate-pulse rounded-xl" />)}
             </div>
           ) : (
             <>
@@ -981,7 +990,7 @@ export default function OwnerDashboard() {
         <TabsContent value="bookings" className="pt-6">
           {bookingsLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[1,2,3,4].map(i => <div key={i} className="h-32 bg-muted animate-pulse rounded-xl" />)}
+              {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-muted animate-pulse rounded-xl" />)}
             </div>
           ) : allBookings.length === 0 ? (
             <div className="text-center py-16">
@@ -1125,18 +1134,18 @@ export default function OwnerDashboard() {
                                       ) : '—'}
                                     </td>
                                     <td className="px-4 py-3 align-top text-muted-foreground">
-                                       {(() => {
-                                         const agent = agentProfileMap[b.agent_id];
-                                         if (agent) {
-                                           return (
-                                             <div>
-                                               <div className="font-medium text-foreground">{agent.full_name || 'Agent'}</div>
-                                               <div className="text-xs">{agent.email}</div>
-                                             </div>
-                                           );
-                                         }
-                                         return b.agent_email || '—';
-                                       })()}
+                                      {(() => {
+                                        const agent = agentProfileMap[b.agent_id];
+                                        if (agent) {
+                                          return (
+                                            <div>
+                                              <div className="font-medium text-foreground">{agent.full_name || 'Agent'}</div>
+                                              <div className="text-xs">{agent.email}</div>
+                                            </div>
+                                          );
+                                        }
+                                        return b.agent_email || '—';
+                                      })()}
                                     </td>
                                     <td className="px-4 py-3 align-top">
                                       <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${cfg.cls}`}>
@@ -1208,7 +1217,7 @@ export default function OwnerDashboard() {
                                           onSave={async (signature) => {
                                             try {
                                               setUpdatingState({ id: b.id, action: 'approve' });
-                                              
+
                                               let signatureUrl = signature;
                                               if (!signature.startsWith('http')) {
                                                 const arr = signature.split(',');
@@ -1220,10 +1229,10 @@ export default function OwnerDashboard() {
                                                   u8arr[n] = bstr.charCodeAt(n);
                                                 }
                                                 const file = new File([u8arr], `signs/signature_owner_${b.id}.png`, { type: mime });
-                                                
+
                                                 const uploadResult = await base44.integrations.Core.UploadFile({ file });
                                                 signatureUrl = uploadResult?.file_url;
-                                                
+
                                                 if (!signatureUrl) {
                                                   throw new Error('Failed to obtain signature public URL from storage.');
                                                 }
@@ -1247,7 +1256,7 @@ export default function OwnerDashboard() {
                                                   console.error('Failed to append signature to profile:', profileErr);
                                                 }
                                               }
-                                              
+
                                               const finalAgreementData = {
                                                 ...agreementData,
                                                 landlordSignature: signatureUrl,
@@ -1388,7 +1397,7 @@ export default function OwnerDashboard() {
                                       }
                                       const leaseEndDate = getLeaseEndDate(b.move_in_date, b.agreement_conditions?.leaseDuration || b.lease_duration_months);
                                       const isLeaseOver = leaseEndDate ? leaseEndDate <= new Date() : false;
-                                      
+
                                       if (isLeaseOver) {
                                         return (
                                           <Button
@@ -1406,7 +1415,7 @@ export default function OwnerDashboard() {
                                           </Button>
                                         );
                                       }
-                                      
+
                                       return (
                                         <span className="text-xs text-emerald-600 font-semibold">Lease Active</span>
                                       );
@@ -1549,7 +1558,7 @@ export default function OwnerDashboard() {
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
-            
+
             {!editingAgreementData ? (
               <div className="py-8 text-center">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto" />
@@ -1570,7 +1579,7 @@ export default function OwnerDashboard() {
                   isSubmitting={updatingState?.id === editingAgreementId}
                   hideSubmitButton={true}
                 />
-                
+
                 {editingAgreementData && (
                   <div className="space-y-4">
                     {editingAgreementData.landlordSignature ? (

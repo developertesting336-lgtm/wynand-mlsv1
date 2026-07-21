@@ -50,7 +50,7 @@ export default function InquiryForm({ listing, onSubmitted, compact = false, own
         console.error('Failed to fetch verifications:', error);
         return {};
       }
-      console.log('Fetched verification for user:', currentUser.id, data);
+
       return data || {};
     },
     enabled: !!currentUser?.id,

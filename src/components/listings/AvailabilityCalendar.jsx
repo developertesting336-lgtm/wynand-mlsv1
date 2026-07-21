@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { isSubscriptionActive } from '@/lib/utils';
+import { sendPushNotification } from '@/utils/pushNotification';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -129,7 +130,6 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
         return;
       }
       const verif = rows?.find(r => r.user_id === currentUser.id) || {};
-      console.log('Fetched tenant verification:', verif);
       setTenantVerification(verif);
       setVerificationLoading(false);
     };
@@ -140,7 +140,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
   useEffect(() => {
     const fetchAll = async () => {
       const { data: allData, error: allError } = await supabase.from('verifications').select('*');
-      console.log('All verifications rows (debug):', allData, allError);
+
     };
     fetchAll();
   }, []);
@@ -329,21 +329,15 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
         }).catch(() => { });
       }
 
-      // Send in-app / push notification to the owner
+      // send-push edge function handles both: DB insert into notifications + web-push delivery
       if (ownerId) {
-        const { error: notifError } = await supabase
-          .from('notifications')
-          .insert({
-            user_id: ownerId,
-            title: 'New Booking Request',
-            message: `${name} has requested to book "${listing.title}".`,
-            type: 'booking_request',
-            read: false,
-          });
-
-        if (notifError) {
-          console.error('Error creating notification:', notifError);
-        }
+        sendPushNotification(
+          ownerId,
+          'New Booking Request',
+          `${name} has requested to book "${listing.title}".`,
+          `/owner-dashboard`,
+          'booking_request'
+        ).catch(err => console.error('Web-push error:', err));
       }
     },
     onSuccess: () => {
@@ -596,7 +590,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
                 </form>
               ) : (
                 <Button className="w-full gap-2" onClick={() => {
-                  console.log('Opening request form');
+
                   setRequestForm(p => ({ ...p, dates: [...selectedDates].sort() }));
                   setShowRequestForm(true);
                 }}>

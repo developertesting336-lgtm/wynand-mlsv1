@@ -80,8 +80,6 @@ export const AuthProvider = ({ children }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email)
-
         if (
           event === 'INITIAL_SESSION' ||
           event === 'SIGNED_IN' ||

@@ -167,3 +167,34 @@ export async function unsubscribePushNotifications(userId) {
     return { success: false, error: err.message };
   }
 }
+
+/**
+ * Send a web-push notification to a specific user via the `send-push` edge function.
+ * The edge function also inserts a row into the notifications table (in-app bell).
+ * The VAPID private key stays securely on the server.
+ *
+ * @param {string} userId  - The recipient's profile UUID
+ * @param {string} title   - Notification title
+ * @param {string} body    - Notification body text
+ * @param {string} [url]   - Optional URL to open when the notification is clicked
+ * @param {string} [type]  - Notification type stored in DB (default: 'general')
+ */
+export async function sendPushNotification(userId, title, body, url = '/', type = 'general') {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-push', {
+      body: { user_id: userId, title, body, url, type },
+    });
+
+    if (error) {
+      console.error('send-push edge function error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (err) {
+    console.error('sendPushNotification error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+

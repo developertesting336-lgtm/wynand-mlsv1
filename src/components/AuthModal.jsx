@@ -203,10 +203,10 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
 
     try {
       const email = form.email.toLowerCase().trim()
-      
+
       // First check if account exists
       const accountExists = await checkIfEmailExists(email)
-      
+
       if (!accountExists) {
         setError('Account does not exist. Please check your email or sign up.')
         setLoading(false)
@@ -215,7 +215,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
 
       // Account exists, send OTP
       const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001'
-      
+
       const res = await fetch(`${emailServerUrl}/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -244,10 +244,10 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
 
     try {
       const email = form.email.toLowerCase().trim()
-      
+
       // Verify account still exists before resending
       const accountExists = await checkIfEmailExists(email)
-      
+
       if (!accountExists) {
         setError('Account does not exist.')
         setLoading(false)
@@ -255,7 +255,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       }
 
       const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001'
-      
+
       const res = await fetch(`${emailServerUrl}/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -295,7 +295,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
 
     try {
       const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001'
-      
+
       const res = await fetch(`${emailServerUrl}/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -501,7 +501,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
           <p className="text-slate-600 mb-6">
             Your password has been reset successfully. You can now sign in with your new password.
           </p>
-          <Button 
+          <Button
             onClick={() => { setMode('login'); setError(''); setOtp(''); setNewPassword(''); setConfirmPassword('') }}
             className="w-full h-11 text-base"
           >
@@ -625,10 +625,10 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
               <Label htmlFor="phone_number">Phone Number</Label>
               <Input
                 id="phone_number"
-                type="tel"
-                placeholder="+1 (555) 000-0000"
+                type="number"
+                placeholder="Enter 10-digit phone number"
                 value={form.phone_number}
-                onChange={e => handleChange('phone_number', e.target.value)}
+                onChange={e => handleChange('phone_number', e.target.value.slice(0, 10))}
               />
             </div>
           )}
@@ -685,25 +685,25 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
           </Button>
         </form>
 
-          <div className="mt-6 text-center text-sm text-gray-500">
-            {mode === 'login' ? (
-              <div className="space-y-2">
-                <p>
-                  Don't have an account?{' '}
-                  <button onClick={switchMode} className="text-primary font-medium hover:underline">
-                    Sign up
-                  </button>
-                </p>
-                <p>
-                  <button 
-                    onClick={() => setMode('reset-password')}
-                    className="text-primary font-medium hover:underline"
-                  >
-                    Forgot password?
-                  </button>
-                </p>
-              </div>
-            ) : (
+        <div className="mt-6 text-center text-sm text-gray-500">
+          {mode === 'login' ? (
+            <div className="space-y-2">
+              <p>
+                Don't have an account?{' '}
+                <button onClick={switchMode} className="text-primary font-medium hover:underline">
+                  Sign up
+                </button>
+              </p>
+              <p>
+                <button
+                  onClick={() => setMode('reset-password')}
+                  className="text-primary font-medium hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </p>
+            </div>
+          ) : (
             <p>
               Already have an account?{' '}
               <button onClick={switchMode} className="text-primary font-medium hover:underline">

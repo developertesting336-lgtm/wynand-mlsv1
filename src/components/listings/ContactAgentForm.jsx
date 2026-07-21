@@ -60,7 +60,7 @@ export default function ContactAgentForm({ listing, ownerRole = 'agent', refCode
         }
 
         const verif = rows || {};
-        console.log('Fetched verification for user:', currentUser.id, verif);
+
         setTenantVerification(verif);
       } catch (err) {
         console.error('Error fetching verification:', err);
