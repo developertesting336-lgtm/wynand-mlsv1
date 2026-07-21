@@ -151,18 +151,53 @@ export default function InquiryForm({ listing, onSubmitted, compact = false, own
 
     // Email the listing owner via Express API
     if (listing.owner_email) {
+      const verifiedBadge = tenantVerification.id_verification === 'approved' && tenantVerification.employment_verification === 'approved'
+        ? '<span style="display:inline-block;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;line-height:20px">✓ Verified Tenant</span>'
+        : '';
       const emailPayload = {
         to: listing.owner_email,
         subject: `New inquiry for "${listing.title}"`,
         body: `
-<p>Hi ${listing.owner_name || 'there'},</p>
-<p>You have a new inquiry for <strong>${listing.title}</strong>.</p>
-<table style="border-collapse:collapse;width:100%;max-width:480px">
-  <tr><td style="padding:6px 0;color:#666">Name</td><td style="padding:6px 0;font-weight:600">${form.name}${tenantVerification.id_verification === 'approved' && tenantVerification.employment_verification === 'approved' ? ' <span style="display:inline-flex;align-items:center;gap:4px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">✓ Verified Tenant</span>' : ''}</td></tr>
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:32px 16px">
+<tr><td align="center">
+  <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
+    <tr><td style="padding:0 0 24px 0;text-align:center">
+      <img src="https://pvverified.com/logo.png" alt="PV Verified Rentals" width="160" style="border:0" />
+    </td></tr>
+    <tr><td style="background:#ffffff;border-radius:16px;padding:40px 32px;box-shadow:0 4px 24px rgba(0,0,0,0.06)">
+      <h1 style="margin:0 0 8px 0;font-size:22px;color:#1e293b;font-weight:700">New Inquiry</h1>
+      <p style="margin:0 0 24px 0;font-size:15px;color:#64748b;line-height:1.5">${listing.owner_name || 'Hi there'}, you've received a new inquiry for <strong style="color:#0f172a">${listing.title}</strong>.</p>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:20px">
+        <tr><td style="padding:6px 0">
+          <span style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px">Name</span>
+          <p style="margin:2px 0 0 0;font-size:15px;color:#0f172a;font-weight:600">${form.name} ${verifiedBadge}</p>
+        </td></tr>
+      </table>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f9ff;border-radius:12px;padding:16px;border-left:4px solid #0ea5e9;margin-bottom:24px">
+        <tr><td style="font-size:14px;color:#1e293b;line-height:1.6;font-style:italic">${form.message}</td></tr>
+      </table>
+
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td align="center">
+          <a href="${window.location.origin}/dashboard/inquiries" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;text-decoration:none">View Inquiry</a>
+        </td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="padding:20px 32px 0 32px;text-align:center">
+      <p style="margin:0 0 4px 0;font-size:12px;color:#94a3b8">PV Verified Rentals · Puerto Vallarta</p>
+      <p style="margin:0;font-size:11px;color:#cbd5e1">This is an automated notification — please do not reply directly.</p>
+    </td></tr>
+  </table>
+</td></tr>
 </table>
-<blockquote style="border-left:3px solid #0ea5e9;margin:12px 0;padding:8px 16px;background:#f0f9ff;border-radius:4px">${form.message}</blockquote>
-<p style="color:#888;font-size:12px">PV Verified Rentals</p>
-        `.trim(),
+</body>
+</html>`.trim(),
         fromName: 'PV Verified Rentals',
       };
 
@@ -192,12 +227,42 @@ export default function InquiryForm({ listing, onSubmitted, compact = false, own
         to: form.email,
         subject: `Your inquiry for "${listing.title}" was received`,
         body: `
-<p>Hi ${form.name},</p>
-<p>Thanks for your inquiry! The owner of <strong>${listing.title}</strong> has been notified and will reach out to you soon.</p>
-<p>In the meantime, feel free to browse more verified listings at <a href="${window.location.origin}/listings">PV Verified Rentals</a>.</p>
-<p style="color:#888;font-size:12px">PV Verified Rentals · Puerto Vallarta</p>
-        `.trim(),
-        fromEmail: 'noreply@pvverified.com',
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:32px 16px">
+<tr><td align="center">
+  <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
+    <tr><td style="padding:0 0 24px 0;text-align:center">
+      <img src="https://pvverified.com/logo.png" alt="PV Verified Rentals" width="160" style="border:0" />
+    </td></tr>
+    <tr><td style="background:#ffffff;border-radius:16px;padding:40px 32px;box-shadow:0 4px 24px rgba(0,0,0,0.06)">
+      <div style="width:56px;height:56px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;margin:0 auto 16px auto;text-align:center;line-height:56px;font-size:28px">✓</div>
+      <h1 style="margin:0 0 8px 0;font-size:22px;color:#1e293b;font-weight:700;text-align:center">Inquiry Sent!</h1>
+      <p style="margin:0 0 24px 0;font-size:15px;color:#64748b;line-height:1.5;text-align:center">Thanks, ${form.name}! Your inquiry for <strong style="color:#0f172a">${listing.title}</strong> has been received. The owner will reach out to you soon.</p>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:24px">
+        <tr><td style="font-size:13px;color:#64748b;padding-bottom:4px">Listing</td></tr>
+        <tr><td style="font-size:15px;color:#0f172a;font-weight:600">${listing.title}</td></tr>
+      </table>
+
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td align="center">
+          <a href="${window.location.origin}/listings" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;text-decoration:none">Browse More Listings</a>
+        </td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="padding:20px 32px 0 32px;text-align:center">
+      <p style="margin:0 0 4px 0;font-size:12px;color:#94a3b8">PV Verified Rentals · Puerto Vallarta</p>
+      <p style="margin:0;font-size:11px;color:#cbd5e1">This is an automated message — please do not reply directly.</p>
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`.trim(),
+        fromEmail: 'info@pvverified.com',
         fromName: 'PV Verified Rentals',
       }),
     }).catch(() => { });

@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, User, MessageSquare, ShieldAlert } from 'lucide-react';
+import { Send, User, MessageSquare, ShieldAlert, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
-export default function InquiryReplies({ inquiry, currentUserId, currentUserName, currentUserRole }) {
+export default function InquiryReplies({ inquiry, currentUserId, currentUserName, currentUserRole, onBack }) {
   const [replies, setReplies] = useState([]);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -305,6 +305,11 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
     <div className="flex flex-col h-full">
       <div className="bg-muted/30 border-b px-4 py-3">
         <div className="flex items-center gap-2">
+          {onBack && (
+            <button onClick={onBack} className="md:hidden p-1 -ml-2 mr-1 rounded-full hover:bg-muted shrink-0 text-muted-foreground transition-colors">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          )}
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             <User className="w-4 h-4 text-primary" />
           </div>

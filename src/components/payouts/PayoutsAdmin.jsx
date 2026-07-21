@@ -78,7 +78,7 @@ ${bodyMap[newStatus]}
 </table>
 <p style="color:#888;font-size:12px;margin-top:24px">PV Verified Rentals · Puerto Vallarta</p>
             `.trim(),
-            fromEmail: 'noreply@pvverified.com',
+            fromEmail: 'info@pvverified.com',
             fromName: 'PV Verified Rentals',
           }),
         }).catch(() => { });

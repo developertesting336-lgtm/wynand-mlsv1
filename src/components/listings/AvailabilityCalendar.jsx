@@ -274,14 +274,56 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
             to: listing.owner_email,
             subject: `New booking request for "${listing.title}"`,
             body: `
-<p>Hi ${listing.owner_name || 'there'},</p>
-<p><strong>${name}</strong> has requested the following dates for <strong>${listing.title}</strong>:</p>
-<ul>${sortedDates.map(d => `<li>${format(new Date(d + 'T00:00:00'), 'MMMM d, yyyy')}</li>`).join('')}</ul>
-${note ? `<p>Note: ${note}</p>` : ''}
-<p>Reply to: <a href="mailto:${email}">${email}</a></p>
-<p style="color:#888;font-size:12px">PV Verified Rentals · Puerto Vallarta</p>
-            `.trim(),
-            fromEmail: 'noreply@pvverified.com',
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:32px 16px">
+<tr><td align="center">
+  <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
+    <tr><td style="padding:0 0 24px 0;text-align:center">
+      <img src="https://pvverified.com/logo.png" alt="PV Verified Rentals" width="160" style="border:0" />
+    </td></tr>
+    <tr><td style="background:#ffffff;border-radius:16px;padding:40px 32px;box-shadow:0 4px 24px rgba(0,0,0,0.06)">
+      <h1 style="margin:0 0 8px 0;font-size:22px;color:#1e293b;font-weight:700">Booking Request</h1>
+      <p style="margin:0 0 24px 0;font-size:15px;color:#64748b;line-height:1.5">${listing.owner_name || 'Hi there'}, <strong style="color:#0f172a">${name}</strong> has requested to book <strong style="color:#0f172a">${listing.title}</strong>.</p>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;padding:20px;margin-bottom:20px">
+        <tr><td style="font-size:13px;color:#94a3b8;padding-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Requested Dates</td></tr>
+        ${sortedDates.map((d, i) => `
+        <tr><td style="padding:${i > 0 ? '8px 0 0 0' : '0 0 0 0'}">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#0ea5e9;margin-right:8px;vertical-align:middle"></span>
+          <span style="font-size:15px;color:#0f172a;font-weight:500">${format(new Date(d + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}</span>
+        </td></tr>`).join('')}
+      </table>
+
+      ${note ? `
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f9ff;border-radius:12px;padding:16px;border-left:4px solid #0ea5e9;margin-bottom:24px">
+        <tr><td style="font-size:13px;color:#94a3b8;padding-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Note from Tenant</td></tr>
+        <tr><td style="font-size:14px;color:#1e293b;line-height:1.6">${note}</td></tr>
+      </table>` : ''}
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border-radius:12px;padding:12px 16px;margin-bottom:24px">
+        <tr><td style="font-size:13px;color:#059669">
+          ${budget ? `&nbsp;·&nbsp; <strong>Budget:</strong> $${Number(budget).toLocaleString()} MXN` : ''}
+        </td></tr>
+      </table>
+
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td align="center">
+        </td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="padding:20px 32px 0 32px;text-align:center">
+      <p style="margin:0 0 4px 0;font-size:12px;color:#94a3b8">PV Verified Rentals · Puerto Vallarta</p>
+      <p style="margin:0;font-size:11px;color:#cbd5e1">This is an automated notification — please do not reply directly.</p>
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`.trim(),
+            fromEmail: 'info@pvverified.com',
             fromName: 'PV Verified Rentals',
           }),
         }).catch(() => { });
@@ -463,9 +505,6 @@ ${note ? `<p>Note: ${note}</p>` : ''}
               <CheckCircle className="w-10 h-10 text-primary mx-auto mb-2" />
               <p className="font-semibold">Booking request sent!</p>
               <p className="text-sm text-muted-foreground mt-1">The owner will review and confirm shortly.</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => { setRequestSent(false); setSelectedDates(new Set()); }}>
-                Request more dates
-              </Button>
             </div>
           ) : selectedDates.size > 0 && (
             <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-3">

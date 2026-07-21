@@ -27,7 +27,7 @@ serve(async (req) => {
 
     // Read SMTP/email service credentials from Supabase secrets
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    const smtpFrom = Deno.env.get('SMTP_FROM') || fromEmail || 'noreply@pvverified.com';
+    const smtpFrom = Deno.env.get('SMTP_FROM') || fromEmail || 'info@pvverified.com';
     const smtpFromName = Deno.env.get('SMTP_FROM_NAME') || fromName || 'PV Verified Rentals';
     
     console.log('[Email] Config:', { 

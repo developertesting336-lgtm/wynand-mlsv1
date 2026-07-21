@@ -66,7 +66,7 @@ export default function ReferralsList({ agentId }) {
 ${newStatus === 'converted' ? '<p style="margin-top:16px;padding:12px;background:#f0fdf4;border-radius:8px;color:#15803d"><strong>🎉 Congratulations!</strong> This lead has been converted. You can now request a commission payout from your dashboard.</p>' : ''}
 <p style="color:#888;font-size:12px;margin-top:24px">PV Verified Rentals · Puerto Vallarta</p>
               `.trim(),
-            fromEmail: 'noreply@pvverified.com',
+            fromEmail: 'info@pvverified.com',
             fromName: 'PV Verified Rentals',
           }),
         }).catch(() => { });

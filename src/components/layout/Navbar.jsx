@@ -115,6 +115,7 @@ export default function Navbar() {
   };
 
   const handleEnableFromPrompt = async () => {
+    setShowPrompt(false);
     const res = await registerPushNotifications(user.id);
     if (res.success) {
       setPushStatus('subscribed');

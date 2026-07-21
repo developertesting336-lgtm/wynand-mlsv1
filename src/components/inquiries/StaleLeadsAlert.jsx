@@ -42,7 +42,7 @@ export default function StaleLeadsAlert({ inquiries, agentEmail, agentName }) {
 <p><a href="${window.location.origin}/agent-dashboard" style="display:inline-block;background:#0ea5e9;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">Go to My Dashboard →</a></p>
 <p style="color:#888;font-size:12px;margin-top:24px">PV Verified Rentals · Puerto Vallarta</p>
         `.trim(),
-        fromEmail: process.env.VITE_APP_EMAIL || 'noreply@pvverified.com',
+        fromEmail: process.env.VITE_APP_EMAIL || 'info@pvverified.com',
         fromName: 'PV Verified Rentals',
       }),
     });

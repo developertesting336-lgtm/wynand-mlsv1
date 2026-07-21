@@ -109,9 +109,9 @@ export default function InquiryKanban({ inquiries }) {
   }
 
   return (
-    <div className="flex gap-0 h-[70vh] border rounded-xl overflow-hidden bg-white">
+    <div className="flex gap-0 h-[70vh] md:h-[70vh] border rounded-xl overflow-hidden bg-white">
       {/* Conversation list */}
-      <div className="w-80 shrink-0 border-r overflow-y-auto">
+      <div className={`w-full md:w-80 shrink-0 md:border-r overflow-y-auto ${selectedInquiry ? 'hidden md:block' : 'block'}`}>
         <div className="p-3 border-b bg-muted/30">
           <h3 className="font-semibold text-sm">Conversations ({inquiries.length})</h3>
         </div>
@@ -178,7 +178,7 @@ export default function InquiryKanban({ inquiries }) {
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 flex flex-col">
+      <div className={`flex-1 flex flex-col ${!selectedInquiry ? 'hidden md:flex' : 'flex'}`}>
         {selectedInquiry ? (
           <InquiryReplies
             inquiry={{
@@ -190,6 +190,7 @@ export default function InquiryKanban({ inquiries }) {
             currentUserId={userInfo.id}
             currentUserName={userInfo.name}
             currentUserRole={userInfo.role}
+            onBack={() => setSelectedInquiry(null)}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center">

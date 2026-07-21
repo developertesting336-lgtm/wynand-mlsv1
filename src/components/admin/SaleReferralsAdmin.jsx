@@ -77,7 +77,7 @@ export default function SaleReferralsAdmin() {
 <p style="margin-top:12px">Our team will contact you within 30 days to arrange payment. Thank you for your referral!</p>
 <p style="color:#888;font-size:12px;margin-top:24px">PV Verified Rentals · Puerto Vallarta</p>
           `.trim(),
-          fromEmail: 'noreply@pvverified.com',
+          fromEmail: 'info@pvverified.com',
           fromName: 'PV Verified Rentals',
         }),
       }).catch(() => { });
