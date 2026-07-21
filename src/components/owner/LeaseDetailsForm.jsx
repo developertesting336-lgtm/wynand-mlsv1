@@ -243,7 +243,7 @@ export default function LeaseDetailsForm({
               </div>
               <div>
                 <Label htmlFor="lateFee">Late Fee (MXN $)</Label>
-                <Input id="lateFee" value={formData.lateFee} onChange={(e) => handleChange('lateFee', e.target.value)} placeholder="e.g., 1000" />
+                <Input id="lateFee" type="number" step="0.01" value={formData.lateFee} onChange={(e) => handleChange('lateFee', e.target.value)} placeholder="e.g., 1000" />
               </div>
               <div>
                 <Label htmlFor="gracePeriodDays">Grace Period (days)</Label>
@@ -368,7 +368,7 @@ export default function LeaseDetailsForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="emergencyContact">Emergency Contact</Label>
-                <Input id="emergencyContact" value={formData.emergencyContact} onChange={(e) => handleChange('emergencyContact', e.target.value)} placeholder="Name and phone number" />
+                <Input id="emergencyContact" type="number" value={formData.emergencyContact} onChange={(e) => handleChange('emergencyContact', e.target.value.slice(0, 10))} placeholder="Name and phone number" />
               </div>
               <div>
                 <Label htmlFor="emergencyResponseTimeHours">Response Time (hours)</Label>

@@ -17,7 +17,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 // Enter your VAPID Public Key here
-const VAPID_PUBLIC_KEY = 'BCCW5bb7HgyST570k0LwvSLoUH6GkNMLYmGek5eXA+DZMn8J5Rt9EfdszmMqg60tpcYuP9jmXq3xDPAdAebb538';
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
 export async function registerPushNotifications(userId) {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -51,18 +51,21 @@ export async function registerPushNotifications(userId) {
     const p256dh = rawSubscription.keys.p256dh;
     const auth = rawSubscription.keys.auth;
 
-    // 5. Store subscription credentials in Supabase
+    // 5. Delete any old subscription records for this user_id to ensure strictly 1 row per user
+    await supabase
+      .from('user_push_subscriptions')
+      .delete()
+      .eq('user_id', userId);
+
+    // 6. Store new subscription credentials in Supabase
     const { data, error } = await supabase
       .from('user_push_subscriptions')
-      .upsert(
-        {
-          user_id: userId,
-          endpoint,
-          p256dh,
-          auth
-        },
-        { onConflict: 'endpoint' }
-      )
+      .insert({
+        user_id: userId,
+        endpoint,
+        p256dh,
+        auth
+      })
       .select();
 
     if (error) throw error;
@@ -74,30 +77,66 @@ export async function registerPushNotifications(userId) {
   }
 }
 
-export async function checkPushSubscription() {
+export async function checkPushSubscription(userId) {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     return 'unsupported';
   }
-  
+
+  // 1. If browser permission is default (never asked / reset), user is unsubscribed on this browser
   if (Notification.permission === 'default') {
     return 'unsubscribed';
   }
-  
+
+  // 2. If browser permission is denied, user denied notifications
   if (Notification.permission === 'denied') {
     return 'denied';
   }
-  
+
   try {
     const registration = await navigator.serviceWorker.getRegistration('/');
     if (!registration) {
       return 'unsubscribed';
     }
+
     const subscription = await registration.pushManager.getSubscription();
+    // 3. If browser has no active push subscription (e.g. cookies/site data cleared)
     if (!subscription) {
       return 'unsubscribed';
     }
-    return Notification.permission === 'granted' ? 'subscribed' : 'denied';
+
+    // 4. Browser HAS active subscription & permission. Check/sync with Supabase DB for this user
+    if (userId) {
+      const rawSubscription = JSON.parse(JSON.stringify(subscription));
+      const endpoint = rawSubscription.endpoint;
+
+      const { data } = await supabase
+        .from('user_push_subscriptions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('endpoint', endpoint)
+        .maybeSingle();
+
+      // If DB record is missing for this user & device endpoint, delete old user entries & insert new one
+      if (!data) {
+        await supabase
+          .from('user_push_subscriptions')
+          .delete()
+          .eq('user_id', userId);
+
+        await supabase
+          .from('user_push_subscriptions')
+          .insert({
+            user_id: userId,
+            endpoint: endpoint,
+            p256dh: rawSubscription.keys?.p256dh,
+            auth: rawSubscription.keys?.auth
+          });
+      }
+    }
+
+    return 'subscribed';
   } catch (err) {
+    console.error('Error checking push subscription:', err);
     return 'unsubscribed';
   }
 }
@@ -107,13 +146,13 @@ export async function unsubscribePushNotifications(userId) {
   try {
     const registration = await navigator.serviceWorker.ready;
     const subscription = await registration.pushManager.getSubscription();
-    
+
     if (subscription) {
       const endpoint = subscription.endpoint;
-      
+
       // Unsubscribe from push service
       await subscription.unsubscribe();
-      
+
       // Delete from database
       await supabase
         .from('user_push_subscriptions')
@@ -121,7 +160,7 @@ export async function unsubscribePushNotifications(userId) {
         .eq('user_id', userId)
         .eq('endpoint', endpoint);
     }
-    
+
     return { success: true };
   } catch (err) {
     console.error('Error unsubscribing from push notifications:', err);

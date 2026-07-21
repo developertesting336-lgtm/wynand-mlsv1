@@ -45,7 +45,7 @@ export default function Navbar() {
     }
 
     // Check push subscription status
-    checkPushSubscription().then(status => setPushStatus(status));
+    checkPushSubscription(user.id).then(status => setPushStatus(status));
 
     const fetchNotifications = async () => {
       const { data, error } = await supabase

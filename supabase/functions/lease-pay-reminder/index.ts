@@ -24,8 +24,8 @@ serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // VAPID keys setup
-    const rawPublicKey = Deno.env.get('VAPID_PUBLIC_KEY') || 'BCCW5bb7HgyST570k0LwvSLoUH6GkNMLYmGek5eXA+DZMn8J5Rt9EfdszmMqg60tpcYuP9jmXq3xDPAdAebb538';
-    const rawPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY') || 'dZq613Sfk/8/JCzqIFWhDtW6mabuR11VtEoBRXiSYA';
+    const rawPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
+    const rawPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
 
     webpush.setVapidDetails(
       'mailto:support@pvverified.com',

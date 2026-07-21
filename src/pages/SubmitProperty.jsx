@@ -513,7 +513,12 @@ export default function SubmitProperty() {
             )}
             <div>
               <Label>WhatsApp Number</Label>
-              <Input value={form.whatsapp} onChange={e => update('whatsapp', e.target.value)} placeholder="+52 322 123 4567" />
+              <Input
+                type="number"
+                value={form.whatsapp}
+                onChange={e => update('whatsapp', e.target.value.slice(0, 10))}
+                placeholder="3221234567"
+              />
             </div>
             <div>
               <Label>Email</Label>
@@ -581,7 +586,13 @@ export default function SubmitProperty() {
             </div>
             <div>
               <Label>Agent Phone</Label>
-              <Input disabled={user?.role === 'agent'} value={form.agent_phone} onChange={e => update('agent_phone', e.target.value)} placeholder="+52 322 123 4567" />
+              <Input
+                disabled={user?.role === 'agent'}
+                type="number"
+                value={form.agent_phone}
+                onChange={e => update('agent_phone', e.target.value.slice(0, 10))}
+                placeholder="3221234567"
+              />
             </div>
           </CardContent>
         </Card>

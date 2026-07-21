@@ -328,6 +328,23 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
           }),
         }).catch(() => { });
       }
+
+      // Send in-app / push notification to the owner
+      if (ownerId) {
+        const { error: notifError } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: ownerId,
+            title: 'New Booking Request',
+            message: `${name} has requested to book "${listing.title}".`,
+            type: 'booking_request',
+            read: false,
+          });
+
+        if (notifError) {
+          console.error('Error creating notification:', notifError);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['booking-dates', listing.id] });
