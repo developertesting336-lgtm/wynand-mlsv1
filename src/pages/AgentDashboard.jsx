@@ -246,7 +246,21 @@ export default function AgentDashboard() {
       const { error } = await supabase.from('bookings').update(updatePayload).eq('id', agentSigningBooking.id);
       if (error) throw error;
 
-      toast.success('Agreement signed successfully.');
+      const anvilResponse = await supabase.functions.invoke('anvil-send-lease', {
+        body: {
+          bookingId: agentSigningBooking.id,
+          agreementConditions: mergedConditions,
+          tenantSignature: existingConditions.tenantSignature,
+          tenantSignatureDate: existingConditions.tenantSignatureDate,
+          agentSignature: signatureUrl,
+          agentSignatureDate: mergedConditions.agentSignatureDate,
+        },
+      });
+      if (anvilResponse.error) {
+        throw new Error(anvilResponse.error.message || 'Failed to regenerate lease agreement through Anvil');
+      }
+
+      toast.success('Agreement signed successfully and lease updated.');
       queryClient.invalidateQueries({ queryKey: ['agent-bookings'] });
       closeAgentSignatureModal();
     } catch (err) {

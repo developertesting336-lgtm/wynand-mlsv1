@@ -28,7 +28,7 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader || '' } },
     });
 
-    const { bookingId, agreementConditions, tenantSignature, tenantSignatureDate } = await req.json();
+    const { bookingId, agreementConditions, tenantSignature, tenantSignatureDate, agentSignature, agentSignatureDate } = await req.json();
 
     if (!bookingId) {
       return new Response(JSON.stringify({ error: "bookingId is required" }), {
@@ -140,16 +140,26 @@ serve(async (req) => {
       }
     };
 
-    // Upload landlord signature if provided (on first call or if still base64)
+    // Upload landlord signature if provided (or use agent signature as fallback for PDF)
     let landlordSignatureUrl = conditions.landlordSignature;
-    if (conditions.landlordSignature && !landlordSignatureUrl?.startsWith('http')) {
-      landlordSignatureUrl = await uploadSignature(conditions.landlordSignature, 'landlord');
+    if (landlordSignatureUrl && !landlordSignatureUrl?.startsWith('http')) {
+      landlordSignatureUrl = await uploadSignature(landlordSignatureUrl, 'landlord');
+    }
+
+    // Upload agent signature if provided
+    let agentSignatureUrl = conditions.agentSignature;
+    if (agentSignature && !agentSignature.startsWith('http')) {
+      agentSignatureUrl = await uploadSignature(agentSignature, 'agent');
+    }
+
+    if (!landlordSignatureUrl && agentSignatureUrl) {
+      landlordSignatureUrl = agentSignatureUrl;
     }
 
     // Upload tenant signature if provided
-    let tenantSignatureUrl = tenantSignature;
-    if (tenantSignature && !tenantSignature.startsWith('http')) {
-      tenantSignatureUrl = await uploadSignature(tenantSignature, 'tenant');
+    let tenantSignatureUrl = tenantSignature || conditions.tenantSignature;
+    if (tenantSignatureUrl && !tenantSignatureUrl.startsWith('http')) {
+      tenantSignatureUrl = await uploadSignature(tenantSignatureUrl, 'tenant');
     }
 
     // 5. Fill the PDF template using Anvil Fill PDF API
@@ -239,9 +249,9 @@ serve(async (req) => {
         emergencyResponseTimeHours: conditions.emergencyResponseTimeHours || "",
         additionalTermsConditions: conditions.additionalTermsConditions || "",
         landlordSignature: landlordSignatureUrl || "",
-        landlordSignatureDate: formatSignatureDate(conditions.landlordSignatureDate),
+        landlordSignatureDate: formatSignatureDate(conditions.landlordSignatureDate || agentSignatureDate),
         tenantSignature: tenantSignatureUrl || "",
-        tenantSignatureDate: formatSignatureDate(tenantSignatureDate)
+        tenantSignatureDate: formatSignatureDate(tenantSignatureDate),
       }
     };
 
@@ -312,8 +322,10 @@ serve(async (req) => {
           ...conditions,
           landlordSignature: landlordSignatureUrl,
           tenantSignature: tenantSignatureUrl,
-          landlordSignatureDate: formatSignatureDate(conditions.landlordSignatureDate),
-          tenantSignatureDate: formatSignatureDate(tenantSignatureDate)
+          agentSignature: agentSignatureUrl || conditions.agentSignature,
+          landlordSignatureDate: formatSignatureDate(conditions.landlordSignatureDate || agentSignatureDate),
+          tenantSignatureDate: formatSignatureDate(tenantSignatureDate),
+          agentSignatureDate: formatSignatureDate(conditions.agentSignatureDate || agentSignatureDate)
         }
       })
       .eq("id", bookingId);
