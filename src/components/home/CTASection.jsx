@@ -1,9 +1,29 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/AuthContext';
 import { ShieldCheck, ArrowRight, Key } from 'lucide-react';
 
 export default function CTASection() {
+  const navigate = useNavigate();
+  const { user, isAuthenticated, login } = useAuth();
+
+  const handleListPropertyClick = (event) => {
+    event.preventDefault();
+
+    if (!isAuthenticated) {
+      login();
+      return;
+    }
+
+    if (user?.role === 'renter' || user?.role === 'tenant') {
+      navigate('/dashboard');
+      return;
+    }
+
+    navigate('/submit-property');
+  };
+
   return (
     <section className="bg-foreground text-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
@@ -19,11 +39,9 @@ export default function CTASection() {
               Many of our best properties never make it to the public listings. Sign up to get exclusive access to verified off-market rentals in Puerto Vallarta.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 mt-8">
-              <Link to="/submit-property">
-                <Button size="lg" className="gap-2 w-full sm:w-auto">
-                  List Your Property <ArrowRight className="w-4 h-4" />
-                </Button>
-              </Link>
+              <Button onClick={handleListPropertyClick} size="lg" className="gap-2 w-full sm:w-auto">
+                List Your Property <ArrowRight className="w-4 h-4" />
+              </Button>
               <Link to="/listings">
                 <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto border-background/20 text-white hover:bg-background/10">
                   Browse All Rentals

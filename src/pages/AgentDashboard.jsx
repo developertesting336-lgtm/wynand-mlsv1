@@ -76,6 +76,11 @@ export default function AgentDashboard() {
   const [editingAgreementId, setEditingAgreementId] = useState(null);
   const [editingAgreementData, setEditingAgreementData] = useState(null);
   const [updatingState, setUpdatingState] = useState({ id: null, action: null });
+  const [documentModalBooking, setDocumentModalBooking] = useState(null);
+  const [ownerVerification, setOwnerVerification] = useState(null);
+  const [renterVerification, setRenterVerification] = useState(null);
+  const [agentSigningBooking, setAgentSigningBooking] = useState(null);
+  const [agentSigning, setAgentSigning] = useState(false);
   const openEditModal = (listing) => setEditingListing(listing);
   const closeEditModal = () => setEditingListing(null);
   const openAgreementEdit = (booking) => {
@@ -99,6 +104,157 @@ export default function AgentDashboard() {
       ownerEmail === agentEmail &&
       agentEmail === userEmail
     );
+  };
+
+  const closeDocumentsModal = () => {
+    setDocumentModalBooking(null);
+    setOwnerVerification(null);
+    setRenterVerification(null);
+  };
+
+  const normalizeBookingUserId = (value) => {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      return value?.id || value?.user_id || value?.owner_id || value?.renter_id || null;
+    }
+    return null;
+  };
+
+  const openDocumentsModal = async (booking) => {
+    setDocumentModalBooking(booking);
+    const ownerUserId = normalizeBookingUserId(booking.owner_id) || normalizeBookingUserId(booking.owner);
+    const renterUserId = normalizeBookingUserId(booking.renter_id) || normalizeBookingUserId(booking.renter);
+
+    try {
+      const ids = Array.from(new Set([ownerUserId, renterUserId].filter(Boolean)));
+      if (ids.length === 0) {
+        setOwnerVerification(null);
+        setRenterVerification(null);
+        return;
+      }
+
+      let data = null;
+      let error = null;
+      if (ids.length === 1) {
+        ({ data, error } = await supabase.from('verifications').select('*').eq('user_id', ids[0]));
+      } else {
+        ({ data, error } = await supabase.from('verifications').select('*').in('user_id', ids));
+      }
+
+      if (error) {
+        throw error;
+      }
+    console.log(data, '541452')
+      const ownerVerificationRow = data?.find((row) => row.user_id === ownerUserId) || null;
+      console.log(ownerVerificationRow, 'ownerVerificationRow');
+      const renterVerificationRow = data?.find((row) => row.user_id === renterUserId) || null;
+      setOwnerVerification(ownerVerificationRow);
+      setRenterVerification(renterVerificationRow);
+    } catch (err) {
+      console.error('Failed to load booking verifications:', err);
+      setOwnerVerification(null);
+      setRenterVerification(null);
+    }
+  };
+
+  const openAgentSignatureModal = (booking) => {
+    setAgentSigningBooking(booking);
+  };
+
+  const closeAgentSignatureModal = () => {
+    setAgentSigningBooking(null);
+  };
+
+  const normalizeVerificationDocs = (docs) => {
+    if (!docs) return [];
+    if (Array.isArray(docs)) return docs;
+    if (typeof docs === 'string') {
+      try {
+        const parsed = JSON.parse(docs);
+        return Array.isArray(parsed) ? parsed : [docs];
+      } catch {
+        return [docs];
+      }
+    }
+    return [docs];
+  };
+
+  const isImageUrl = (url) => typeof url === 'string' && /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i.test(url);
+
+  const ownerProfilePhotoUrl = ownerVerification?.profile_photo || ownerVerification?.profile_photo_url || ownerVerification?.photo_url;
+  // console.log(ownerProfilePhotoUrl, 'ownerProfilePhotoUrl');
+  const ownerIdentityDocs = normalizeVerificationDocs(ownerVerification?.identity_documents);
+  const renterProfilePhotoUrl = renterVerification?.profile_photo || renterVerification?.profile_photo_url || renterVerification?.photo_url;
+  const renterIdentityDocs = normalizeVerificationDocs(renterVerification?.identity_documents);
+
+  const handleAgentSignatureSave = async (signature) => {
+    if (!agentSigningBooking) return;
+    setAgentSigning(true);
+    try {
+      let signatureUrl = signature;
+      if (!signatureUrl.startsWith('http')) {
+        const arr = signature.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const file = new File([u8arr], `signs/signature_agent_${agentSigningBooking.id}.png`, { type: mime });
+        const uploadResult = await base44.integrations.Core.UploadFile({ file });
+        signatureUrl = uploadResult?.file_url;
+        if (!signatureUrl) {
+          throw new Error('Failed to obtain signature public URL from storage.');
+        }
+      }
+
+      if (user?.id) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('signatures')
+            .eq('id', user.id)
+            .single();
+          if (!profileError) {
+            const currentSigs = profile?.signatures || [];
+            if (!currentSigs.includes(signatureUrl)) {
+              const updatedSigs = [...currentSigs, signatureUrl].slice(-3);
+              await supabase.from('profiles').update({ signatures: updatedSigs }).eq('id', user.id);
+            }
+          }
+        } catch (profileErr) {
+          console.error('Failed to update agent signatures:', profileErr);
+        }
+      }
+
+      const existingConditions = agentSigningBooking.agreement_conditions || {};
+      const mergedConditions = {
+        ...existingConditions,
+        agentSignature: signatureUrl,
+        agentSignatureDate: new Date().toISOString(),
+      };
+      const updatePayload = {
+        agreement_conditions: mergedConditions,
+        updated_date: new Date().toISOString(),
+      };
+      if (existingConditions.tenantSignature) {
+        updatePayload.lease_status = 'approved';
+      }
+
+      const { error } = await supabase.from('bookings').update(updatePayload).eq('id', agentSigningBooking.id);
+      if (error) throw error;
+
+      toast.success('Agreement signed successfully.');
+      queryClient.invalidateQueries({ queryKey: ['agent-bookings'] });
+      closeAgentSignatureModal();
+    } catch (err) {
+      console.error('Failed to save agent signature:', err);
+      toast.error(`Failed to save signature: ${err.message}`);
+    } finally {
+      setAgentSigning(false);
+    }
   };
 
   useEffect(() => {
@@ -478,8 +634,8 @@ export default function AgentDashboard() {
         user={user} 
         onboardingLoading={onboardingLoading} 
         handleStripeOnboard={handleStripeOnboard}
-        title="Set up Stripe for Commissions"
-        description="Connect your Stripe account to receive referral commissions and subscription payments directly to your bank account."
+        title="Set up Your Payments"
+        description="To receive payments connect your bank account through Stripe."
       />
 
       <div className="flex items-center justify-between mb-8">
@@ -901,9 +1057,8 @@ export default function AgentDashboard() {
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Owner</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Tenant</th>
-                              <th className="px-4 py-3 font-semibold text-muted-foreground">Move-in Date</th>
-                              <th className="px-4 py-3 font-semibold text-muted-foreground">Lease</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
+                              <th className="px-4 py-3 font-semibold text-muted-foreground">Documents</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Agreement</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                             </tr>
@@ -920,6 +1075,7 @@ export default function AgentDashboard() {
                                 !b.agreement_conditions?.tenantSignature &&
                                 listing?.owner_email?.trim().toLowerCase() === listing?.agent_email?.trim().toLowerCase() &&
                                 listing?.owner_email?.trim().toLowerCase() === user?.email?.trim().toLowerCase();
+                              const needsAgentSignature = b.agreement_conditions && !b.agreement_conditions?.agentSignature;
                               return (
                                 <tr key={b.id} className="hover:bg-muted/30 transition-colors">
                                   <td className="px-4 py-3 font-medium">
@@ -933,16 +1089,15 @@ export default function AgentDashboard() {
                                     <div className="text-sm">{tenant?.full_name || 'Unknown'}</div>
                                     <div className="text-xs text-muted-foreground">{tenant?.email || ''}</div>
                                   </td>
-                                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                                    {b.move_in_date ? format(new Date(b.move_in_date + 'T00:00:00'), 'MMM d, yyyy') : 'N/A'}
-                                  </td>
-                                  <td className="px-4 py-3 text-muted-foreground">
-                                    {b.lease_duration_months || 12} months
-                                  </td>
                                   <td className="px-4 py-3">
                                     <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${statusCls}`}>
                                       <CheckCircle className="w-3 h-3" /> {statusLabel}
                                     </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <Button size="sm" variant="outline" className="text-xs font-semibold py-1 px-2.5 h-auto whitespace-nowrap" onClick={() => openDocumentsModal(b)}>
+                                      View Docs
+                                    </Button>
                                   </td>
                                   <td className="px-4 py-3">
                                     {b.lease_pdf_url ? (
@@ -960,6 +1115,13 @@ export default function AgentDashboard() {
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                     {(() => {
+                                      if (needsAgentSignature) {
+                                        return (
+                                          <Button size="sm" variant="outline" className="text-xs font-semibold py-1 px-2.5 h-auto whitespace-nowrap" onClick={() => openAgentSignatureModal(b)}>
+                                            Sign Agreement
+                                          </Button>
+                                        );
+                                      }
                                       if (!isCurrentUserOwnerAndAgent(b)) {
                                         return <span className="text-xs text-muted-foreground font-semibold">No action</span>;
                                       }
@@ -1248,6 +1410,203 @@ export default function AgentDashboard() {
           </div>
         </div>
       )}
+
+      <Dialog open={!!documentModalBooking} onOpenChange={(open) => !open && closeDocumentsModal()}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Booking Documents</DialogTitle>
+            <DialogDescription>
+              Review owner and renter documents for this booking.
+            </DialogDescription>
+          </DialogHeader>
+          <Tabs defaultValue="owner" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="owner">Owner</TabsTrigger>
+              <TabsTrigger value="renter">Renter</TabsTrigger>
+            </TabsList>
+            <TabsContent value="owner" className="space-y-4">
+              <div className="grid gap-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <h4 className="text-sm font-semibold mb-2">Owner Property Documents</h4>
+                  {documentModalBooking?.agreement_conditions?.owner_docs?.length > 0 ? (
+                    <div className="grid gap-3">
+                      {documentModalBooking.agreement_conditions.owner_docs.map((doc, index) => (
+                        <a key={`${doc}-${index}`} href={doc} target="_blank" rel="noreferrer noopener" className="group block overflow-hidden rounded-2xl border border-slate-200 bg-white hover:border-primary transition">
+                          {isImageUrl(doc) ? (
+                            <img src={doc} alt={`Owner document ${index + 1}`} className="h-40 w-full object-contain bg-slate-100" />
+                          ) : (
+                            <div className="flex h-40 items-center justify-center bg-slate-100 text-slate-500">
+                              <FileText className="w-8 h-8" />
+                            </div>
+                          )}
+                          <div className="p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-medium">Owner document {index + 1}</p>
+                              <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-primary" />
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate mt-2">{doc}</p>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No owner agreement documents uploaded.</p>
+                  )}
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <h4 className="text-sm font-semibold mb-2">Owner Identity & Profile</h4>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                      <p className="text-xs uppercase text-muted-foreground mb-2">Profile Photo</p>
+                      {ownerProfilePhotoUrl ? (
+                        <img src={ownerProfilePhotoUrl} alt="Owner profile" className="w-full max-w-full max-h-56 rounded-xl object-contain" />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No profile photo uploaded.</p>
+                      )}
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                      <p className="text-xs uppercase text-muted-foreground">Identity Documents</p>
+                      {Array.isArray(ownerVerification?.identity_documents) && ownerVerification.identity_documents.length > 0 ? (
+                        <div className="grid gap-3">
+                          {ownerVerification.identity_documents.map((doc, index) => (
+                            <a key={`owner-id-${index}`} href={doc} target="_blank" rel="noreferrer noopener" className="group block overflow-hidden rounded-2xl border border-slate-200 bg-white hover:border-primary transition">
+                              {isImageUrl(doc) ? (
+                                <img src={doc} alt={`Owner identity ${index + 1}`} className="h-40 w-full object-contain bg-slate-100" />
+                              ) : (
+                                <div className="flex h-40 items-center justify-center bg-slate-100 text-slate-500">
+                                  <FileText className="w-8 h-8" />
+                                </div>
+                              )}
+                              <div className="p-4 flex items-center justify-between gap-3">
+                                <p className="font-medium">Identity document {index + 1}</p>
+                                <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-primary" />
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      ) : ownerVerification?.id_document_url ? (
+                        <a href={ownerVerification.id_document_url} target="_blank" rel="noreferrer noopener" className="group block overflow-hidden rounded-2xl border border-slate-200 bg-white hover:border-primary transition">
+                          <div className="flex h-40 items-center justify-center bg-slate-100 text-slate-500">
+                            <FileText className="w-8 h-8" />
+                          </div>
+                          <div className="p-4 flex items-center justify-between gap-3">
+                            <p className="font-medium">View primary identity document</p>
+                            <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-primary" />
+                          </div>
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No identity documents uploaded.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="renter" className="space-y-4">
+              <div className="grid gap-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <h4 className="text-sm font-semibold mb-2">Renter Identity Documents</h4>
+                  <div className="grid gap-2">
+                    {Array.isArray(renterVerification?.identity_documents) && renterVerification.identity_documents.length > 0 ? (
+                      <div className="grid gap-3">
+                        {renterVerification.identity_documents.map((doc, index) => (
+                          <a key={`renter-id-${index}`} href={doc} target="_blank" rel="noreferrer noopener" className="group block overflow-hidden rounded-2xl border border-slate-200 bg-white hover:border-primary transition">
+                            {isImageUrl(doc) ? (
+                              <img src={doc} alt={`Renter identity ${index + 1}`} className="h-40 w-full object-contain bg-slate-100" />
+                            ) : (
+                              <div className="flex h-40 items-center justify-center bg-slate-100 text-slate-500">
+                                <FileText className="w-8 h-8" />
+                              </div>
+                            )}
+                            <div className="p-4 flex items-center justify-between gap-3">
+                              <p className="font-medium">Identity document {index + 1}</p>
+                              <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-primary" />
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    ) : renterVerification?.id_document_url ? (
+                      <a href={renterVerification.id_document_url} target="_blank" rel="noreferrer noopener" className="group block overflow-hidden rounded-2xl border border-slate-200 bg-white hover:border-primary transition">
+                        <div className="flex h-40 items-center justify-center bg-slate-100 text-slate-500">
+                          <FileText className="w-8 h-8" />
+                        </div>
+                        <div className="p-4 flex items-center justify-between gap-3">
+                          <p className="font-medium">View primary identity document</p>
+                          <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-primary" />
+                        </div>
+                      </a>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No identity documents uploaded.</p>
+                    )}
+                    {renterVerification?.employment_proof_url ? (
+                      <a href={renterVerification.employment_proof_url} target="_blank" rel="noreferrer noopener" className="group block overflow-hidden rounded-2xl border border-slate-200 bg-white hover:border-primary transition">
+                        {isImageUrl(renterVerification.employment_proof_url) ? (
+                          <img src={renterVerification.employment_proof_url} alt="Employment proof" className="h-40 w-full object-contain bg-slate-100" />
+                        ) : (
+                          <div className="flex h-40 items-center justify-center bg-slate-100 text-slate-500">
+                            <FileText className="w-8 h-8" />
+                          </div>
+                        )}
+                        <div className="p-4 flex items-center justify-between gap-3">
+                          <p className="font-medium">View employment proof</p>
+                          <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-primary" />
+                        </div>
+                      </a>
+                    ) : null}
+                    {Array.isArray(renterVerification?.bank_documents) && renterVerification.bank_documents.length > 0 ? (
+                      <div className="grid gap-3">
+                        {renterVerification.bank_documents.map((doc, index) => (
+                          <a key={`bank-doc-${index}`} href={doc} target="_blank" rel="noreferrer noopener" className="group block overflow-hidden rounded-2xl border border-slate-200 bg-white hover:border-primary transition">
+                            {isImageUrl(doc) ? (
+                              <img src={doc} alt={`Bank document ${index + 1}`} className="h-40 w-full object-contain bg-slate-100" />
+                            ) : (
+                              <div className="flex h-40 items-center justify-center bg-slate-100 text-slate-500">
+                                <FileText className="w-8 h-8" />
+                              </div>
+                            )}
+                            <div className="p-4 flex items-center justify-between gap-3">
+                              <p className="font-medium">Bank document {index + 1}</p>
+                              <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-primary" />
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No bank documents available.</p>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <h4 className="text-sm font-semibold mb-2">Renter Profile Photo</h4>
+                  {renterProfilePhotoUrl ? (
+                    <img src={renterProfilePhotoUrl} alt="Renter profile" className="w-full max-w-full max-h-56 rounded-xl object-contain" />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No renter profile photo uploaded.</p>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDocumentsModal}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!agentSigningBooking} onOpenChange={(open) => !open && closeAgentSignatureModal()}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Agent Signature</DialogTitle>
+          </DialogHeader>
+          <SignaturePad
+            title="Agent Signature"
+            submitLabel="Save Signature"
+            onSave={handleAgentSignatureSave}
+            onCancel={closeAgentSignatureModal}
+            isSubmitting={agentSigning}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

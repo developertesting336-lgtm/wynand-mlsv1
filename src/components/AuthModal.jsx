@@ -666,9 +666,9 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="renter">Rent a property</SelectItem>
-                  <SelectItem value="owner">List my property (Owner)</SelectItem>
-                  <SelectItem value="agent">Become an Agent</SelectItem>
+                  <SelectItem value="agent">List a rental Property (Agent)</SelectItem>
+                  <SelectItem value="owner">List my own Property (Owner)</SelectItem>
+                  <SelectItem value="renter">Search for a Property</SelectItem>
                 </SelectContent>
               </Select>
             </div>

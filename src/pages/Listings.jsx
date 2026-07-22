@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/lib/supabase';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -15,7 +16,8 @@ import CompareBar from '../components/listings/CompareBar';
 import CompareDrawer from '../components/listings/CompareDrawer';
 
 export default function Listings() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const location = useLocation();
+  const urlParams = new URLSearchParams(location.search);
   const [user, setUser] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'map'
 
@@ -32,9 +34,25 @@ export default function Listings() {
 
   const { favoriteIds, toggle } = useFavorites(user?.id);
   const [filters, setFilters] = useState({
-    neighborhood: urlParams.get('neighborhood') || undefined,
+    neighborhood: urlParams.get('neighborhood') ? urlParams.get('neighborhood').toLowerCase().replace(/\s+/g, '_') : undefined,
     maxPrice: urlParams.get('maxPrice') ? Number(urlParams.get('maxPrice')) : undefined,
   });
+
+  // Sync filters with URL parameters when navigating via React Router
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const neighborhood = params.get('neighborhood') 
+      ? params.get('neighborhood').toLowerCase().replace(/\s+/g, '_')
+      : undefined;
+    const maxPrice = params.get('maxPrice') ? Number(params.get('maxPrice')) : undefined;
+    
+    setFilters(prev => {
+      if (prev.neighborhood !== neighborhood || prev.maxPrice !== maxPrice) {
+        return { neighborhood, maxPrice };
+      }
+      return prev;
+    });
+  }, [location.search]);
   const [sortBy, setSortBy] = useState('newest');
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);

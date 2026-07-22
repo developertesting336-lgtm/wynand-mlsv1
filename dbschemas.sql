@@ -443,6 +443,7 @@ create index IF not exists idx_user_push_subscriptions_user_id on public.user_pu
 create table public.verifications (
   id uuid not null default gen_random_uuid (),
   user_id uuid not null,
+  profile_photo text null,
   id_document_url text null,
   employment_proof_url text null,
   veriff_session_id text null,

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/lib/supabase';
+import { storageIntegration } from '@/lib/auth';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -159,6 +161,7 @@ function MultiUploadDocRow({ icon: Icon, label, description, documents = [], fol
 export default function TenantVerification({ user, onUserUpdated }) {
   const queryClient = useQueryClient();
   const [verification, setVerification] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [loadingRecord, setLoadingRecord] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [showSatModal, setShowSatModal] = useState(false);
@@ -188,6 +191,43 @@ export default function TenantVerification({ user, onUserUpdated }) {
   useEffect(() => {
     loadVerification();
   }, [user?.id]);
+
+  const profilePhotoUrl = verification?.profile_photo || user?.photo_url || user?.photo_url;
+
+  const handleProfilePhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const { file_url } = await storageIntegration.UploadFile({ file, folder: 'Profile' });
+
+      // Upsert into verifications table (creates record if missing)
+      const payload = {
+        user_id: user.id,
+        profile_photo: file_url,
+        updated_date: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('verifications')
+        .upsert(payload, { onConflict: 'user_id' })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setVerification(data);
+
+      // Invalidate cache and notify listeners so Navbar can refresh verifications
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      try { window.dispatchEvent(new Event('app:user-updated')); } catch (e) {}
+      toast.success('Profile photo uploaded');
+    } catch (err) {
+      console.error('Failed to upload profile photo:', err);
+      toast.error('Failed to upload profile photo');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const idDocUrl = verification?.id_document_url || user?.id_document_url;
   const identityDocs = verification?.identity_documents || [];
@@ -508,6 +548,41 @@ export default function TenantVerification({ user, onUserUpdated }) {
 
   return (
     <div className="space-y-6">
+      {/* Profile Photo Upload */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-primary" />
+          <h3 className="text-lg font-semibold">Profile Photo</h3>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3 border bg-slate-50 border-slate-200">
+          <div className="flex items-center gap-4">
+            <Avatar className="w-20 h-20">
+              {profilePhotoUrl ? (
+                <AvatarImage src={profilePhotoUrl} alt="Profile photo" />
+              ) : (
+                <AvatarFallback>{user?.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
+              )}
+            </Avatar>
+            <div>
+              <p className="text-sm font-semibold">Upload a profile photo</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Visible on your profile and listings.</p>
+            </div>
+          </div>
+
+          <div className="shrink-0">
+            <label className="cursor-pointer">
+              <input type="file" className="hidden" accept="image/*" onChange={handleProfilePhoto} />
+              <Button size="sm" className="gap-1.5" disabled={uploadingPhoto} asChild>
+                <span>
+                  {uploadingPhoto ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  {uploadingPhoto ? 'Uploading…' : (profilePhotoUrl ? 'Replace' : 'Upload')}
+                </span>
+              </Button>
+            </label>
+          </div>
+        </div>
+      </div>
       {/* Identity Verification Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">

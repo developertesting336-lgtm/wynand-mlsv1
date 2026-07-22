@@ -890,8 +890,8 @@ export default function UserDashboard() {
         user={user} 
         onboardingLoading={onboardingLoading} 
         handleStripeOnboard={handleStripeOnboard}
-        title="Set up Stripe for Referral Commissions"
-        description="Connect your Stripe account to receive referral commissions when someone you refer makes a booking. Commissions are paid after move-in."
+        title="Set up Your Payments"
+        description="To receive referral commission connect your bank account through Stripe."
       />
 
       {/* Header */}

@@ -880,8 +880,8 @@ export default function OwnerDashboard() {
         user={user}
         onboardingLoading={onboardingLoading}
         handleStripeOnboard={handleStripeOnboard}
-        title="Set up Stripe Payments"
-        description="Connect your Stripe account to PV Verified Rentals. This enables tenants to pay rent or deposits directly to your bank account securely."
+        title="Set up Your Payments"
+        description="To receive payments connect your bank account through Stripe."
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

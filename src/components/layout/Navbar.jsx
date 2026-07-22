@@ -1,24 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Menu, X, ShieldCheck, Search, PlusCircle, LayoutDashboard, DollarSign, Users, Heart, UserCircle, KeyRound, Handshake, Building2, UserCog, Bell, CheckCheck } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { registerPushNotifications, checkPushSubscription, unsubscribePushNotifications } from '@/utils/pushNotification';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, login, logout } = useAuth();
+  const [verification, setVerification] = useState(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => { setIsOpen(false); }, [location.pathname]);
 
   const notifRef = useRef(null);
+  const profileRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setIsNotifOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -31,6 +38,7 @@ export default function Navbar() {
 
   const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [pushStatus, setPushStatus] = useState('checking'); // 'checking', 'subscribed', 'unsubscribed', 'denied', 'unsupported'
   const [showPrompt, setShowPrompt] = useState(false);
   const [notifLimit, setNotifLimit] = useState(10);
@@ -67,6 +75,11 @@ export default function Navbar() {
 
     fetchNotifications();
 
+    // load verification record to pick profile_photo if present
+    supabase.from('verifications').select('profile_photo').eq('user_id', user.id).maybeSingle().then(res => {
+      if (!res.error) setVerification(res.data || null);
+    }).catch(() => {});
+
     const channel = supabase
       .channel(`notifications:${user.id}`)
       .on(
@@ -95,6 +108,18 @@ export default function Navbar() {
       supabase.removeChannel(channel);
     };
   }, [user, notifLimit]);
+
+  // Refresh verification photo when other parts of the app notify about updates
+  useEffect(() => {
+    const handler = () => {
+      if (!user?.id) return;
+      supabase.from('verifications').select('profile_photo').eq('user_id', user.id).maybeSingle().then(res => {
+        if (!res.error) setVerification(res.data || null);
+      }).catch(() => {});
+    };
+    window.addEventListener('app:user-updated', handler);
+    return () => window.removeEventListener('app:user-updated', handler);
+  }, [user]);
 
   useEffect(() => {
     if (user && user.role !== 'admin' && pushStatus === 'unsubscribed') {
@@ -180,14 +205,20 @@ export default function Navbar() {
   };
 
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem('push_prompt_dismissed_at');
-    logout();
+    try {
+      await logout();
+      navigate('/');
+    } catch (e) {
+      // fallback redirect
+      try { window.location.href = '/'; } catch (_) {}
+    }
   };
 
 
   const navLinks = [
-    { to: '/pricing', icon: DollarSign, label: 'Pricing', roles: ['renter', 'owner'], requiresAuth: false },
+    { to: '/pricing', icon: DollarSign, label: 'Pricing', roles: ['renter'], requiresAuth: false },
     { to: '/listings', icon: Search, label: 'Browse', roles: ['renter', 'agent', 'owner', 'admin'], requiresAuth: false },
     { to: '/agents', icon: Users, label: 'Agents', roles: ['renter', 'owner', 'admin'], requiresAuth: false },
     { to: '/admin', icon: UserCog, label: 'Admin Panel', roles: ['admin'], requiresAuth: true },
@@ -195,7 +226,7 @@ export default function Navbar() {
     { to: '/dashboard', icon: UserCircle, label: 'My Dashboard', roles: ['renter'], requiresAuth: true },
     { to: '/owner-dashboard', icon: Building2, label: 'Owner Dashboard', roles: ['owner'], requiresAuth: true },
     { to: '/agent-dashboard', icon: LayoutDashboard, label: 'Agent Dashboard', roles: ['agent'], requiresAuth: true },
-    { to: '/agent-billing', icon: LayoutDashboard, label: 'Billing', roles: ['agent'], requiresAuth: true },
+    { to: '/agent-billing', icon: LayoutDashboard, label: 'Billing', roles: [], requiresAuth: true },
     { to: '/favorites', icon: Heart, label: 'Favorites', roles: [], requiresAuth: true },
     { to: '/submit-property', icon: PlusCircle, label: 'List Property', roles: ['agent', 'owner'], requiresAuth: true },
   ];
@@ -317,10 +348,39 @@ export default function Navbar() {
                   )}
 
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
-                  <Link to={role === 'admin' ? '/admin' : '/profile'} className="text-sm text-foreground hover:text-primary transition-colors max-w-[140px] truncate">
-                    {user.full_name ? user.full_name.split(' ')[0] : user.email}
-                  </Link>
-                  <Button variant="outline" size="sm" onClick={handleLogout}>Log out</Button>
+                  <div className="relative" ref={profileRef}>
+                    <button
+                      onClick={() => setIsProfileMenuOpen(prev => !prev)}
+                      className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center"
+                      aria-label="Open profile menu"
+                    >
+                      <Avatar className="w-8 h-8">
+                        {(verification?.profile_photo || user.photo_url) ? (
+                          <AvatarImage src={verification?.profile_photo || user.photo_url} alt="Profile" />
+                        ) : (
+                          <AvatarFallback>{user?.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
+                        )}
+                      </Avatar>
+                    </button>
+
+                    {isProfileMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-44 bg-white border border-border rounded-xl shadow-xl z-50 py-2">
+                        <Link
+                          to={role === 'admin' ? '/admin' : '/profile'}
+                          className="block text-sm px-4 py-2 hover:bg-muted"
+                          onClick={() => setIsProfileMenuOpen(false)}
+                        >
+                          Profile
+                        </Link>
+                        <button
+                          onClick={() => { setIsProfileMenuOpen(false); handleLogout(); }}
+                          className="w-full text-left text-sm px-4 py-2 hover:bg-muted"
+                        >
+                          Log out
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <Button size="sm" onClick={login}>Sign In</Button>
@@ -354,10 +414,36 @@ export default function Navbar() {
                   <div className="flex flex-col gap-2 px-4 py-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <Link to={role === 'admin' ? '/admin' : '/profile'} className="text-sm text-foreground hover:text-primary transition-colors truncate max-w-[200px] block">
-                          {user.full_name ? user.full_name.split(' ')[0] : user.email}
-                        </Link>
-                        <span className="text-xs text-muted-foreground">{role}</span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setIsProfileMenuOpen(prev => !prev)}
+                            className="rounded-full overflow-hidden flex items-center justify-center"
+                            aria-label="Open profile menu"
+                          >
+                            <Avatar className="w-10 h-10">
+                              {(verification?.profile_photo || user.photo_url) ? (
+                                <AvatarImage src={verification?.profile_photo || user.photo_url} alt="Profile" />
+                              ) : (
+                                <AvatarFallback>{user?.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
+                              )}
+                            </Avatar>
+                          </button>
+                          <div>
+                            <span className="text-sm font-medium">{user.full_name ? user.full_name.split(' ')[0] : ''}</span>
+                            <span className="text-xs text-muted-foreground block">{role}</span>
+                          </div>
+                        </div>
+
+                        {isProfileMenuOpen && (
+                          <div className="mt-3 border-t pt-3">
+                            <div className="flex flex-col gap-2 px-4 py-2">
+                              <Link to={role === 'admin' ? '/admin' : '/profile'} className="text-sm text-foreground hover:text-primary transition-colors">
+                                Profile
+                              </Link>
+                              <Button variant="outline" size="sm" onClick={handleLogout}>Log out</Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <Button variant="outline" size="sm" onClick={handleLogout}>Log out</Button>
                     </div>

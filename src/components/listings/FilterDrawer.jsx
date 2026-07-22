@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,11 @@ import { NEIGHBORHOODS, FURNISHED_OPTIONS, RENTAL_TYPES } from '@/lib/constants'
 export default function FilterDrawer({ filters, setFilters }) {
   const [open, setOpen] = useState(false);
   const [local, setLocal] = useState(filters);
+
+  // Sync local state with filters prop when it changes (e.g., from URL navigation)
+  useEffect(() => {
+    setLocal(filters);
+  }, [filters]);
 
   const update = (key, value) => setLocal(prev => ({ ...prev, [key]: value }));
 

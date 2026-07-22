@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, CheckCircle } from 'lucide-react';
+import { Loader2, CheckCircle, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { storageIntegration } from '@/lib/auth';
 
 export default function LeaseDetailsForm({ 
   booking, 
@@ -81,6 +82,7 @@ export default function LeaseDetailsForm({
     propertyState: getInitialValue('propertyState', parsedAddress.state),
     propertyUnit: getInitialValue('propertyUnit', listing?.unit || ''),
     landlordSignature: getInitialValue('landlordSignature', ''),
+    owner_docs: getInitialValue('owner_docs', []),
   });
 
   // Parse address if it exists to prefill city and state
@@ -114,6 +116,38 @@ export default function LeaseDetailsForm({
     const next = { ...formData, [field]: value };
     setFormData(next);
     onChange(next);
+  };
+
+  const handleDocumentUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    const maxSize = 30 * 1024 * 1024;
+    const overLimit = files.find((file) => file.size > maxSize);
+    if (overLimit) {
+      toast.error('Each document must be 30 MB or smaller.');
+      return;
+    }
+
+    try {
+      const uploadedUrls = [];
+      for (const file of files) {
+        const result = await storageIntegration.UploadFile({ file, folder: 'LeaseDocuments' });
+        if (result?.file_url) {
+          uploadedUrls.push(result.file_url);
+        }
+      }
+      const next = {
+        ...formData,
+        owner_docs: [...(formData.owner_docs || []), ...uploadedUrls],
+      };
+      setFormData(next);
+      onChange(next);
+      toast.success('Owner documents uploaded');
+    } catch (err) {
+      console.error('Failed to upload owner documents:', err);
+      toast.error('Failed to upload documents. Please try again.');
+    }
   };
 
   const handleSubmit = (e) => {
@@ -386,9 +420,72 @@ export default function LeaseDetailsForm({
             </div>
           </div>
 
+          {/* Owner Documents Section */}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase">12. Owner Documents</h3>
+                  <p className="text-sm text-muted-foreground max-w-2xl">
+                    Upload property documents.
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-100 text-slate-600 text-xs font-medium px-3 py-1">
+                  30 MB max per file
+                </span>
+              </div>
+
+              <label htmlFor="ownerDocs" className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-4 cursor-pointer hover:border-primary transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Upload Property Documents</p>
+                    <p className="text-xs text-muted-foreground">Drag files here or click to choose PDFs and images.</p>
+                  </div>
+                </div>
+                <span className="rounded-full bg-primary text-white px-4 py-2 text-sm font-medium">Choose Files</span>
+              </label>
+              <input
+                id="ownerDocs"
+                type="file"
+                multiple
+                accept="application/pdf,image/*"
+                onChange={handleDocumentUpload}
+                className="sr-only"
+              />
+
+              {formData.owner_docs?.length > 0 && (
+                <div className="grid gap-3">
+                  {formData.owner_docs.map((doc, index) => (
+                    <a
+                      key={doc}
+                      href={doc}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-primary"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                          <FileText className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <p className="font-medium text-slate-900">Document {index + 1}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[280px]">{doc}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs text-primary group-hover:underline">View</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Signatures Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase">12. Signatures</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase">13. Signatures</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="landlordSignature">Landlord Signature</Label>

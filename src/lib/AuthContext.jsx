@@ -127,11 +127,26 @@ export const AuthProvider = ({ children }) => {
     const handler = () => setShowAuthModal(true)
     window.addEventListener('app:open-auth-modal', handler)
 
+    // Listen for external profile updates (e.g. photo changes) so we can refresh context
+    const userUpdatedHandler = async () => {
+      try {
+        const currentUser = await auth.me();
+        if (mounted) {
+          setUser(currentUser);
+          setIsAuthenticated(!!currentUser);
+        }
+      } catch (e) {
+        console.warn('Failed to refresh user after external update', e);
+      }
+    };
+    window.addEventListener('app:user-updated', userUpdatedHandler)
+
     return () => {
       mounted = false
       clearTimeout(safetyTimeoutId)
       subscription.unsubscribe()
       window.removeEventListener('app:open-auth-modal', handler)
+      window.removeEventListener('app:user-updated', userUpdatedHandler)
     }
   }, [])
 
@@ -158,10 +173,14 @@ export const AuthProvider = ({ children }) => {
     setShowAuthModal(true);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async (redirectUrl) => {
     setUser(null);
     setIsAuthenticated(false);
-    auth.logout();
+    try {
+      await auth.logout(redirectUrl);
+    } catch (e) {
+      console.error('Error during logout:', e);
+    }
   }, []);
 
   const onAuthSuccess = useCallback((authUser) => {

@@ -6,8 +6,9 @@ export default function StripeConnectBanner({
   user, 
   onboardingLoading, 
   handleStripeOnboard, 
-  title = 'Set up Stripe Payments',
-  description = 'Connect your Stripe account to receive payments directly to your bank account.'
+  title = 'Set up Your Payments',
+  description = 'Connect your Stripe account to receive payments directly to your bank account.',
+  buttonText = 'Connect Bank Account'
 }) {
   if (!user) return null;
 
@@ -29,9 +30,9 @@ export default function StripeConnectBanner({
           className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-medium disabled:animate-none"
         >
           {onboardingLoading ? (
-            <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Connect Stripe</span>
+            <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> {buttonText}</span>
           ) : (
-            'Connect Stripe'
+            buttonText
           )}
         </Button>
       </div>
@@ -41,7 +42,7 @@ export default function StripeConnectBanner({
   return (
     <div className="mb-6 p-3 rounded-xl border border-green-200 bg-green-50/50 flex items-center gap-2 text-xs text-green-800">
       <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-      <span>Stripe Connect is active. Payments will be transferred to your account.</span>
+      <span>Bank account is connected through stripe.</span>
     </div>
   );
 }

@@ -236,7 +236,7 @@ export const auth = {
   },
 
   /** Logout */
-  async logout(redirectUrl) {
+  async logout() {
     // Log user logout action before signing out (so user context is present)
     try {
       await auditLogger.log('USER_LOGOUT')
@@ -249,9 +249,6 @@ export const auth = {
       console.error('Logout error:', error)
     }
     clearSession()
-    if (redirectUrl && typeof redirectUrl === 'string') {
-      window.location.href = redirectUrl
-    }
   },
 
   /** Update user profile */
@@ -326,4 +323,4 @@ export const storageIntegration = {
 
     return { file_url: urlData.publicUrl }
   }
-}
+}

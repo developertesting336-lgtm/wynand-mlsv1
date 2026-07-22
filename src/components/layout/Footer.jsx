@@ -1,8 +1,27 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
 import { ShieldCheck } from 'lucide-react';
 
 export default function Footer() {
+  const navigate = useNavigate();
+  const { user, isAuthenticated, login } = useAuth();
+
+  const handleListProperty = (event) => {
+    event.preventDefault();
+
+    if (!isAuthenticated) {
+      login();
+      return;
+    }
+
+    if (user?.role === 'renter' || user?.role === 'tenant') {
+      navigate('/dashboard');
+      return;
+    }
+
+    navigate('/submit-property');
+  };
   return (
     <footer className="bg-foreground text-background/80 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -20,17 +39,17 @@ export default function Footer() {
             <h4 className="font-semibold text-white mb-4">Quick Links</h4>
             <div className="space-y-2 text-sm">
               <Link to="/listings" className="block hover:text-primary transition-colors">Browse Rentals</Link>
-              <Link to="/submit-property" className="block hover:text-primary transition-colors">List Your Property</Link>
+              <button type="button" onClick={handleListProperty} className="block hover:text-primary transition-colors text-left">List Your Property</button>
             </div>
           </div>
           <div>
             <h4 className="font-semibold text-white mb-4">Neighborhoods</h4>
-            <div className="space-y-2 text-sm text-background/60">
-              <p>Zona Romántica</p>
-              <p>Marina Vallarta</p>
-              <p>Nuevo Vallarta</p>
-              <p>Centro</p>
-              <p>Conchas Chinas</p>
+            <div className="space-y-2 text-sm">
+              <Link to="/listings?neighborhood=romantica" className="block text-background/60 hover:text-primary transition-colors">Zona Romántica</Link>
+              <Link to="/listings?neighborhood=marina_vallarta" className="block text-background/60 hover:text-primary transition-colors">Marina Vallarta</Link>
+              <Link to="/listings?neighborhood=nuevo_vallarta" className="block text-background/60 hover:text-primary transition-colors">Nuevo Vallarta</Link>
+              <Link to="/listings?neighborhood=centro" className="block text-background/60 hover:text-primary transition-colors">Centro</Link>
+              <Link to="/listings?neighborhood=conchas_chinas" className="block text-background/60 hover:text-primary transition-colors">Conchas Chinas</Link>
             </div>
           </div>
         </div>

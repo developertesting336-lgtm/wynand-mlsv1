@@ -8,12 +8,16 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { User, Mail, Phone, Shield, Loader2, Pencil, Building2, Calendar } from 'lucide-react';
+import { User, Mail, Phone, Shield, Loader2, Pencil, Building2, Calendar, Upload } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { storageIntegration } from '@/lib/auth';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
+  const [verification, setVerification] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState({ full_name: '', phone_number: '' });
   const [bookings, setBookings] = useState([]);
@@ -31,6 +35,10 @@ export default function Profile() {
   useEffect(() => {
     if (!user?.id) return;
     setLoadingData(true);
+    // load verification record to read profile_photo if present
+    supabase.from('verifications').select('*').eq('user_id', user.id).maybeSingle().then(res => {
+      if (!res.error) setVerification(res.data || null);
+    }).catch(() => {});
     Promise.all([
       // Fetch bookings with listing and agreement data if renter
       user.role === 'renter' ? supabase.from('bookings').select('*, listings(title, price_usd), agreement_conditions').eq('renter_id', user.id).order('created_date', { ascending: false }) : Promise.resolve({ data: [] }),
@@ -63,6 +71,35 @@ export default function Profile() {
       toast.error('Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const profilePhotoUrl = verification?.profile_photo || user?.photo_url || null;
+
+  const handleProfilePhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const { file_url } = await storageIntegration.UploadFile({ file, folder: 'Profile' });
+      // upsert into verifications.profile_photo (do not modify profiles table)
+      const { data: vData, error: vErr } = await supabase
+        .from('verifications')
+        .upsert({ user_id: user.id, profile_photo: file_url, updated_date: new Date().toISOString() }, { onConflict: 'user_id' })
+        .select()
+        .maybeSingle();
+      if (vErr) throw vErr;
+
+      // update local state
+      if (vData) setVerification(vData);
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      try { window.dispatchEvent(new Event('app:user-updated')); } catch (e) {}
+      toast.success('Profile photo updated');
+    } catch (err) {
+      console.error('Failed to upload profile photo:', err);
+      toast.error('Failed to upload profile photo');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -132,6 +169,32 @@ export default function Profile() {
           </Dialog>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Avatar className="w-20 h-20">
+                {profilePhotoUrl ? (
+                  <AvatarImage src={profilePhotoUrl} alt="Profile photo" />
+                ) : (
+                  <AvatarFallback>{user?.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
+                )}
+              </Avatar>
+              <div>
+                <p className="text-sm font-semibold">{user.full_name || 'Your profile'}</p>
+                <p className="text-xs text-muted-foreground">{user.email}</p>
+              </div>
+            </div>
+            <div>
+              <label className="cursor-pointer inline-flex">
+                <input type="file" className="hidden" accept="image/*" onChange={handleProfilePhoto} />
+                <Button size="sm" className="gap-1.5" disabled={uploadingPhoto} asChild>
+                  <span>
+                    {uploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {uploadingPhoto ? 'Uploading...' : 'Upload/Replace Photo'}
+                  </span>
+                </Button>
+              </label>
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Full Name</p>

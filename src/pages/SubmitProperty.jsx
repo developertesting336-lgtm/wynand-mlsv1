@@ -80,7 +80,9 @@ export default function SubmitProperty() {
 
   const isIdVerified = user?.id_verified || verification?.id_verification === 'approved';
 
-  const hasActiveSubscription = (user?.role === 'owner' || user?.role === 'agent')
+  // Owners and agents do not require an active subscription to list properties.
+  // Only renters require an active subscription.
+  const hasActiveSubscription = user?.role === 'renter'
     ? isSubscriptionActive(subscription)
     : true;
 
@@ -193,7 +195,8 @@ export default function SubmitProperty() {
       toast.error('Complete identity verification before submitting a property.');
       return;
     }
-    if (!hasActiveSubscription) {
+    // Only enforce subscription requirement for renters
+    if (user?.role === 'renter' && !hasActiveSubscription) {
       toast.error('You need an active subscription to submit a property. Please subscribe first.');
       return;
     }
@@ -315,7 +318,7 @@ export default function SubmitProperty() {
         </div>
       )}
 
-      {user && (user.role === 'owner' || user.role === 'agent') && !isLoadingSubscription && !hasActiveSubscription && (
+      {user && user.role === 'renter' && !isLoadingSubscription && !hasActiveSubscription && (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 mb-6">
           An active subscription is required to submit a property. Please visit the Pricing page to subscribe.
         </div>
