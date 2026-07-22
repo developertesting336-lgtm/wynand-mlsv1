@@ -81,6 +81,7 @@ export default function AgentDashboard() {
   const [renterVerification, setRenterVerification] = useState(null);
   const [agentSigningBooking, setAgentSigningBooking] = useState(null);
   const [agentSigning, setAgentSigning] = useState(false);
+  const [agentSignatures, setAgentSignatures] = useState([]);
   const openEditModal = (listing) => setEditingListing(listing);
   const closeEditModal = () => setEditingListing(null);
   const openAgreementEdit = (booking) => {
@@ -222,6 +223,7 @@ export default function AgentDashboard() {
             if (!currentSigs.includes(signatureUrl)) {
               const updatedSigs = [...currentSigs, signatureUrl].slice(-3);
               await supabase.from('profiles').update({ signatures: updatedSigs }).eq('id', user.id);
+              setAgentSignatures(updatedSigs);
             }
           }
         } catch (profileErr) {
@@ -272,7 +274,37 @@ export default function AgentDashboard() {
   };
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    base44.auth.me()
+      .then(async (currentUser) => {
+        setUser(currentUser);
+        if (!currentUser) return;
+
+        try {
+          let profileQuery = supabase
+            .from('profiles')
+            .select('signatures')
+            .eq('id', currentUser.id)
+            .single();
+
+          let { data: profileData, error: profileError } = await profileQuery;
+          if ((profileError || !profileData) && currentUser.email) {
+            const fallback = await supabase
+              .from('profiles')
+              .select('signatures')
+              .eq('email', currentUser.email)
+              .single();
+            profileData = fallback.data;
+            profileError = fallback.error;
+          }
+
+          if (!profileError && profileData?.signatures) {
+            setAgentSignatures(profileData.signatures);
+          }
+        } catch (err) {
+          console.error('Failed to load agent signatures:', err);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const { data: myListings = [] } = useQuery({
@@ -1615,6 +1647,7 @@ export default function AgentDashboard() {
           <SignaturePad
             title="Agent Signature"
             submitLabel="Save Signature"
+            savedSignatures={agentSignatures}
             onSave={handleAgentSignatureSave}
             onCancel={closeAgentSignatureModal}
             isSubmitting={agentSigning}

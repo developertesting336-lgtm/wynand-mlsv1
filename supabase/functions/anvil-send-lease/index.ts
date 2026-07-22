@@ -30,6 +30,14 @@ serve(async (req) => {
 
     const { bookingId, agreementConditions, tenantSignature, tenantSignatureDate, agentSignature, agentSignatureDate } = await req.json();
 
+    console.log('[anvil] anvil-send-lease invoked', {
+      bookingId,
+      hasAgreementConditions: !!agreementConditions,
+      hasTenantSignature: !!tenantSignature,
+      hasAgentSignature: !!agentSignature,
+      hasAgentSignatureDate: !!agentSignatureDate,
+    });
+
     if (!bookingId) {
       return new Response(JSON.stringify({ error: "bookingId is required" }), {
         status: 400,
@@ -140,25 +148,25 @@ serve(async (req) => {
       }
     };
 
-    // Upload landlord signature if provided (or use agent signature as fallback for PDF)
+    const isUrl = (value: string | undefined | null) => typeof value === 'string' && value.startsWith('http');
+
+    // Upload landlord signature if provided
     let landlordSignatureUrl = conditions.landlordSignature;
-    if (landlordSignatureUrl && !landlordSignatureUrl?.startsWith('http')) {
+    if (landlordSignatureUrl && !isUrl(landlordSignatureUrl)) {
       landlordSignatureUrl = await uploadSignature(landlordSignatureUrl, 'landlord');
     }
 
     // Upload agent signature if provided
-    let agentSignatureUrl = conditions.agentSignature;
-    if (agentSignature && !agentSignature.startsWith('http')) {
-      agentSignatureUrl = await uploadSignature(agentSignature, 'agent');
-    }
-
-    if (!landlordSignatureUrl && agentSignatureUrl) {
-      landlordSignatureUrl = agentSignatureUrl;
+    let agentSignatureUrl = agentSignature || conditions.agentSignature;
+    if (agentSignatureUrl && !isUrl(agentSignatureUrl)) {
+      console.log('[anvil] uploading raw agent signature for booking', bookingId);
+      agentSignatureUrl = await uploadSignature(agentSignatureUrl, 'agent');
+      console.log('[anvil] uploaded agent signature url', { agentSignatureUrl });
     }
 
     // Upload tenant signature if provided
     let tenantSignatureUrl = tenantSignature || conditions.tenantSignature;
-    if (tenantSignatureUrl && !tenantSignatureUrl.startsWith('http')) {
+    if (tenantSignatureUrl && !isUrl(tenantSignatureUrl)) {
       tenantSignatureUrl = await uploadSignature(tenantSignatureUrl, 'tenant');
     }
 
@@ -249,14 +257,16 @@ serve(async (req) => {
         emergencyResponseTimeHours: conditions.emergencyResponseTimeHours || "",
         additionalTermsConditions: conditions.additionalTermsConditions || "",
         landlordSignature: landlordSignatureUrl || "",
-        landlordSignatureDate: formatSignatureDate(conditions.landlordSignatureDate || agentSignatureDate),
+        landlordSignatureDate: formatSignatureDate(conditions.landlordSignatureDate),
         tenantSignature: tenantSignatureUrl || "",
         tenantSignatureDate: formatSignatureDate(tenantSignatureDate),
+        agentSignature: agentSignatureUrl || "",
+        agentSignatureDate: formatSignatureDate(conditions.agentSignatureDate || agentSignatureDate),
       }
     };
 
     console.log(`[anvil] Filling PDF template ${pdfTemplateId} for booking ${bookingId}`);
-    console.log(fillData, '00000000000000000000000')
+    // console.log(fillData, '00000000000000000000000')
 
     const fillResponse = await fetch(`https://app.useanvil.com/api/v1/fill/${pdfTemplateId}.pdf`, {
       method: "POST",
@@ -273,23 +283,23 @@ serve(async (req) => {
       throw new Error(`Failed to fill PDF template: ${fillResponse.status} ${errText}`);
     }
 
-    // 6. Delete old PDF from bucket if updating
-    if (tenantSignature && booking.lease_pdf_url) {
-      try {
-        const oldFileName = booking.lease_pdf_url.split('/').pop();
-        if (oldFileName) {
+    // 6. Use a deterministic lease filename so regenerated leases replace the previous PDF
+    const pdfBytes = await fillResponse.arrayBuffer();
+    const fileName = `leases/${bookingId}-lease-agreement.pdf`;
+
+    // Clean up old PDF if it used a different filename scheme
+    if (booking.lease_pdf_url) {
+      const oldFileName = booking.lease_pdf_url.split('/').pop();
+      const newFileName = fileName.split('/').pop();
+      if (oldFileName && oldFileName !== newFileName) {
+        try {
           await supabaseAdmin.storage.from("MLS").remove([`leases/${oldFileName}`]);
           console.log(`[anvil] Deleted old PDF: ${oldFileName}`);
+        } catch (err) {
+          console.warn("[anvil] Could not delete old PDF:", err);
         }
-      } catch (err) {
-        console.warn("[anvil] Could not delete old PDF:", err);
       }
     }
-
-    // 7. Upload the filled PDF to Supabase Storage
-    const pdfBytes = await fillResponse.arrayBuffer();
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").split("T")[0];
-    const fileName = `leases/${bookingId}-${timestamp}-lease-agreement.pdf`;
 
     const { error: uploadError } = await supabaseAdmin
       .storage
@@ -321,10 +331,10 @@ serve(async (req) => {
         agreement_conditions: {
           ...conditions,
           landlordSignature: landlordSignatureUrl,
+          landlordSignatureDate: formatSignatureDate(conditions.landlordSignatureDate),
           tenantSignature: tenantSignatureUrl,
-          agentSignature: agentSignatureUrl || conditions.agentSignature,
-          landlordSignatureDate: formatSignatureDate(conditions.landlordSignatureDate || agentSignatureDate),
           tenantSignatureDate: formatSignatureDate(tenantSignatureDate),
+          agentSignature: agentSignatureUrl,
           agentSignatureDate: formatSignatureDate(conditions.agentSignatureDate || agentSignatureDate)
         }
       })
@@ -334,6 +344,16 @@ serve(async (req) => {
       console.error("[anvil] Supabase Update Error:", updateError);
       throw new Error("Failed to update booking with lease URL.");
     }
+
+    console.log('[anvil] lease PDF updated for booking', {
+      bookingId,
+      lease_pdf_url: publicUrl,
+      lease_status: newLeaseStatus,
+      bookingStatus: tenantSignature ? 'approved' : 'lease_pending',
+      agentSignatureUrl,
+      landlordSignatureUrl,
+      tenantSignatureUrl,
+    });
 
     return new Response(JSON.stringify({
       success: true,
