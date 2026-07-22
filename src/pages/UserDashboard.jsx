@@ -26,6 +26,7 @@ import { useStripeOnboarding } from '@/hooks/useStripeOnboarding';
 import ReferralPaymentsTab from '@/components/ReferralPaymentsTab';
 import InquiryReplies from '@/components/inquiries/InquiryReplies';
 import InquiryKanban from '@/components/inquiries/InquiryKanban';
+import PaidBookingChat from '@/components/chat/PaidBookingChat';
 import { toast } from 'sonner';
 import { NEIGHBORHOOD_LABELS } from '@/lib/constants';
 
@@ -355,6 +356,7 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Lease</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Agreement</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground">Agent Signed</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                 </tr>
               </thead>
@@ -370,6 +372,7 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
               const depositAmount = parseFloat(conditions.securityDepositAmount) || 0;
               const rentAmount = parseFloat(conditions.monthlyRent?.toString().replace(/[^0-9.]/g, '')) || 0;
               const totalAmount = depositAmount + (rentAmount * 2);
+              const agentSigned = Boolean(conditions.agentSignature);
 
               return (
                 <tr key={b.id} className="hover:bg-muted/30 transition-colors">
@@ -427,6 +430,12 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
                       <span className="text-xs text-muted-foreground italic">Pending...</span>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${agentSigned ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                      {agentSigned ? <CheckCircle className="w-3.5 h-3.5" /> : <Hourglass className="w-3.5 h-3.5" />}
+                      {agentSigned ? 'Signed' : 'Pending'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-right">
                     {(b.status === 'lease_pending' || (b.status === 'approved' && b.lease_status !== 'signed')) ? (
                       <SignLeaseButton booking={b} listing={listing} onSigned={() => {}} />
@@ -434,19 +443,24 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
                       <Button
                         size="sm"
                         onClick={() => handlePayment(b.id)}
-                        disabled={payingId === b.id}
+                        disabled={payingId === b.id || !agentSigned}
+                        title={agentSigned ? 'Proceed to payment' : 'Payment is available after the agent signs the agreement'}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-transform active:scale-[0.98] py-1 px-2.5 h-auto whitespace-nowrap disabled:opacity-70 disabled:cursor-not-allowed"
                       >
                         {payingId === b.id ? (
                           <span className="flex items-center gap-1.5">
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            Pay ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {agentSigned ? `Pay $${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Awaiting agent signature'}
                             <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
                           </span>
                         ) : (
                           <>
-                            Pay ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
+                            {agentSigned ? (
+                              <>
+                                Pay ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
+                              </>
+                            ) : 'Awaiting agent signature'}
                           </>
                         )}
                       </Button>
@@ -943,6 +957,9 @@ export default function UserDashboard() {
           <TabsTrigger value="bookings" className="gap-1.5">
             <Calendar className="w-4 h-4" /> Bookings
           </TabsTrigger>
+          <TabsTrigger value="chat" className="gap-1.5">
+            <MessageSquare className="w-4 h-4" /> Chat
+          </TabsTrigger>
           <TabsTrigger value="payments" className="gap-1.5">
             <CreditCard className="w-4 h-4" /> Payments
             {myPayments.length > 0 && (
@@ -1055,6 +1072,10 @@ export default function UserDashboard() {
         {/* Bookings Tab */}
         <TabsContent value="bookings" className="pt-6">
           <BookingsTab bookings={myBookings} isLoading={bookingsLoading} listings={allListings} userEmail={user.email} />
+        </TabsContent>
+
+        <TabsContent value="chat" className="pt-6">
+          <PaidBookingChat bookings={myBookings} listings={allListings} currentUser={{ ...user, role: 'renter' }} />
         </TabsContent>
 
         {/* Payments Tab */}

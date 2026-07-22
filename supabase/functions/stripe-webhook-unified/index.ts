@@ -392,6 +392,34 @@ serve(async (req: any) => {
                 console.error('Failed to update booking status:', bookingUpdateError.message);
               } else {
                 console.log('Successfully updated booking status to confirmed.');
+
+                const emailServerUrl = Deno.env.get('EMAIL_SERVER_URL') || 'https://email.pvverified.com';
+                const emailHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+                const emailSecret = Deno.env.get('INTERNAL_EMAIL_SECRET');
+                if (emailSecret) emailHeaders['x-internal-email-secret'] = emailSecret;
+
+                try {
+                  const invoiceResponse = await fetch(`${emailServerUrl}/send-payment-invoice`, {
+                    method: 'POST',
+                    headers: emailHeaders,
+                    body: JSON.stringify({
+                      bookingId,
+                      amount: amountCents ? amountCents / 100 : 0,
+                      currency,
+                      paymentDate: sessionCreatedAt,
+                      stripeSessionId,
+                      stripePaymentIntentId: paymentIntentId,
+                    }),
+                  });
+
+                  if (!invoiceResponse.ok) {
+                    console.error('Payment invoice email failed:', invoiceResponse.status, await invoiceResponse.text());
+                  } else {
+                    console.log('Payment invoice emails sent for booking:', bookingId);
+                  }
+                } catch (emailError) {
+                  console.error('Payment invoice email request failed:', emailError);
+                }
               }
             }
           }

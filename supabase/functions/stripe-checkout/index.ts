@@ -70,7 +70,10 @@ serve(async (req) => {
     }
 
 
-    if (booking.status !== 'approved' || booking.lease_status !== 'signed') {
+    const agreementConditions = booking.agreement_conditions || {};
+    const agentSigned = Boolean(agreementConditions.agentSignature);
+
+    if (booking.status !== 'approved' || booking.lease_status !== 'signed' || !agentSigned) {
       return new Response(JSON.stringify({ error: 'Lease agreement must be signed by all parties before payment.' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -115,7 +118,7 @@ serve(async (req) => {
     // Charge the renter for deposit + first month rent + last month rent.
     // Platform fee is taken from the amount paid to the connected account.
     // Use agreement_conditions from booking for deposit and rent
-    const agreement = booking.agreement_conditions || {};
+    const agreement = agreementConditions;
     const depositAmount = parseFloat(agreement.securityDepositAmount) || 0;
     const rentAmount = parseFloat((agreement.monthlyRent || '').toString().replace(/[^0-9.]/g, '')) || 0;
     const platformFeeAmount = Math.round(rentAmount * 0.10 * 100) / 100;

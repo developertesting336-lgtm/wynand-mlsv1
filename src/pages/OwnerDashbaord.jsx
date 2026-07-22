@@ -25,6 +25,7 @@ import { useStripeOnboarding } from '@/hooks/useStripeOnboarding';
 import ReferralPaymentsTab from '@/components/ReferralPaymentsTab';
 import TenantVerification from '@/components/profile/TenantVerification';
 import InquiryKanban from '@/components/inquiries/InquiryKanban';
+import PaidBookingChat from '@/components/chat/PaidBookingChat';
 import LeaseDetailsForm from '@/components/owner/LeaseDetailsForm';
 import SignaturePad from '@/components/owner/SignaturePad';
 
@@ -910,6 +911,9 @@ export default function OwnerDashboard() {
           <TabsTrigger value="inquiries" className="gap-1.5">
             <MessageSquare className="w-4 h-4" /> Inquiries ({allInquiries.length})
           </TabsTrigger>
+          <TabsTrigger value="chat" className="gap-1.5">
+            <MessageSquare className="w-4 h-4" /> Chat
+          </TabsTrigger>
           <TabsTrigger value="payments" className="gap-1.5">
             <CreditCard className="w-4 h-4" /> Payments ({myPayments.length})
           </TabsTrigger>
@@ -998,6 +1002,10 @@ export default function OwnerDashboard() {
           ) : (
             <InquiryKanban inquiries={allInquiries} />
           )}
+        </TabsContent>
+
+        <TabsContent value="chat" className="pt-6">
+          <PaidBookingChat bookings={allBookings} listings={allListings} currentUser={{ ...user, role: 'owner' }} />
         </TabsContent>
 
         <TabsContent value="referral-payments" className="pt-6">
