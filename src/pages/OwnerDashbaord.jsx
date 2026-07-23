@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Home, Eye, Calendar, PlusCircle, ShieldCheck, CheckCircle,
   XCircle, Hourglass, ExternalLink, Building2, TrendingUp, BadgeCheck, Lock,
@@ -260,6 +261,250 @@ function BookingRequestCard({ booking, listing, onApprove, onDecline, verifiedTe
   );
 }
 
+function OwnerAppointmentsTab({ user, listings = [] }) {
+  const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
+  const [slotsInputs, setSlotsInputs] = useState({}); // { appointmentId: ['slot1', 'slot2', 'slot3'] }
+  const [suggestingId, setSuggestingId] = useState(null);
+
+  const { data: appointments = [], isLoading, refetch } = useQuery({
+    queryKey: ['owner-appointments', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('owner_id', user.id)
+        .order('created_date', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: profiles = [] } = useQuery({
+    queryKey: ['owner-appointments-profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('profiles').select('id, full_name, email');
+      if (error) throw error;
+      return data || [];
+    }
+  });
+  const profileMap = Object.fromEntries(profiles.map(p => [p.id, p]));
+
+  const handleAccept = async (appointmentId) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ owner_accepted: true, agent_scheduled_slots: [] })
+        .eq('id', appointmentId);
+      if (error) throw error;
+      toast.success('Appointment request accepted and confirmed!');
+      refetch();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to accept appointment');
+    }
+  };
+
+  const handleSuggestSlots = async (appointmentId) => {
+    const slots = slotsInputs[appointmentId] || [];
+    const validSlots = slots.filter(s => s && s.trim() !== '').map(s => new Date(s).toISOString());
+    if (validSlots.length === 0) {
+      toast.error('Please input at least one valid slot');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          agent_scheduled_slots: validSlots,
+          owner_accepted: false
+        })
+        .eq('id', appointmentId);
+      if (error) throw error;
+      toast.success('Slots suggested to the tenant!');
+      setSuggestingId(null);
+      refetch();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to suggest slots');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+      </div>
+    );
+  }
+
+  if (appointments.length === 0) {
+    return (
+      <div className="text-center py-12 bg-card rounded-2xl border border-slate-100 shadow-sm">
+        <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+        <h3 className="text-lg font-semibold text-slate-800">No Appointments</h3>
+        <p className="text-muted-foreground max-w-sm mx-auto text-sm mt-1">
+          Tenants have not requested any viewing appointments for your properties yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-850 leading-relaxed shadow-sm font-medium">
+        🛡️ <span className="font-bold text-amber-950">Protected Lead Policy:</span>
+        <span className="block mt-1">
+          ⚠️ If an owner, agent, or tenant attempts to complete a rental agreement outside PV Verified Rentals after being introduced through the platform, they may face legal consequences for breaching the platform's Terms of Service. Applicable commissions, platform fees, and other contractual obligations will remain payable, and PV Verified Rentals reserves the right to pursue all available legal remedies.
+        </span>
+      </div>
+
+      <div className="border rounded-2xl overflow-hidden bg-card shadow-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr className="border-b bg-muted/50 text-xs uppercase tracking-wider">
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Tenant</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Requested Date & Time</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {appointments.map(app => {
+              const listing = listingMap[app.listing_id];
+              const tenant = profileMap[app.renter_id];
+              const tenantName = tenant?.full_name || tenant?.email || 'Tenant';
+
+              return (
+                <tr key={app.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-4">
+                    <div className="font-semibold text-slate-800">
+                      {listing?.title ? (
+                        <Link to={`/listings/${app.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1">
+                          {listing.title} <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">Unknown Property</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="font-medium text-slate-700">{tenantName}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{tenant?.email}</div>
+                  </td>
+                  <td className="px-4 py-4 font-semibold text-slate-700">
+                    {app.appointment_date ? (
+                      format(new Date(app.appointment_date), 'MMMM d, yyyy · h:mm a')
+                    ) : (
+                      <span className="text-amber-600 font-medium">To be scheduled</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    {app.owner_accepted ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        Confirmed
+                      </span>
+                    ) : app.agent_scheduled_slots?.includes('approved_by_agent') ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse">
+                        Approved by Agent
+                      </span>
+                    ) : app.agent_scheduled_slots?.length > 0 ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                        Alternative Proposed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                        Pending Approval
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    <div className="flex flex-col items-end gap-2">
+                      {!app.owner_accepted && suggestingId !== app.id && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleAccept(app.id)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs animate-transform active:scale-95"
+                          >
+                            Accept Request
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSuggestingId(app.id);
+                              setSlotsInputs(prev => ({
+                                ...prev,
+                                [app.id]: ['', '', '']
+                              }));
+                            }}
+                            className="text-xs"
+                          >
+                            Suggest Slots
+                          </Button>
+                        </div>
+                      )}
+
+                      {suggestingId === app.id && (
+                        <div className="bg-white p-4 rounded-xl border border-slate-200 text-left space-y-3 w-80 shadow-md mt-2">
+                          <div>
+                            <span className="text-xs font-semibold text-slate-600 block mb-1">Propose Alternative Slots (Up to 3):</span>
+                            <div className="space-y-2">
+                              {[0, 1, 2].map(idx => (
+                                <input
+                                  key={idx}
+                                  type="datetime-local"
+                                  value={slotsInputs[app.id]?.[idx] || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSlotsInputs(prev => {
+                                      const arr = [...(prev[app.id] || ['', '', ''])];
+                                      arr[idx] = val;
+                                      return { ...prev, [app.id]: arr };
+                                    });
+                                  }}
+                                  className="w-full text-xs h-9 px-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSuggestingId(null)}
+                              className="h-8 text-xs"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleSuggestSlots(app.id)}
+                              className="bg-primary text-primary-foreground font-semibold h-8 text-xs px-3"
+                            >
+                              Submit Slots
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  );
+}
+
 function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLoading }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -436,6 +681,11 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
                       </Link>
                     ) : (
                       <span className="text-muted-foreground">Unknown Property</span>
+                    )}
+                    {p.payment_for_month_year && (
+                      <div className="text-xs font-semibold text-emerald-600 mt-1 whitespace-nowrap">
+                        Period: {p.payment_for_month_year}
+                      </div>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -907,6 +1157,9 @@ export default function OwnerDashboard() {
                 {pendingCount}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="appointments" className="gap-1.5">
+            <Calendar className="w-4 h-4" /> Appointments
           </TabsTrigger>
           <TabsTrigger value="inquiries" className="gap-1.5">
             <MessageSquare className="w-4 h-4" /> Inquiries ({allInquiries.length})
@@ -1566,6 +1819,10 @@ export default function OwnerDashboard() {
               </Tabs>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="appointments" className="pt-6">
+          <OwnerAppointmentsTab user={user} listings={myListings} />
         </TabsContent>
       </Tabs>
 

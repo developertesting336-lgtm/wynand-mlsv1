@@ -7,12 +7,13 @@ import { Search, Users } from 'lucide-react';
 import AgentCard from '@/components/agents/AgentCard';
 import ReviewModal from '@/components/agents/ReviewModal';
 import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 export default function AgentDirectory() {
   const [search, setSearch] = useState('');
   const [reviewingAgent, setReviewingAgent] = useState(null);
   const queryClient = useQueryClient();
-  
+
   // Get auth state
   const { user, login, authChecked } = useAuth();
 
@@ -41,17 +42,45 @@ export default function AgentDirectory() {
     queryFn: () => base44.entities.AgentReview.list(),
   });
 
+  const { data: verifications = [] } = useQuery({
+    queryKey: ['all-verifications'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('verifications').select('user_id, profile_photo');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+
+
+
+
+  const verificationsMap = useMemo(() => {
+    const map = {};
+    verifications.forEach(v => {
+      if (v.user_id) {
+        map[v.user_id] = v;
+      }
+    });
+    return map;
+  }, [verifications]);
+
+
   // Filter reviews for current user to check if they've already reviewed
   const userReviews = useMemo(() => {
     if (!user?.id) return [];
     return reviews.filter(r => r.reviewer_id === user.id);
   }, [reviews, user?.id]);
 
-  // Only show users who have at least one listing OR are admins/agents, excluding current user
+  // Only show users whose role is agent
   const agents = useMemo(() => {
-    const agentEmails = new Set(listings.map(l => l.owner_email).filter(Boolean));
-    return users.filter(u => u.email !== user?.email && (agentEmails.has(u.email) || u.role === 'admin'));
-  }, [users, listings, user?.email]);
+    return users
+      .filter(u => u.role === 'agent')
+      .map(u => ({
+        ...u,
+        profile_photo: verificationsMap[u.id]?.profile_photo || u.photo_url
+      }));
+  }, [users, verificationsMap]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return agents;

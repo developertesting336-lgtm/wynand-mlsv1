@@ -44,7 +44,8 @@ serve(async (req) => {
                 payee_stripe_connect_id,
                 payee_id,
                 payer_id,
-                payout_status
+                payout_status,
+                payment_type
             `)
             .eq('payout_status', 'pending');
 
@@ -405,47 +406,92 @@ serve(async (req) => {
             referralPayoutAmount = 0;
             platformPayoutAmount = 0;
 
-            const hasAgentAssociated = isAgentSelfReferral || isAgentReferral;
+            if (payment.payment_type === 'monthly_rent') {
+                ownerPayoutAmount = payment.amount_centavos;
+                console.log(`[INFO] Monthly rent payment: owner receives 100% = ${ownerPayoutAmount} cents, no platform fee or commission`);
+            } else {
+                const hasAgentAssociated = isAgentSelfReferral || isAgentReferral;
 
-            if (hasAgentAssociated) {
-                // Case A: Agent Present
-                let commissionCents = baseCommissionCents;
-                if (commissionCents > payment.amount_centavos) {
-                    console.warn(`[WARNING] Commission ${commissionCents} cents exceeds payment total ${payment.amount_centavos} cents. Capping commission at payment total.`);
-                    commissionCents = payment.amount_centavos;
-                }
-                const platformFeeCents = Math.round(commissionCents * 0.10);
-                const ivaCents = Math.round(platformFeeCents * 0.16);
-
-                referralPayoutAmount = commissionCents - platformFeeCents - ivaCents;
-                ownerPayoutAmount = payment.amount_centavos - commissionCents;
-                platformPayoutAmount = platformFeeCents + ivaCents;
-
-                if (isAgentSelfReferral) {
-                    const { data: createdRefPayment, error: refPayError } = await supabase
-                        .from('referral_payments')
-                        .insert({
-                            id: crypto.randomUUID(),
-                            referral_id: payment.payer_id,
-                            booking_id: payment.booking_id,
-                            payer_id: payment.payer_id,
-                            referrer_id: booking.agent_id,
-                            amount_centavos: referralPayoutAmount,
-                            amount_mxn: referralPayoutAmount / 100,
-                            currency: payment.currency || 'mxn',
-                            payout_status: 'pending',
-                        })
-                        .select()
-                        .single();
-
-                    if (refPayError) {
-                        console.error('Failed to create referral_payments entry:', refPayError);
-                    } else if (createdRefPayment?.id) {
-                        referralPaymentId = createdRefPayment.id;
+                if (hasAgentAssociated) {
+                    // Case A: Agent Present
+                    let commissionCents = baseCommissionCents;
+                    if (commissionCents > payment.amount_centavos) {
+                        console.warn(`[WARNING] Commission ${commissionCents} cents exceeds payment total ${payment.amount_centavos} cents. Capping commission at payment total.`);
+                        commissionCents = payment.amount_centavos;
                     }
-                    console.log(`Agent self-referral: owner receives = ${ownerPayoutAmount}, agent receives = ${referralPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
-                } else {
-                    // Agent Referral from agent_referrals table
+                    const platformFeeCents = Math.round(commissionCents * 0.10);
+                    const ivaCents = Math.round(platformFeeCents * 0.16);
+
+                    referralPayoutAmount = commissionCents - platformFeeCents - ivaCents;
+                    ownerPayoutAmount = payment.amount_centavos - commissionCents;
+                    platformPayoutAmount = platformFeeCents + ivaCents;
+
+                    if (isAgentSelfReferral) {
+                        const { data: createdRefPayment, error: refPayError } = await supabase
+                            .from('referral_payments')
+                            .insert({
+                                id: crypto.randomUUID(),
+                                referral_id: payment.payer_id,
+                                booking_id: payment.booking_id,
+                                payer_id: payment.payer_id,
+                                referrer_id: booking.agent_id,
+                                amount_centavos: referralPayoutAmount,
+                                amount_mxn: referralPayoutAmount / 100,
+                                currency: payment.currency || 'mxn',
+                                payout_status: 'pending',
+                            })
+                            .select()
+                            .single();
+
+                        if (refPayError) {
+                            console.error('Failed to create referral_payments entry:', refPayError);
+                        } else if (createdRefPayment?.id) {
+                            referralPaymentId = createdRefPayment.id;
+                        }
+                        console.log(`Agent self-referral: owner receives = ${ownerPayoutAmount}, agent receives = ${referralPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
+                    } else {
+                        // Agent Referral from agent_referrals table
+                        const referredClientId = (saleReferral.referral_type === 'seller')
+                            ? booking.owner_id
+                            : payment.payer_id;
+
+                        const { data: createdReferralPayment, error: referralError } = await supabase
+                            .from('referral_payments')
+                            .insert({
+                                id: crypto.randomUUID(),
+                                referral_id: referredClientId,
+                                booking_id: payment.booking_id,
+                                payer_id: payment.payer_id,
+                                referrer_id: saleReferral.referrer_id,
+                                amount_centavos: referralPayoutAmount,
+                                amount_mxn: referralPayoutAmount / 100,
+                                currency: payment.currency || 'mxn',
+                                payout_status: 'pending',
+                            })
+                            .select()
+                            .single();
+
+                        if (referralError) {
+                            console.error('Failed to create referral payment:', referralError);
+                        } else if (createdReferralPayment?.id) {
+                            referralPaymentId = createdReferralPayment.id;
+                        }
+                        console.log(`Agent referral table match: owner receives = ${ownerPayoutAmount}, agent receives = ${referralPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
+                    }
+                } else if (saleReferral) {
+                    // Case B: Referral Present (No Agent)
+                    let commissionCents = baseCommissionCents;
+                    if (commissionCents > payment.amount_centavos) {
+                        console.warn(`[WARNING] Commission ${commissionCents} cents exceeds payment total ${payment.amount_centavos} cents. Capping commission at payment total.`);
+                        commissionCents = payment.amount_centavos;
+                    }
+                    const platformFeeCents = Math.round(commissionCents * 0.10);
+                    const ivaCents = Math.round(platformFeeCents * 0.16);
+
+                    referralPayoutAmount = commissionCents - platformFeeCents - ivaCents;
+                    ownerPayoutAmount = payment.amount_centavos - commissionCents;
+                    platformPayoutAmount = platformFeeCents + ivaCents;
+
                     const referredClientId = (saleReferral.referral_type === 'seller')
                         ? booking.owner_id
                         : payment.payer_id;
@@ -470,59 +516,19 @@ serve(async (req) => {
                         console.error('Failed to create referral payment:', referralError);
                     } else if (createdReferralPayment?.id) {
                         referralPaymentId = createdReferralPayment.id;
+                        console.log('Created referral payment:', referralPaymentId);
                     }
-                    console.log(`Agent referral table match: owner receives = ${ownerPayoutAmount}, agent receives = ${referralPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
+                    console.log(`Referral match: owner receives = ${ownerPayoutAmount}, referrer receives = ${referralPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
+                } else {
+                    // Case C: Neither Agent nor Referral Present
+                    const platformFeeCents = Math.round(payment.amount_centavos * 0.10);
+                    const ivaCents = Math.round(platformFeeCents * 0.16);
+
+                    platformPayoutAmount = platformFeeCents + ivaCents;
+                    ownerPayoutAmount = payment.amount_centavos - platformPayoutAmount;
+                    referralPayoutAmount = 0;
+                    console.log(`No agent/referral: owner receives = ${ownerPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
                 }
-            } else if (saleReferral) {
-                // Case B: Referral Present (No Agent)
-                let commissionCents = baseCommissionCents;
-                if (commissionCents > payment.amount_centavos) {
-                    console.warn(`[WARNING] Commission ${commissionCents} cents exceeds payment total ${payment.amount_centavos} cents. Capping commission at payment total.`);
-                    commissionCents = payment.amount_centavos;
-                }
-                const platformFeeCents = Math.round(commissionCents * 0.10);
-                const ivaCents = Math.round(platformFeeCents * 0.16);
-
-                referralPayoutAmount = commissionCents - platformFeeCents - ivaCents;
-                ownerPayoutAmount = payment.amount_centavos - commissionCents;
-                platformPayoutAmount = platformFeeCents + ivaCents;
-
-                const referredClientId = (saleReferral.referral_type === 'seller')
-                    ? booking.owner_id
-                    : payment.payer_id;
-
-                const { data: createdReferralPayment, error: referralError } = await supabase
-                    .from('referral_payments')
-                    .insert({
-                        id: crypto.randomUUID(),
-                        referral_id: referredClientId,
-                        booking_id: payment.booking_id,
-                        payer_id: payment.payer_id,
-                        referrer_id: saleReferral.referrer_id,
-                        amount_centavos: referralPayoutAmount,
-                        amount_mxn: referralPayoutAmount / 100,
-                        currency: payment.currency || 'mxn',
-                        payout_status: 'pending',
-                    })
-                    .select()
-                    .single();
-
-                if (referralError) {
-                    console.error('Failed to create referral payment:', referralError);
-                } else if (createdReferralPayment?.id) {
-                    referralPaymentId = createdReferralPayment.id;
-                    console.log('Created referral payment:', referralPaymentId);
-                }
-                console.log(`Referral match: owner receives = ${ownerPayoutAmount}, referrer receives = ${referralPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
-            } else {
-                // Case C: Neither Agent nor Referral Present
-                const platformFeeCents = Math.round(payment.amount_centavos * 0.10);
-                const ivaCents = Math.round(platformFeeCents * 0.16);
-
-                platformPayoutAmount = platformFeeCents + ivaCents;
-                ownerPayoutAmount = payment.amount_centavos - platformPayoutAmount;
-                referralPayoutAmount = 0;
-                console.log(`No agent/referral: owner receives = ${ownerPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
             }
 
             ownerPayoutAmount = Math.max(0, ownerPayoutAmount);

@@ -252,14 +252,14 @@ export default function ContactAgentForm({ listing, ownerRole = 'agent', refCode
           </div>
           <div>
             <CardTitle className="text-base font-bold">Contact the Agent</CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+            {/* <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
               <Mail className="w-3 h-3" /> {agentEmail}
             </p>
             {agentPhone && (
               <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                 <Phone className="w-3 h-3" /> {agentPhone}
               </p>
-            )}
+            )} */}
           </div>
         </div>
       </CardHeader>

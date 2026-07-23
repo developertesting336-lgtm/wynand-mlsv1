@@ -42,7 +42,7 @@ serve(async (req) => {
 
 
 
-    const { bookingId, origin } = await req.json();
+    const { bookingId, origin, paymentType } = await req.json();
 
     if (!bookingId) {
       return new Response(JSON.stringify({ error: 'bookingId is required' }), {
@@ -51,7 +51,7 @@ serve(async (req) => {
       });
     }
 
-
+    const isMonthlyRent = paymentType === 'monthly_rent';
 
     // 1. Fetch the booking
     const { data: booking, error: bookingError } = await supabase
@@ -73,11 +73,20 @@ serve(async (req) => {
     const agreementConditions = booking.agreement_conditions || {};
     const agentSigned = Boolean(agreementConditions.agentSignature);
 
-    if (booking.status !== 'approved' || booking.lease_status !== 'signed' || !agentSigned) {
-      return new Response(JSON.stringify({ error: 'Lease agreement must be signed by all parties before payment.' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (isMonthlyRent) {
+      if (booking.status !== 'confirmed') {
+        return new Response(JSON.stringify({ error: 'Booking must be confirmed to pay monthly rent.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      if (booking.status !== 'approved' || booking.lease_status !== 'signed' || !agentSigned) {
+        return new Response(JSON.stringify({ error: 'Lease agreement must be signed by all parties before payment.' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
 
@@ -115,57 +124,75 @@ serve(async (req) => {
       });
     }
 
-    // Charge the renter for deposit + first month rent + last month rent.
+    // Charge the renter.
     // Platform fee is taken from the amount paid to the connected account.
     // Use agreement_conditions from booking for deposit and rent
     const agreement = agreementConditions;
     const depositAmount = parseFloat(agreement.securityDepositAmount) || 0;
     const rentAmount = parseFloat((agreement.monthlyRent || '').toString().replace(/[^0-9.]/g, '')) || 0;
     const platformFeeAmount = Math.round(rentAmount * 0.10 * 100) / 100;
-    const amountToCharge = depositAmount + (rentAmount * 2);
+    
+    let amountToCharge = 0;
+    const lineItems = [];
+
+    if (isMonthlyRent) {
+      amountToCharge = rentAmount;
+      lineItems.push({
+        price_data: {
+          currency: 'mxn',
+          product_data: {
+            name: 'Monthly Rent',
+            description: `Monthly rent for ${listing.title} · platform fee is added on rent`,
+          },
+          unit_amount: Math.round(rentAmount * 100),
+        },
+        quantity: 1,
+      });
+    } else {
+      amountToCharge = depositAmount + (rentAmount * 2);
+      if (depositAmount > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'mxn',
+            product_data: {
+              name: 'Deposit',
+              description: `Deposit for ${listing.title}`,
+            },
+            unit_amount: Math.round(depositAmount * 100),
+          },
+          quantity: 1,
+        });
+      }
+      if (rentAmount > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'mxn',
+            product_data: {
+              name: 'First Month Rent',
+              description: `First month rent for ${listing.title} · platform fee is added on rent`,
+            },
+            unit_amount: Math.round(rentAmount * 100),
+          },
+          quantity: 1,
+        });
+        lineItems.push({
+          price_data: {
+            currency: 'mxn',
+            product_data: {
+              name: 'Last Month Rent',
+              description: `Last month rent for ${listing.title}`,
+            },
+            unit_amount: Math.round(rentAmount * 100),
+          },
+          quantity: 1,
+        });
+      }
+    }
+
     const amountCents = Math.round(amountToCharge * 100);
     const platformFeeCents = Math.round(platformFeeAmount * 100);
 
     console.log('Creating checkout session', { bookingId, depositAmount, rentAmount, amountToCharge, amountCents, platformFeeCents, destination: profile.stripe_connect_id });
-
-    const lineItems = [];
-    if (depositAmount > 0) {
-      lineItems.push({
-        price_data: {
-          currency: 'mxn',
-          product_data: {
-            name: 'Deposit',
-            description: `Deposit for ${listing.title}`,
-          },
-          unit_amount: Math.round(depositAmount * 100),
-        },
-        quantity: 1,
-      });
-    }
-    if (rentAmount > 0) {
-      lineItems.push({
-        price_data: {
-          currency: 'mxn',
-          product_data: {
-            name: 'First Month Rent',
-            description: `First month rent for ${listing.title} · platform fee is added on rent`,
-          },
-          unit_amount: Math.round(rentAmount * 100),
-        },
-        quantity: 1,
-      });
-      lineItems.push({
-        price_data: {
-          currency: 'mxn',
-          product_data: {
-            name: 'Last Month Rent',
-            description: `Last month rent for ${listing.title}`,
-          },
-          unit_amount: Math.round(rentAmount * 100),
-        },
-        quantity: 1,
-      });
-    }
 
     // Create the Stripe Checkout Session
     // Get renter email from profile
@@ -185,6 +212,7 @@ serve(async (req) => {
       metadata: {
         bookingId: bookingId,
         listingId: listing.id,
+        paymentType: isMonthlyRent ? 'monthly_rent' : 'booking',
       },
     });
 

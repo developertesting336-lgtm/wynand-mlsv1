@@ -312,6 +312,10 @@ export default function SubmitProperty() {
         <p className="text-muted-foreground mt-2">Submit your rental for verification and reach thousands of renters.</p>
       </div>
 
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-sm text-blue-800 mb-6 leading-relaxed shadow-sm font-medium">
+        🛡️ <span className="font-bold">Protected Lead Policy:</span> Any tenant introduced through PV Verified Rentals is deemed a Protected Lead. If the owner enters into a lease with that tenant, or any person introduced by that tenant, during the protection period, the agreed commission and platform fee remain payable, regardless of whether the lease is completed through the platform or directly.
+      </div>
+
       {user && (user.role === 'owner' || user.role === 'agent') && !isLoadingVerification && !isIdVerified && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 mb-6">
           Your identity must be verified before you can submit a property. Please complete verification and try again.

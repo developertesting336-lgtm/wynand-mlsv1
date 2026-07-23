@@ -24,6 +24,7 @@ function StarRating({ rating, count }) {
 }
 
 export default function AgentCard({ agent, listings, reviews, onReview }) {
+
   const avgRating = reviews.length
     ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
     : 0;
@@ -39,11 +40,19 @@ export default function AgentCard({ agent, listings, reviews, onReview }) {
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               {/* Avatar */}
-              <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border-2 border-white shadow">
-                <span className="text-xl font-bold text-primary">
-                  {agent.full_name?.charAt(0)?.toUpperCase() || '?'}
-                </span>
-              </div>
+              {agent.profile_photo ? (
+                <img
+                  src={agent.profile_photo}
+                  alt={agent.full_name}
+                  className="w-14 h-14 rounded-full object-cover shrink-0 border-2 border-white shadow"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border-2 border-white shadow">
+                  <span className="text-xl font-bold text-primary">
+                    {agent.full_name?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                </div>
+              )}
               <div>
                 <h3 className="font-bold text-base leading-tight">{agent.full_name}</h3>
                 <div className="flex items-center gap-1.5 mt-0.5">

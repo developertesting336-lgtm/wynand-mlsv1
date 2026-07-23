@@ -13,6 +13,7 @@ import { base44 } from '@/api/base44Client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   ShieldCheck, Bed, Bath, MapPin,
   ArrowLeft, ChevronLeft, ChevronRight, Dog, Sofa, Clock,
@@ -30,6 +31,8 @@ import ReviewsSection from '../components/reviews/ReviewsSection';
 import { ReviewAverageInline } from '../components/reviews/ReviewsSection';
 import NeighborhoodAmenities from '../components/listings/NeighborhoodAmenities';
 import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 export default function ListingDetail() {
   const listingId = window.location.pathname.split('/').pop();
@@ -66,6 +69,16 @@ export default function ListingDetail() {
         ? base44.entities.User.filter({ email: listing.owner_email }).then(users => users[0] || null)
         : null,
     enabled: !!listing?.owner_email,
+  });
+
+  // Fetch the listing agent's profile if agent_email is provided
+  const { data: agentProfile } = useQuery({
+    queryKey: ['listing-agent-profile', listing?.agent_email],
+    queryFn: () =>
+      listing?.agent_email
+        ? base44.entities.User.filter({ email: listing.agent_email }).then(users => users[0] || null)
+        : null,
+    enabled: !!listing?.agent_email,
   });
 
   const ownerRole = ownerProfile?.role || 'owner';
@@ -453,6 +466,11 @@ export default function ListingDetail() {
             );
           })()}
 
+          {/* Book Appointment Section */}
+          {(!user || user?.role === 'renter') && (
+            <BookAppointmentSection listing={listing} user={user} ownerProfile={ownerProfile} agentProfile={agentProfile} />
+          )}
+
           {/* Reviews */}
           <ReviewsSection listingId={listing.id} />
 
@@ -554,6 +572,174 @@ export default function ListingDetail() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function BookAppointmentSection({ listing, user, ownerProfile, agentProfile }) {
+  const [selectedDate, setSelectedDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Fetch user's existing appointments for this listing
+  const { data: myAppointments = [], refetch } = useQuery({
+    queryKey: ['my-appointments', user?.id, listing?.id],
+    queryFn: async () => {
+      if (!user?.id || !listing?.id) return [];
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('renter_id', user.id)
+        .eq('listing_id', listing.id)
+        .order('created_date', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id && !!listing?.id,
+  });
+
+  const hasPendingAppointment = myAppointments.some(app => !app.owner_accepted);
+
+  const handleBook = (e) => {
+    e.preventDefault();
+    if (!user) {
+      toast.error('You must be signed in to book an appointment');
+      return;
+    }
+    if (!selectedDate) {
+      toast.error('Please select a date and time');
+      return;
+    }
+    setShowConfirmModal(true);
+  };
+
+  const confirmBook = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('appointments').insert({
+        listing_id: listing.id,
+        renter_id: user.id,
+        owner_id: ownerProfile?.id || null,
+        agent_id: agentProfile?.id || null,
+        appointment_date: new Date(selectedDate).toISOString(),
+      });
+
+      if (error) throw error;
+
+      toast.success('Appointment request submitted successfully!');
+      setSelectedDate('');
+      refetch();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to request appointment');
+    } finally {
+      setLoading(false);
+      setShowConfirmModal(false);
+    }
+  };
+
+  return (
+    <div className="border rounded-2xl p-6 bg-card shadow-sm space-y-4">
+      <div className="flex items-center gap-2 text-primary">
+        <Calendar className="w-5 h-5" />
+        <h3 className="font-bold text-lg text-slate-800">Book an Appointment</h3>
+      </div>
+      <p className="text-sm text-slate-500">
+        Request a date and time to view this property. The owner or agent will review your request and confirm or suggest alternative slots.
+      </p>
+
+      {myAppointments.length > 0 && (
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Your Appointment Requests</h4>
+          <div className="divide-y divide-slate-200">
+            {myAppointments.map(app => (
+              <div key={app.id} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">
+                    {format(new Date(app.appointment_date), 'MMMM d, yyyy · h:mm a')}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Requested on {format(new Date(app.created_date), 'MMM d, yyyy')}
+                  </p>
+                </div>
+                <div>
+                  {app.owner_accepted ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                      Confirmed
+                    </span>
+                  ) : app.agent_scheduled_slots?.length > 0 ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                      Slots Suggested
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                      Pending Approval
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {user?.role === 'owner' ? (
+        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 p-3 rounded-lg font-medium">
+          ℹ️ You are the owner of this property. Renter requests will appear on your dashboard.
+        </p>
+      ) : (
+        <form onSubmit={handleBook} className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Select Preferred Date & Time</label>
+            <input
+              type="datetime-local"
+              required
+              disabled={hasPendingAppointment}
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 transition-shadow focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          <Button
+            type="submit"
+            disabled={loading || hasPendingAppointment}
+            className="w-full bg-primary text-primary-foreground font-semibold h-11 rounded-xl flex items-center justify-center gap-2"
+          >
+            {loading ? 'Submitting...' : 'Request Appointment'}
+          </Button>
+
+          {hasPendingAppointment && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 p-2.5 rounded-lg font-medium text-center">
+              ⚠️ You already have a pending viewing request for this property. You can request another once it is confirmed or updated by the host.
+            </p>
+          )}
+        </form>
+      )}
+      <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary font-bold">
+              <AlertCircle className="w-5 h-5" /> Confirm Appointment Request
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-slate-600 leading-relaxed text-sm">
+              🛡️ <strong>Protected Lead Policy:</strong> Any tenant introduced through PV Verified Rentals is deemed a Protected Lead. If the owner enters into a lease with that tenant, or any person introduced by that tenant, during the protection period, the agreed commission and platform fee remain payable, regardless of whether the lease is completed through the platform or directly.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setShowConfirmModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmBook}
+              disabled={loading}
+              className="bg-primary text-primary-foreground font-semibold"
+            >
+              {loading ? 'Confirming...' : 'Confirm Appointment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

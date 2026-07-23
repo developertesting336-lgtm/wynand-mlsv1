@@ -234,6 +234,7 @@ create table public.payments (
   payout_transfer_id text null,
   payout_error text null,
   payment_type text null,
+  payment_for_month_year text null,
   constraint payments_pkey primary key (id),
   constraint payments_booking_id_fkey foreign KEY (booking_id) references bookings (id),
   constraint payments_listing_id_fkey foreign KEY (listing_id) references listings (id)
@@ -561,4 +562,68 @@ create policy "Confirmed booking participants can view verifications"
           or (b.renter_id = auth.uid() and b.owner_id = verifications.user_id)
         )
     )
+  );
+
+-- Policy to allow users, admins, and agents to view verifications
+drop policy if exists "Users and admins can view verifications" on public.verifications;
+create policy "Users and admins can view verifications"
+  on public.verifications for select
+  to authenticated
+  using (
+    (user_id = auth.uid()) OR is_admin() OR is_agent()
+  );
+
+-- ── APPOINTMENTS TABLE ────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.appointments (
+  id uuid NOT null DEFAULT gen_random_uuid (),
+  listing_id uuid NOT null,
+  agent_id uuid null,
+  owner_id uuid null,
+  renter_id uuid NOT null,
+  appointment_date timestamp without time zone null,
+  agent_scheduled_slots text[] null DEFAULT '{}'::text[],
+  owner_accepted boolean null DEFAULT false,
+  created_date timestamp without time zone null DEFAULT now(),
+  updated_date timestamp without time zone null DEFAULT now(),
+  CONSTRAINT appointments_pkey PRIMARY KEY (id),
+  CONSTRAINT appointments_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES listings (id) ON DELETE CASCADE,
+  CONSTRAINT appointments_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES profiles (id) ON DELETE SET NULL,
+  CONSTRAINT appointments_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES profiles (id) ON DELETE SET NULL,
+  CONSTRAINT appointments_renter_id_fkey FOREIGN KEY (renter_id) REFERENCES profiles (id) ON DELETE CASCADE
+) TABLESPACE pg_default;
+
+CREATE INDEX IF NOT EXISTS idx_appointments_listing_id ON public.appointments USING btree (listing_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_appointments_renter_id ON public.appointments USING btree (renter_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_appointments_agent_id ON public.appointments USING btree (agent_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_appointments_owner_id ON public.appointments USING btree (owner_id) TABLESPACE pg_default;
+
+CREATE TRIGGER audit_appointments_trigger
+AFTER INSERT OR UPDATE OR DELETE ON public.appointments
+FOR EACH ROW EXECUTE FUNCTION log_table_change();
+
+ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own appointments"
+  ON public.appointments FOR SELECT
+  TO authenticated
+  USING (
+    (auth.uid() = renter_id) OR
+    (auth.uid() = agent_id) OR
+    (auth.uid() = owner_id) OR
+    is_admin()
+  );
+
+CREATE POLICY "Renters can insert their own appointments"
+  ON public.appointments FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = renter_id);
+
+CREATE POLICY "Involved parties can update appointments"
+  ON public.appointments FOR UPDATE
+  TO authenticated
+  USING (
+    (auth.uid() = renter_id) OR
+    (auth.uid() = agent_id) OR
+    (auth.uid() = owner_id) OR
+    is_admin()
   );

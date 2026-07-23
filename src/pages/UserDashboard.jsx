@@ -60,164 +60,6 @@ function StatCard({ icon: Icon, label, value, color }) {
 
 // ── Inquiry row removed: InquiryKanban now handles chat layout ────────────────
 
-/*
-// ── OLD CARD-BASED BOOKING VIEW (COMMENETED FOR FUTURE REFERENCE) ─────────────
-function BookingRow({ booking, listing, onPay }) {
-  const statusConfig = {
-    pending: { label: 'Pending Approval', icon: Hourglass, cls: 'bg-amber-100 text-amber-700' },
-    approved: { label: 'Approved (Pending Payment)', icon: CheckCircle, cls: 'bg-green-100 text-green-700 animate-pulse' },
-    confirmed: { label: 'Confirmed & Paid', icon: CheckCircle, cls: 'bg-blue-100 text-blue-700 font-semibold' },
-    declined: { label: 'Declined', icon: XCircle, cls: 'bg-red-100 text-red-700' },
-  };
-  const { label, icon: Icon, cls } = statusConfig[booking.status] || statusConfig.pending;
-  const depositAmount = listing?.deposit_amount || 0;
-  const rentAmount = listing?.price_mxn || listing?.price_usd || 0;
-  const subtotal = depositAmount + rentAmount;
-  const totalAmount = subtotal;
-
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white shadow-sm p-5 mb-4 last:mb-0">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900">
-            Move-in Date: {booking.move_in_date ? format(new Date(booking.move_in_date + 'T00:00:00'), 'MMMM d, yyyy') : 'N/A'}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            Lease: {booking.lease_duration_months} months
-          </p>
-          {booking.message && <p className="text-xs text-slate-500 mt-2 italic max-w-2xl">"{booking.message}"</p>}
-        </div>
-        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${cls}`}>
-          <Icon className="w-4 h-4" /> {label}
-        </span>
-      </div>
-
-      {booking.status === 'approved' && subtotal > 0 && (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Payment Summary</p>
-              <p className="text-xs text-slate-500">Deposit and first month rent.</p>
-            </div>
-            <p className="text-sm font-semibold text-slate-900">
-              ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
-            </p>
-          </div>
-
-          <ul className="mt-4 space-y-2 text-sm text-slate-700">
-            <li className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-              <span>Deposit</span>
-              <span className="font-semibold text-slate-900">
-                ${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
-              </span>
-            </li>
-            <li className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-              <span>First Month Rent</span>
-              <span className="font-semibold text-slate-900">
-                ${rentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
-              </span>
-            </li>
-          </ul>
-
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <span className="text-xs text-slate-500">Ready to pay now</span>
-            <Button
-              size="sm"
-              onClick={() => onPay(booking.id)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm transition-transform active:scale-[0.98]"
-            >
-              Pay ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal opacity-90 ml-0.5"> MXN</span>
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OldBookingsTab({ bookings = [], isLoading, listings, userEmail }) {
-  const handlePayment = async (bookingId) => {
-    try {
-      const res = await supabase.functions.invoke('stripe-checkout', {
-        body: JSON.stringify({
-          bookingId,
-          origin: window.location.origin
-        })
-      });
-
-      let data = res.data;
-      if (res && typeof res.json === 'function') {
-        try {
-          data = await res.json();
-        } catch (err) {
-          console.warn('Response is not JSON, using raw object:', err);
-        }
-      }
-
-      if (data?.url) {
-        window.location.href = data.url;
-      } else if (data?.error) {
-        toast.error(data.error);
-      } else {
-        toast.error('Failed to start payment checkout.');
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error('Network error starting payment checkout.');
-    }
-  };
-
-  const grouped = bookings.reduce((acc, b) => {
-    if (!acc[b.listing_id]) acc[b.listing_id] = [];
-    acc[b.listing_id].push(b);
-    return acc;
-  }, {});
-
-  const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
-
-  if (isLoading) return <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>;
-
-  if (bookings.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <Calendar className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-        <p className="font-semibold text-lg">No booking requests yet</p>
-        <p className="text-muted-foreground text-sm mt-1">Use the availability calendar on any listing to request dates.</p>
-        <Link to="/listings"><Button className="mt-5 gap-2"><Search className="w-4 h-4" /> Browse Listings</Button></Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {Object.entries(grouped).map(([listingId, items]) => {
-        const listing = listingMap[listingId];
-        return (
-          <Card key={listingId}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <Link to={`/listings/${listingId}`} className="font-semibold text-sm hover:text-primary transition-colors flex items-center gap-1">
-                  {listing?.title || 'Listing'} <ExternalLink className="w-3.5 h-3.5 opacity-60" />
-                </Link>
-                {listing?.neighborhood && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> {NEIGHBORHOOD_LABELS[listing.neighborhood] || listing.neighborhood}
-                  </span>
-                )}
-              </div>
-              {items.map(b => (
-                <BookingRow key={b.id} booking={b} listing={listing} onPay={handlePayment} />
-              ))}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
-*/
-
-// ── TABLE-BASED BOOKINGS VIEW ──────────────────────────────────────────────────
 function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
   const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
   const [payingId, setPayingId] = useState(null);
@@ -225,6 +67,10 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const debouncedSearch = useDebouncedValue(search, 500);
+
+  // States for move out date modal dialog
+  const [selectedBookingForMoveOut, setSelectedBookingForMoveOut] = useState(null);
+  const [modalMoveOutDate, setModalMoveOutDate] = useState('');
 
   const filteredBookings = bookings.filter(b => {
     const query = debouncedSearch.trim().toLowerCase();
@@ -261,9 +107,6 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
         })
       });
 
-      console.log(res);
-      
-
       let data = res.data;
       if (res && typeof res.json === 'function') {
         try {
@@ -289,19 +132,89 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
     }
   };
 
-  if (isLoading) return <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>;
+  const handleSaveMoveOutDate = async () => {
+    if (!selectedBookingForMoveOut) return;
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ move_out_date: modalMoveOutDate || null })
+        .eq('id', selectedBookingForMoveOut.id);
+      if (error) throw error;
+      toast.success('Move-out date saved successfully');
+      setSelectedBookingForMoveOut(null);
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to update move-out date:', err);
+      toast.error('Failed to update move-out date');
+    }
+  };
 
-  if (bookings.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <Calendar className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-        <p className="font-semibold text-lg">No booking requests yet</p>
-        <p className="text-muted-foreground text-sm mt-1">Use the availability calendar on any listing to request dates.</p>
-        <Link to="/listings"><Button className="mt-5 gap-2"><Search className="w-4 h-4" /> Browse Listings</Button></Link>
-      </div>
-    );
-  }
+  return (
+    <>
+      <BookingsTable
+        bookings={bookings}
+        listingMap={listingMap}
+        search={search}
+        setSearch={setSearch}
+        page={page}
+        setPage={setPage}
+        pageSize={pageSize}
+        setPageSize={setPageSize}
+        filteredBookings={filteredBookings}
+        paginatedBookings={paginatedBookings}
+        payingId={payingId}
+        handlePayment={handlePayment}
+        setSelectedBookingForMoveOut={setSelectedBookingForMoveOut}
+        setModalMoveOutDate={setModalMoveOutDate}
+        totalPages={totalPages}
+      />
 
+      {/* Set/Change Move-out Date Modal */}
+      <Dialog open={!!selectedBookingForMoveOut} onOpenChange={(open) => !open && setSelectedBookingForMoveOut(null)}>
+        <DialogContent className="sm:max-w-[420px] rounded-3xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              Set Move-out Date
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-slate-500">
+              Please specify the date you plan to move out of the property.
+            </p>
+            <div className="space-y-2">
+              <label htmlFor="move-out-date-input" className="text-xs font-semibold text-slate-700 font-medium">Move-out Date</label>
+              <Input
+                id="move-out-date-input"
+                type="date"
+                value={modalMoveOutDate}
+                onChange={(e) => setModalMoveOutDate(e.target.value)}
+                className="h-11 rounded-2xl border border-slate-200 focus:border-slate-300 focus:ring-2 focus:ring-primary/10"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setSelectedBookingForMoveOut(null)}
+              className="rounded-2xl h-11 px-5"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveMoveOutDate}
+              className="rounded-2xl h-11 px-5"
+            >
+              Save Date
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, totalPages }) {
   const statusConfig = {
     pending: { label: 'Pending Approval', icon: Hourglass, cls: 'bg-amber-100 text-amber-700 border-amber-200' },
     lease_pending: { label: 'Sign Lease Agreement', icon: PenLine, cls: 'bg-blue-100 text-blue-700 border-blue-200 animate-pulse' },
@@ -353,6 +266,7 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Owner</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Move-in Date</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground">Move-out Date</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Lease</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Agreement</th>
@@ -391,6 +305,32 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {b.move_in_date ? format(new Date(b.move_in_date + 'T00:00:00'), 'MMMM d, yyyy') : 'N/A'}
+                  </td>
+                  <td className="px-4 py-3">
+                    {b.end_lease ? (
+                      <span className="text-muted-foreground text-sm font-medium">
+                        {b.move_out_date ? format(new Date(b.move_out_date + 'T00:00:00'), 'MMMM d, yyyy') : '—'}
+                      </span>
+                    ) : (
+                      <div className="flex flex-col items-start gap-1">
+                        {b.move_out_date && (
+                          <span className="text-xs text-slate-700 font-medium">
+                            {format(new Date(b.move_out_date + 'T00:00:00'), 'MMM d, yyyy')}
+                          </span>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={() => {
+                            setSelectedBookingForMoveOut(b);
+                            setModalMoveOutDate(b.move_out_date || '');
+                          }}
+                          className="text-[10px] h-6 px-2 rounded-lg text-primary hover:text-primary"
+                        >
+                          {b.move_out_date ? 'Change Date' : 'Set Move-out Date'}
+                        </Button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {b.lease_duration_months} months
@@ -608,6 +548,11 @@ function PaymentsTab({ payments = [], bookings = [], listings = [], isLoading })
                       ) : (
                         <span className="text-muted-foreground">Unknown Property</span>
                       )}
+                      {p.payment_for_month_year && (
+                        <div className="text-xs font-semibold text-emerald-600 mt-1 whitespace-nowrap">
+                          Period: {p.payment_for_month_year}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium">{ownerName}</div>
@@ -643,6 +588,398 @@ function PaymentsTab({ payments = [], bookings = [], listings = [], isLoading })
         </div>
       )}
     </div>
+  );
+}
+
+// ── Monthly Rent Payments tab ──────────────────────────────────────────────────
+function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] }) {
+  const activeBookings = bookings.filter(b => b.status === 'confirmed');
+  const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
+
+  const [payingBookingId, setPayingBookingId] = useState(null);
+
+  const handlePayMonthlyRent = async (bookingId) => {
+    setPayingBookingId(bookingId);
+    try {
+      const res = await supabase.functions.invoke('stripe-checkout', {
+        body: JSON.stringify({
+          bookingId,
+          origin: window.location.origin,
+          paymentType: 'monthly_rent'
+        })
+      });
+
+      let data = res.data;
+      if (res && typeof res.json === 'function') {
+        try {
+          data = await res.json();
+        } catch (err) {
+          console.warn('Response is not JSON, using raw object:', err);
+        }
+      }
+
+      if (data?.url) {
+        window.location.href = data.url;
+      } else if (data?.error) {
+        toast.error(data.error);
+      } else {
+        toast.error('Failed to create checkout session');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Payment checkout failed');
+    } finally {
+      setPayingBookingId(null);
+    }
+  };
+
+  if (activeBookings.length === 0) {
+    return (
+      <div className="text-center py-12 bg-card rounded-2xl border border-slate-100 shadow-sm">
+        <CreditCard className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+        <h3 className="text-lg font-semibold text-slate-800">No Active Bookings</h3>
+        <p className="text-muted-foreground max-w-sm mx-auto text-sm mt-1">
+          Once your booking is confirmed, you will be able to make subsequent monthly rent payments here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border rounded-2xl overflow-hidden bg-card shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b bg-muted/50 text-xs uppercase tracking-wider">
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Monthly Rent</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Payments Completed</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Next Payment Period</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {activeBookings.map(booking => {
+              const listing = listingMap[booking.listing_id];
+              const agreement = booking.agreement_conditions || {};
+              const rentAmount = parseFloat((agreement.monthlyRent || '').toString().replace(/[^0-9.]/g, '')) || 0;
+              
+              // Count existing payments for this booking
+              const bookingPayments = payments.filter(p => p.booking_id === booking.id);
+              const monthsPaid = bookingPayments.length;
+
+              // Calculate start and end date of the upcoming billing period
+              let paymentRangeText = 'N/A';
+              let isButtonEnabled = true;
+              let activationDateText = '';
+              let isLastMonthPaid = false;
+              
+              if (booking.move_in_date) {
+                try {
+                  const moveIn = new Date(booking.move_in_date);
+                  // Calculate upcoming monthly billing period
+                  // If monthsPaid === 0, the next upcoming rent payment should start covering from month index 2 onwards
+                  // since months 0 and 1 (first + last month rent) were already paid in the booking checkout.
+                  // For subsequent monthly rent payments, offset the month pointer by (monthsPaid + 1).
+                  let targetMonthStart = moveIn.getUTCMonth();
+                  let targetMonthEnd = moveIn.getUTCMonth() + 1;
+
+                  if (monthsPaid === 0) {
+                    targetMonthStart = moveIn.getUTCMonth() + 2;
+                    targetMonthEnd = moveIn.getUTCMonth() + 3;
+                  } else {
+                    targetMonthStart = moveIn.getUTCMonth() + monthsPaid + 2;
+                    targetMonthEnd = moveIn.getUTCMonth() + monthsPaid + 3;
+                  }
+
+                  const startDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthStart, moveIn.getUTCDate()));
+                  const endDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthEnd, moveIn.getUTCDate()));
+
+                  const monthNames = [
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ];
+
+                  const startDay = startDate.getUTCDate();
+                  const startMonthName = monthNames[startDate.getUTCMonth()];
+                  const startYear = startDate.getUTCFullYear();
+                  
+                  const endDay = endDate.getUTCDate();
+                  const endMonthName = monthNames[endDate.getUTCMonth()];
+                  const endYear = endDate.getUTCFullYear();
+
+                  paymentRangeText = `${startMonthName} ${startDay}, ${startYear} to ${endMonthName} ${endDay}, ${endYear}`;
+
+                  // Disable button unless <= 3 days left
+                  const now = new Date();
+                  now.setHours(0, 0, 0, 0);
+
+                  const startMs = startDate.getTime();
+                  const currentMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+
+                  const diffMs = startMs - currentMs;
+                  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+                  isButtonEnabled = diffDays <= 3;
+
+                  // If move_out_date is set, check if the billing period falls on or after the move-out date
+                  // meaning the last month is already paid via the initial deposit payment.
+                  if (booking.move_out_date) {
+                    const moveOut = new Date(booking.move_out_date);
+                    // If start of this next billing period is on or after the move out date, 
+                    // or if the move out date falls within the next period range:
+                    if (startDate >= moveOut || (startDate < moveOut && endDate >= moveOut)) {
+                      isLastMonthPaid = true;
+                      isButtonEnabled = false;
+                    }
+                  }
+
+                  // 3 days before start date:
+                  const activationDate = new Date(startDate.getTime() - 3 * 24 * 60 * 60 * 1000);
+                  const actDay = activationDate.getUTCDate();
+                  const actMonthName = monthNames[activationDate.getUTCMonth()];
+                  const actYear = activationDate.getUTCFullYear();
+                  activationDateText = isLastMonthPaid 
+                    ? 'Final month rent pre-paid' 
+                    : `${actMonthName} ${actDay}, ${actYear}`;
+                } catch (err) {
+                  console.error('Error formatting range on UI:', err);
+                }
+              }
+
+              return (
+                <tr key={booking.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-4">
+                    <div className="font-semibold text-slate-800 text-sm">
+                      {listing?.title ? (
+                        <Link to={`/listings/${booking.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1">
+                          {listing.title} <ExternalLink className="w-3 h-3 opacity-60" />
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">Unknown Property</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
+                  </td>
+                  <td className="px-4 py-4 font-semibold text-slate-700 text-sm">
+                    ${rentAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
+                  </td>
+                  <td className="px-4 py-4 text-slate-600 font-medium text-sm">
+                    {monthsPaid} month{monthsPaid !== 1 ? 's' : ''}
+                  </td>
+                  <td className="px-4 py-4 text-slate-600 text-sm font-semibold">
+                    {paymentRangeText}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    <div className="flex flex-col items-end gap-1">
+                      {isLastMonthPaid ? (
+                        <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 whitespace-nowrap">
+                          Final month pre-paid (Move-out approaching)
+                        </span>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handlePayMonthlyRent(booking.id)}
+                            disabled={payingBookingId === booking.id || !isButtonEnabled}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center justify-center gap-1.5 rounded-lg text-xs"
+                          >
+                            {payingBookingId === booking.id ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing...
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="w-3.5 h-3.5" /> Pay Rent
+                              </>
+                            )}
+                          </Button>
+                          {!isButtonEnabled && (
+                            <span className="text-[10px] text-amber-600 font-semibold bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 mt-1 whitespace-nowrap">
+                              Available on {activationDateText}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Appointments tab ──────────────────────────────────────────────────────────
+function AppointmentsTab({ user, listings = [] }) {
+  const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
+
+  const { data: appointments = [], isLoading, refetch } = useQuery({
+    queryKey: ['dashboard-appointments', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('renter_id', user.id)
+        .order('created_date', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: profiles = [] } = useQuery({
+    queryKey: ['appointments-profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('profiles').select('id, full_name, email');
+      if (error) throw error;
+      return data || [];
+    }
+  });
+  const profileMap = Object.fromEntries(profiles.map(p => [p.id, p]));
+
+  const handleAcceptSlot = async (appointmentId, selectedSlot) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          appointment_date: new Date(selectedSlot).toISOString(),
+          owner_accepted: false,
+          agent_scheduled_slots: []
+        })
+        .eq('id', appointmentId);
+      if (error) throw error;
+      toast.success('Slot chosen successfully! Awaiting owner confirmation.');
+      refetch();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to accept slot');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+      </div>
+    );
+  }
+
+  if (appointments.length === 0) {
+    return (
+      <div className="text-center py-12 bg-card rounded-2xl border border-slate-100 shadow-sm">
+        <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+        <h3 className="text-lg font-semibold text-slate-800">No Appointments</h3>
+        <p className="text-muted-foreground max-w-sm mx-auto text-sm mt-1">
+          You haven't requested any property viewing appointments yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-850 leading-relaxed shadow-sm font-medium">
+        🛡️ <span className="font-bold text-amber-950">Protected Lead Policy:</span>
+        <span className="block mt-1">
+          ⚠️ If an owner, agent, or tenant attempts to complete a rental agreement outside PV Verified Rentals after being introduced through the platform, they may face legal consequences for breaching the platform's Terms of Service. Applicable commissions, platform fees, and other contractual obligations will remain payable, and PV Verified Rentals reserves the right to pursue all available legal remedies.
+        </span>
+      </div>
+
+      <div className="border rounded-2xl overflow-hidden bg-card shadow-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b bg-muted/50 text-xs uppercase tracking-wider">
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Agent / Owner</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Date & Time</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border text-sm">
+            {appointments.map(app => {
+              const listing = listingMap[app.listing_id];
+              const agent = profileMap[app.agent_id];
+              const owner = profileMap[app.owner_id];
+              const hostName = agent?.full_name || owner?.full_name || agent?.email || owner?.email || 'Host';
+
+              return (
+                <tr key={app.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-4">
+                    <div className="font-semibold text-slate-800">
+                      {listing?.title ? (
+                        <Link to={`/listings/${app.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1">
+                          {listing.title} <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">Unknown Property</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="font-medium text-slate-700">{hostName}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{agent ? 'Agent' : 'Owner'}</div>
+                  </td>
+                  <td className="px-4 py-4 font-semibold text-slate-700">
+                    {app.appointment_date ? (
+                      format(new Date(app.appointment_date), 'MMMM d, yyyy · h:mm a')
+                    ) : (
+                      <span className="text-amber-600 font-medium">To be scheduled</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    {app.owner_accepted ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        Confirmed
+                      </span>
+                    ) : app.agent_scheduled_slots?.includes('approved_by_agent') ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse">
+                        Awaiting Owner
+                      </span>
+                    ) : app.agent_scheduled_slots?.length > 0 ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                        Alternative Proposed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                        Pending
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    {app.agent_scheduled_slots?.length > 0 && !app.owner_accepted && (
+                      <div className="flex flex-col items-end gap-1.5">
+                        <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Choose a suggested slot:</span>
+                        <div className="flex flex-wrap gap-1 justify-end max-w-xs">
+                          {app.agent_scheduled_slots.map((slot, index) => (
+                            <Button
+                              key={index}
+                              size="xs"
+                              variant="outline"
+                              onClick={() => handleAcceptSlot(app.id, slot)}
+                              className="text-xs border-amber-200 bg-amber-50/50 hover:bg-amber-100 hover:text-amber-800 px-2 py-1 rounded"
+                            >
+                              {format(new Date(slot), 'MMM d, h:mm a')}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
   );
 }
 
@@ -957,6 +1294,9 @@ export default function UserDashboard() {
           <TabsTrigger value="bookings" className="gap-1.5">
             <Calendar className="w-4 h-4" /> Bookings
           </TabsTrigger>
+          <TabsTrigger value="appointments" className="gap-1.5">
+            <Calendar className="w-4 h-4" /> Appointments
+          </TabsTrigger>
           <TabsTrigger value="chat" className="gap-1.5">
             <MessageSquare className="w-4 h-4" /> Chat
           </TabsTrigger>
@@ -967,6 +1307,9 @@ export default function UserDashboard() {
                 {myPayments.length}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="monthly-payments" className="gap-1.5">
+            <Calendar className="w-4 h-4" /> Monthly Payments
           </TabsTrigger>
           <TabsTrigger value="reviews" className="gap-1.5">
             <Star className="w-4 h-4" /> Reviews
@@ -1074,6 +1417,11 @@ export default function UserDashboard() {
           <BookingsTab bookings={myBookings} isLoading={bookingsLoading} listings={allListings} userEmail={user.email} />
         </TabsContent>
 
+        {/* Appointments Tab */}
+        <TabsContent value="appointments" className="pt-6">
+          <AppointmentsTab user={user} listings={allListings} />
+        </TabsContent>
+
         <TabsContent value="chat" className="pt-6">
           <PaidBookingChat bookings={myBookings} listings={allListings} currentUser={{ ...user, role: 'renter' }} />
         </TabsContent>
@@ -1081,6 +1429,11 @@ export default function UserDashboard() {
         {/* Payments Tab */}
         <TabsContent value="payments" className="pt-6">
           <PaymentsTab payments={myPayments} bookings={myBookings} listings={allListings} isLoading={paymentsLoading} />
+        </TabsContent>
+
+        {/* Monthly Payments Tab */}
+        <TabsContent value="monthly-payments" className="pt-6">
+          <MonthlyRentPaymentsTab bookings={myBookings} listings={allListings} payments={myPayments} />
         </TabsContent>
 
         {/* Reviews Tab */}

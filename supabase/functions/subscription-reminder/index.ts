@@ -221,6 +221,115 @@ serve(async (req: Request) => {
       });
     }
 
+    // ---------- Monthly Rent Reminder Logic ----------
+    // Load env vars for email server
+    const emailServerUrl = Deno.env.get('EMAIL_SERVER_URL') ?? '';
+    // No internal secret needed
+
+    // Fetch active bookings (end_lease = false)
+    const { data: activeBookings, error: bookingsError } = await supabase
+      .from('bookings')
+      .select('id, owner_id, renter_id, listing_id, listings(title, address)')
+      .eq('end_lease', false);
+    if (bookingsError) {
+      console.error('Error fetching active bookings:', bookingsError);
+    } else {
+      for (const booking of activeBookings ?? []) {
+
+        // Get most recent payment for this booking
+        const { data: recentPayment, error: paymentErr } = await supabase
+          .from('payments')
+          .select('payment_for_month_year, amount_centavos, amount_mxn, currency, created_date')
+          .eq('booking_id', booking.id)
+          .order('created_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (paymentErr || !recentPayment) {
+          // No payment yet – skip reminder
+          continue;
+        }
+        // Parse due date (second date in range)
+        console.log('0000000000000');
+
+        const rangeParts = recentPayment.payment_for_month_year?.split(' to ');
+        if (!rangeParts || rangeParts.length !== 2) continue;
+        const dueDate = new Date(rangeParts[1]);
+        if (Number.isNaN(dueDate.getTime())) continue;
+        const diffDays = Math.round((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Determine if we should notify and/or email (now 1 day before = 1, and 1 day after = -1)
+        const shouldNotify = diffDays === 1 || diffDays === -1;
+        const shouldEmail = diffDays === 1 || diffDays === -1;
+
+        if (!shouldNotify) continue;
+
+        const listingTitle = booking.listings?.title || 'your rental property';
+        // Build status/identifier suffix to prevent sending duplicate notifications for the same state
+        const periodStart = recentPayment.payment_for_month_year.split(' to ')[0];
+        const stateKey = diffDays === 1 ? '1_day_before' : '1_day_after';
+        const uniqueMessageCheck = `[Period: ${periodStart}] ${stateKey}`;
+
+        // Check if we already sent a notification with this unique period state key
+        const { data: existingNotifs, error: checkErr } = await supabase
+          .from('notifications')
+          .select('id')
+          .eq('user_id', booking.renter_id)
+          .eq('type', 'rent_reminder')
+          .like('message', `%${uniqueMessageCheck}%`)
+          .limit(1);
+
+        if (checkErr) {
+          console.error('Error checking existing notifications:', checkErr);
+        }
+
+        if (existingNotifs && existingNotifs.length > 0) {
+          // Already sent reminder for this due-state and period - skip
+          continue;
+        }
+
+        // Insert notification (type: rent_reminder)
+        const notifTitle = 'Rent Payment Reminder';
+        const notifMessage = diffDays === 1
+          ? `Your rent for "${listingTitle}" (${periodStart}) is due tomorrow. ${uniqueMessageCheck}`
+          : `Your rent for "${listingTitle}" (${periodStart}) is overdue by 1 day. ${uniqueMessageCheck}`;
+
+        const { error: notifInsertErr } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: booking.renter_id,
+            title: notifTitle,
+            message: notifMessage,
+            type: 'rent_reminder',
+            is_read: false,
+          });
+        if (notifInsertErr) {
+          console.error('Failed to insert rent reminder notification:', notifInsertErr);
+        }
+
+        // Send email if needed
+        if (shouldEmail && emailServerUrl) {
+          try {
+            await fetch(`${emailServerUrl}/send-rent-reminder`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                bookingId: booking.id,
+                amount: recentPayment.amount_centavos ? recentPayment.amount_centavos / 100 : recentPayment.amount_mxn,
+                currency: recentPayment.currency || 'MXN',
+                dueDate: dueDate.toISOString(),
+                paymentForMonthYear: recentPayment.payment_for_month_year,
+                diffDays: diffDays,
+              }),
+            });
+          } catch (emailErr) {
+            console.error('Error sending rent reminder email:', emailErr);
+          }
+        }
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, results }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

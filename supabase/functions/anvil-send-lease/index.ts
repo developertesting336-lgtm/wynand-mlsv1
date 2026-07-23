@@ -88,6 +88,16 @@ serve(async (req) => {
       .eq("id", booking.owner_id)
       .single();
 
+    let agentProfile = null;
+    if (booking.agent_id) {
+      const { data: ap } = await supabaseAdmin
+        .from("profiles")
+        .select("*")
+        .eq("id", booking.agent_id)
+        .maybeSingle();
+      agentProfile = ap;
+    }
+
     if (!renterProfile?.email || !ownerProfile?.email) {
       throw new Error("Renter or Owner email not found");
     }
@@ -171,7 +181,7 @@ serve(async (req) => {
     }
 
     // 5. Fill the PDF template using Anvil Fill PDF API
-    const pdfTemplateId = "OQX8J8rLtRn0jpj9mwNn";
+    const pdfTemplateId = "iGyxgylcctlRwQAXYajS";
     const rentAmount = listing.price_usd || 0;
     const depositAmount = listing.deposit_amount || 0;
     const leaseStart = booking.move_in_date || new Date().toISOString().split("T")[0];
@@ -262,6 +272,7 @@ serve(async (req) => {
         tenantSignatureDate: formatSignatureDate(tenantSignatureDate),
         agentSignature: agentSignatureUrl || "",
         agentSignatureDate: formatSignatureDate(conditions.agentSignatureDate || agentSignatureDate),
+        agentName: conditions.agentName || (agentProfile ? (agentProfile.full_name || agentProfile.email) : "") || "Agent",
       }
     };
 

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   ChevronLeft, ChevronRight, Lock, Calendar, Send, CheckCircle, X, Loader2, AlertCircle
 } from 'lucide-react';
@@ -37,6 +38,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
   const [tenantVerification, setTenantVerification] = useState({});
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Pre-fill form with logged-in user
   useEffect(() => {
@@ -542,7 +544,6 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
                 <form
                   onSubmit={(e) => {
                     console.log('Form submitted');
-                    e.preventDefault();
                     e.preventDefault();
                     if (verificationLoading) return;
                     if (currentUser?.role === 'renter' && !hasActiveSubscription) {

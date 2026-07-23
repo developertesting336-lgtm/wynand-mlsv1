@@ -333,18 +333,20 @@ serve(async (req: any) => {
         if (existingPayment) {
           console.log('Skipping duplicate booking payment for event:', event.id);
         } else {
-          // Fetch booking to get owner and agent IDs
+          // Fetch booking to get owner, agent and move-in date
           let ownerId = null;
           let agentId = null;
+          let moveInDate = null;
           if (bookingId) {
             const { data: booking } = await supabase
               .from('bookings')
-              .select('owner_id, agent_id')
+              .select('owner_id, agent_id, move_in_date')
               .eq('id', bookingId)
               .maybeSingle();
             if (booking) {
               ownerId = booking.owner_id || null;
               agentId = booking.agent_id || null;
+              moveInDate = booking.move_in_date || null;
             }
           }
 
@@ -366,6 +368,57 @@ serve(async (req: any) => {
 
           const paymentIntentId = session.payment_intent || null;
 
+          // Calculate payment_for_month_year
+          let paymentForMonthYear = null;
+          if (moveInDate) {
+            try {
+              const { count: existingCount, error: countError } = await supabase
+                .from('payments')
+                .select('id', { count: 'exact', head: true })
+                .eq('booking_id', bookingId);
+              
+              const isBookingPayment = metadata.paymentType === 'booking';
+              const monthsToAdd = (countError || existingCount === null) ? 0 : existingCount;
+              
+              const moveIn = new Date(moveInDate);
+              
+              // If it's the very first booking payment, we charge deposit + 2 months rent (first + last month rent).
+              // So the coverage is startDate (moveInDate) to endDate (moveInDate + 2 months).
+              // For subsequent monthly rent payments (monthsToAdd > 0), the offset starts from (monthsToAdd + 1)
+              // because 2 months were already paid for in the first transaction.
+              let targetMonthStart = moveIn.getUTCMonth();
+              let targetMonthEnd = moveIn.getUTCMonth() + 1;
+
+              if (monthsToAdd === 0) {
+                targetMonthStart = moveIn.getUTCMonth();
+                targetMonthEnd = moveIn.getUTCMonth() + 2;
+              } else {
+                targetMonthStart = moveIn.getUTCMonth() + monthsToAdd + 1;
+                targetMonthEnd = moveIn.getUTCMonth() + monthsToAdd + 2;
+              }
+              
+              const startDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthStart, moveIn.getUTCDate()));
+              const endDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthEnd, moveIn.getUTCDate()));
+
+              const monthNames = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'
+              ];
+
+              const startDay = startDate.getUTCDate();
+              const startMonthName = monthNames[startDate.getUTCMonth()];
+              const startYear = startDate.getUTCFullYear();
+              
+              const endDay = endDate.getUTCDate();
+              const endMonthName = monthNames[endDate.getUTCMonth()];
+              const endYear = endDate.getUTCFullYear();
+
+              paymentForMonthYear = `${startMonthName} ${startDay}, ${startYear} to ${endMonthName} ${endDay}, ${endYear}`;
+            } catch (dateErr) {
+              console.error('Error calculating payment_for_month_year:', dateErr);
+            }
+          }
+
           const { error: insertError } = await supabase.from('payments').insert({
             booking_id: bookingId,
             listing_id: listingId,
@@ -379,7 +432,8 @@ serve(async (req: any) => {
             stripe_event_id: event.id,
             stripe_session_id: stripeSessionId,
             stripe_payment_intent_id: paymentIntentId,
-            payment_type: 'booking',
+            payment_type: metadata.paymentType || 'booking',
+            payment_for_month_year: paymentForMonthYear,
           });
 
           if (insertError) {
@@ -398,8 +452,11 @@ serve(async (req: any) => {
                 const emailSecret = Deno.env.get('INTERNAL_EMAIL_SECRET');
                 if (emailSecret) emailHeaders['x-internal-email-secret'] = emailSecret;
 
+                const isMonthlyRent = (metadata?.paymentType === 'monthly_rent');
+                const endpoint = isMonthlyRent ? 'send-monthly-rent-invoice' : 'send-payment-invoice';
+
                 try {
-                  const invoiceResponse = await fetch(`${emailServerUrl}/send-payment-invoice`, {
+                  const invoiceResponse = await fetch(`${emailServerUrl}/${endpoint}`, {
                     method: 'POST',
                     headers: emailHeaders,
                     body: JSON.stringify({
@@ -409,6 +466,7 @@ serve(async (req: any) => {
                       paymentDate: sessionCreatedAt,
                       stripeSessionId,
                       stripePaymentIntentId: paymentIntentId,
+                      paymentForMonthYear,
                     }),
                   });
 
