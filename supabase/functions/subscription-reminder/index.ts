@@ -222,8 +222,8 @@ serve(async (req: Request) => {
     }
 
     // ---------- Monthly Rent Reminder Logic ----------
-    // Load env vars for email server
-    const emailServerUrl = Deno.env.get('EMAIL_SERVER_URL') ?? '';
+    // Fetch EMAIL_SERVER_URL from env or fallback to pvverified domain
+    const emailServerUrl = Deno.env.get('VITE_EMAIL_SERVER_URL') || 'https://email.pvverified.com';
     // No internal secret needed
 
     // Fetch active bookings (end_lease = false)

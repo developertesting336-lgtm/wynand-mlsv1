@@ -311,26 +311,44 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                       <span className="text-muted-foreground text-sm font-medium">
                         {b.move_out_date ? format(new Date(b.move_out_date + 'T00:00:00'), 'MMMM d, yyyy') : '—'}
                       </span>
-                    ) : (
-                      <div className="flex flex-col items-start gap-1">
-                        {b.move_out_date && (
-                          <span className="text-xs text-slate-700 font-medium">
-                            {format(new Date(b.move_out_date + 'T00:00:00'), 'MMM d, yyyy')}
-                          </span>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="xs"
-                          onClick={() => {
-                            setSelectedBookingForMoveOut(b);
-                            setModalMoveOutDate(b.move_out_date || '');
-                          }}
-                          className="text-[10px] h-6 px-2 rounded-lg text-primary hover:text-primary"
-                        >
-                          {b.move_out_date ? 'Change Date' : 'Set Move-out Date'}
-                        </Button>
-                      </div>
-                    )}
+                    ) : (() => {
+                      // Check if the remaining time until move-out is less than 30 days from now
+                      let isWithin30Days = false;
+                      if (b.move_out_date) {
+                        const now = new Date();
+                        const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+                        const mOutParts = b.move_out_date.split('-');
+                        const mOutUtc = Date.UTC(parseInt(mOutParts[0]), parseInt(mOutParts[1]) - 1, parseInt(mOutParts[2]));
+                        const diffTime = mOutUtc - todayUtc;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        if (diffDays < 30) {
+                          isWithin30Days = true;
+                        }
+                      }
+                      
+                      return (
+                        <div className="flex flex-col items-start gap-1">
+                          {b.move_out_date && (
+                            <span className="text-xs text-slate-700 font-medium">
+                              {format(new Date(b.move_out_date + 'T00:00:00'), 'MMM d, yyyy')}
+                            </span>
+                          )}
+                          {!isWithin30Days && (
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              onClick={() => {
+                                setSelectedBookingForMoveOut(b);
+                                setModalMoveOutDate(b.move_out_date || '');
+                              }}
+                              className="text-[10px] h-6 px-2 rounded-lg text-primary hover:text-primary"
+                            >
+                              {b.move_out_date ? 'Change Date' : 'Set Move-out Date'}
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {b.lease_duration_months} months
@@ -653,7 +671,6 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
             <tr className="border-b bg-muted/50 text-xs uppercase tracking-wider">
               <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Monthly Rent</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Payments Completed</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Next Payment Period</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
             </tr>
@@ -664,8 +681,8 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
               const agreement = booking.agreement_conditions || {};
               const rentAmount = parseFloat((agreement.monthlyRent || '').toString().replace(/[^0-9.]/g, '')) || 0;
               
-              // Count existing payments for this booking
-              const bookingPayments = payments.filter(p => p.booking_id === booking.id);
+              // Count existing payments for this booking (only monthly rents, excluding initial booking payment)
+              const bookingPayments = payments.filter(p => p.booking_id === booking.id && p.payment_type === 'monthly_rent');
               const monthsPaid = bookingPayments.length;
 
               // Calculate start and end date of the upcoming billing period
@@ -673,6 +690,7 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
               let isButtonEnabled = true;
               let activationDateText = '';
               let isLastMonthPaid = false;
+              let displayRentAmount = rentAmount;
               
               if (booking.move_in_date) {
                 try {
@@ -680,17 +698,8 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
                   // Calculate upcoming monthly billing period
                   // If monthsPaid === 0, the next upcoming rent payment should start covering from month index 2 onwards
                   // since months 0 and 1 (first + last month rent) were already paid in the booking checkout.
-                  // For subsequent monthly rent payments, offset the month pointer by (monthsPaid + 1).
-                  let targetMonthStart = moveIn.getUTCMonth();
-                  let targetMonthEnd = moveIn.getUTCMonth() + 1;
-
-                  if (monthsPaid === 0) {
-                    targetMonthStart = moveIn.getUTCMonth() + 2;
-                    targetMonthEnd = moveIn.getUTCMonth() + 3;
-                  } else {
-                    targetMonthStart = moveIn.getUTCMonth() + monthsPaid + 2;
-                    targetMonthEnd = moveIn.getUTCMonth() + monthsPaid + 3;
-                  }
+                  const targetMonthStart = moveIn.getUTCMonth() + monthsPaid + 2;
+                  const targetMonthEnd = moveIn.getUTCMonth() + monthsPaid + 3;
 
                   const startDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthStart, moveIn.getUTCDate()));
                   const endDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthEnd, moveIn.getUTCDate()));
@@ -700,13 +709,34 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
                     'July', 'August', 'September', 'October', 'November', 'December'
                   ];
 
+                  let adjustedEndDate = new Date(endDate);
+                  displayRentAmount = rentAmount;
+
+                  if (booking.move_out_date) {
+                    const moveOut = new Date(booking.move_out_date);
+                    // If start of this billing period is already past/at the move out date, it means we have fully covered up to move out
+                    if (startDate >= moveOut) {
+                      isLastMonthPaid = true;
+                      isButtonEnabled = false;
+                    } 
+                    // If move out falls inside this upcoming billing period, cap the end date of this period to the move out date
+                    else if (moveOut > startDate && moveOut < endDate) {
+                      adjustedEndDate = moveOut;
+                      // Pro-rate the rent by days
+                      const diffTime = Math.abs(adjustedEndDate.getTime() - startDate.getTime());
+                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      const dailyRate = rentAmount / 30; // Assuming 30 days per month
+                      displayRentAmount = dailyRate * diffDays;
+                    }
+                  }
+
                   const startDay = startDate.getUTCDate();
                   const startMonthName = monthNames[startDate.getUTCMonth()];
                   const startYear = startDate.getUTCFullYear();
                   
-                  const endDay = endDate.getUTCDate();
-                  const endMonthName = monthNames[endDate.getUTCMonth()];
-                  const endYear = endDate.getUTCFullYear();
+                  const endDay = adjustedEndDate.getUTCDate();
+                  const endMonthName = monthNames[adjustedEndDate.getUTCMonth()];
+                  const endYear = adjustedEndDate.getUTCFullYear();
 
                   paymentRangeText = `${startMonthName} ${startDay}, ${startYear} to ${endMonthName} ${endDay}, ${endYear}`;
 
@@ -719,20 +749,9 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
 
                   const diffMs = startMs - currentMs;
                   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-                  isButtonEnabled = diffDays <= 3;
-
-                  // If move_out_date is set, check if the billing period falls on or after the move-out date
-                  // meaning the last month is already paid via the initial deposit payment.
-                  if (booking.move_out_date) {
-                    const moveOut = new Date(booking.move_out_date);
-                    // If start of this next billing period is on or after the move out date, 
-                    // or if the move out date falls within the next period range:
-                    if (startDate >= moveOut || (startDate < moveOut && endDate >= moveOut)) {
-                      isLastMonthPaid = true;
-                      isButtonEnabled = false;
-                    }
-                  }
+                   if (!isLastMonthPaid) {
+                     isButtonEnabled = diffDays <= 3;
+                   }
 
                   // 3 days before start date:
                   const activationDate = new Date(startDate.getTime() - 3 * 24 * 60 * 60 * 1000);
@@ -762,11 +781,9 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
                     <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
                   </td>
                   <td className="px-4 py-4 font-semibold text-slate-700 text-sm">
-                    ${rentAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
+                    ${displayRentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
                   </td>
-                  <td className="px-4 py-4 text-slate-600 font-medium text-sm">
-                    {monthsPaid} month{monthsPaid !== 1 ? 's' : ''}
-                  </td>
+
                   <td className="px-4 py-4 text-slate-600 text-sm font-semibold">
                     {paymentRangeText}
                   </td>

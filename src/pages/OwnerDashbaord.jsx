@@ -645,32 +645,42 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
               const depositAmount = parseFloat(conditions.securityDepositAmount || 0);
               const rentAmount = parseFloat(conditions.monthlyRent?.toString().replace(/[^0-9.]/g, '') || 0);
 
-              let ownerDisplayAmount = 0;
-              let description = '';
+               const isMonthlyPayment = p.payment_type === 'monthly_rent';
+               let ownerDisplayAmount = 0;
+               let description = '';
 
-              if (rentAmount > 0) {
-                if (hasAgentOrReferral) {
-                  ownerDisplayAmount = depositAmount + rentAmount;
-                  description = 'Deposit + First Month Rent (Last month rent went to Agent commission)';
-                } else {
-                  const totalPaidByTenant = depositAmount + (rentAmount * 2);
-                  const platformFee = totalPaidByTenant * 0.10;
-                  const iva = platformFee * 0.16;
-                  ownerDisplayAmount = totalPaidByTenant - platformFee - iva;
-                  description = 'Net payout after 10% platform fee and 16% IVA';
-                }
-              } else {
-                // Fallback to database payout amount split if agreement_conditions are not set
-                if (hasAgentOrReferral) {
-                  ownerDisplayAmount = amountUsd * 0.80;
-                  description = '80% of total payment';
-                } else {
-                  const platformFee = amountUsd * 0.10;
-                  const iva = platformFee * 0.16;
-                  ownerDisplayAmount = amountUsd - platformFee - iva;
-                  description = 'Net payout after 10% platform fee and 16% IVA';
-                }
-              }
+               if (isMonthlyPayment) {
+                 const tenantPaid = p.amount_centavos ? (p.amount_centavos / 100) : p.amount_mxn;
+                 const platformFee = rentAmount * 0.10;
+                 const iva = platformFee * 0.16;
+                 ownerDisplayAmount = rentAmount; // Net rent to owner (platform fee was added on top)
+                 description = 'Monthly Rent (Platform fee added to renter payment)';
+               } else {
+                 // Booking payment (deposit + first + last month rent)
+                 if (rentAmount > 0) {
+                   if (hasAgentOrReferral) {
+                     ownerDisplayAmount = depositAmount + rentAmount;
+                     description = 'Deposit + First Month Rent (Last month rent went to Agent commission)';
+                   } else {
+                     const totalPaidByTenant = depositAmount + (rentAmount * 2);
+                     const platformFee = (rentAmount * 2) * 0.10;
+                     const iva = platformFee * 0.16;
+                     ownerDisplayAmount = totalPaidByTenant - platformFee - iva;
+                     description = 'Deposit + 2 Months Rent (Net payout after 10% platform fee and 16% IVA on rent)';
+                   }
+                 } else {
+                   // Fallback
+                   if (hasAgentOrReferral) {
+                     ownerDisplayAmount = amountUsd * 0.80;
+                     description = '80% of total payment';
+                   } else {
+                     const platformFee = amountUsd * 0.10;
+                     const iva = platformFee * 0.16;
+                     ownerDisplayAmount = amountUsd - platformFee - iva;
+                     description = 'Net payout after 10% platform fee and 16% IVA';
+                   }
+                 }
+               }
 
               return (
                 <tr key={p.id} className="hover:bg-muted/30 transition-colors">
@@ -845,8 +855,30 @@ export default function OwnerDashboard() {
   });
 
   const { data: myPayments = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: ['owner-payments', user?.id],
-    queryFn: () => base44.entities.Payment.filter({ payee_id: user.id }, '-created_date', 100),
+    queryKey: ['owner-payments', user?.id, listingIds],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      // Fetch all payments belonging to any of the owner's listings
+      if (listingIds.length === 0) {
+        // Fallback: fetch payments where payee_id = user.id
+        const { data, error } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('payee_id', user.id)
+          .order('created_date', { ascending: false });
+        if (error) throw error;
+        return data || [];
+      } else {
+        // Fetch where payee_id = user.id OR listing_id IN listingIds
+        const { data, error } = await supabase
+          .from('payments')
+          .select('*')
+          .or(`payee_id.eq.${user.id},listing_id.in.(${listingIds.join(',')})`)
+          .order('created_date', { ascending: false });
+        if (error) throw error;
+        return data || [];
+      }
+    },
     enabled: !!user?.id,
   });
 
@@ -1678,7 +1710,16 @@ export default function OwnerDashboard() {
                                         );
                                       }
                                       const leaseEndDate = getLeaseEndDate(b.move_in_date, b.agreement_conditions?.leaseDuration || b.lease_duration_months);
-                                      const isLeaseOver = leaseEndDate ? leaseEndDate <= new Date() : false;
+                                      let isLeaseOver = leaseEndDate ? leaseEndDate <= new Date() : false;
+                                      
+                                      if (b.move_out_date) {
+                                        const now = new Date();
+                                        now.setHours(0, 0, 0, 0);
+                                        const mOut = new Date(b.move_out_date + 'T00:00:00');
+                                        if (now >= mOut) {
+                                          isLeaseOver = true;
+                                        }
+                                      }
 
                                       if (isLeaseOver) {
                                         return (

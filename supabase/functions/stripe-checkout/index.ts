@@ -130,13 +130,45 @@ serve(async (req) => {
     const agreement = agreementConditions;
     const depositAmount = parseFloat(agreement.securityDepositAmount) || 0;
     const rentAmount = parseFloat((agreement.monthlyRent || '').toString().replace(/[^0-9.]/g, '')) || 0;
-    const platformFeeAmount = Math.round(rentAmount * 0.10 * 100) / 100;
+    let platformFeeAmount = Math.round(rentAmount * 0.10 * 100) / 100;
     
     let amountToCharge = 0;
     const lineItems = [];
 
     if (isMonthlyRent) {
-      amountToCharge = rentAmount;
+      // Fetch payments count to calculate which month's period we are paying for
+      const { count: existingCount, error: countError } = await supabase
+        .from('payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('booking_id', bookingId)
+        .eq('payment_type', 'monthly_rent');
+      
+      const monthsPaid = (countError || existingCount === null) ? 0 : existingCount;
+      let finalRentAmount = rentAmount;
+
+      if (booking.move_in_date) {
+        const moveIn = new Date(booking.move_in_date);
+        const targetMonthStart = moveIn.getUTCMonth() + monthsPaid + 2;
+        const targetMonthEnd = moveIn.getUTCMonth() + monthsPaid + 3;
+
+        const startDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthStart, moveIn.getUTCDate()));
+        const endDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthEnd, moveIn.getUTCDate()));
+
+        if (booking.move_out_date) {
+          const moveOut = new Date(booking.move_out_date);
+          if (moveOut > startDate && moveOut < endDate) {
+            const diffTime = Math.abs(moveOut.getTime() - startDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const dailyRate = rentAmount / 30;
+            finalRentAmount = dailyRate * diffDays;
+          }
+        }
+      }
+
+      // Re-calculate platform fee based on pro-rated rent
+      platformFeeAmount = Math.round(finalRentAmount * 0.10 * 100) / 100;
+
+      amountToCharge = finalRentAmount;
       lineItems.push({
         price_data: {
           currency: 'mxn',
@@ -144,7 +176,7 @@ serve(async (req) => {
             name: 'Monthly Rent',
             description: `Monthly rent for ${listing.title} · platform fee is added on rent`,
           },
-          unit_amount: Math.round(rentAmount * 100),
+          unit_amount: Math.round(finalRentAmount * 100),
         },
         quantity: 1,
       });

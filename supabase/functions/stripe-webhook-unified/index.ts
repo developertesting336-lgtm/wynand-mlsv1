@@ -375,7 +375,8 @@ serve(async (req: any) => {
               const { count: existingCount, error: countError } = await supabase
                 .from('payments')
                 .select('id', { count: 'exact', head: true })
-                .eq('booking_id', bookingId);
+                .eq('booking_id', bookingId)
+                .eq('payment_type', 'monthly_rent');
               
               const isBookingPayment = metadata.paymentType === 'booking';
               const monthsToAdd = (countError || existingCount === null) ? 0 : existingCount;
@@ -393,8 +394,8 @@ serve(async (req: any) => {
                 targetMonthStart = moveIn.getUTCMonth();
                 targetMonthEnd = moveIn.getUTCMonth() + 2;
               } else {
-                targetMonthStart = moveIn.getUTCMonth() + monthsToAdd + 1;
-                targetMonthEnd = moveIn.getUTCMonth() + monthsToAdd + 2;
+                targetMonthStart = moveIn.getUTCMonth() + monthsToAdd + 2;
+                targetMonthEnd = moveIn.getUTCMonth() + monthsToAdd + 3;
               }
               
               const startDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthStart, moveIn.getUTCDate()));
