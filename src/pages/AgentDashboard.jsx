@@ -88,6 +88,9 @@ export default function AgentDashboard() {
   const [inspectionBooking, setInspectionBooking] = useState(null);
   const [inspectionSelectedSignature, setInspectionSelectedSignature] = useState('');
   const [inspectionSigning, setInspectionSigning] = useState(false);
+
+  // Maintenance view modal state
+  const [maintenanceViewBooking, setMaintenanceViewBooking] = useState(null);
   const openEditModal = (listing) => setEditingListing(listing);
   const closeEditModal = () => setEditingListing(null);
   const openAgreementEdit = (booking) => {
@@ -1114,6 +1117,7 @@ export default function AgentDashboard() {
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Documents</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Agreement</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
+                              <th className="px-4 py-3 font-semibold text-muted-foreground">Maintenance</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                             </tr>
                           </thead>
@@ -1242,6 +1246,21 @@ export default function AgentDashboard() {
 
                                       return <span className="text-xs text-muted-foreground italic">Pending Owner</span>;
                                     })()}
+                                  </td>
+                                  {/* Maintenance Requests */}
+                                  <td className="px-4 py-4 align-top">
+                                    {(b.maintenance_requests || []).length === 0 ? (
+                                      <span className="text-xs text-muted-foreground italic">None</span>
+                                    ) : (
+                                      <Button
+                                        size="xs"
+                                        variant="outline"
+                                        className="text-xs whitespace-nowrap px-3 py-2"
+                                        onClick={() => setMaintenanceViewBooking(b)}
+                                      >
+                                        Show All ({b.maintenance_requests.length})
+                                      </Button>
+                                    )}
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                     {(() => {
@@ -1387,6 +1406,13 @@ export default function AgentDashboard() {
           <AgentAppointmentsTab user={user} listings={myListings} />
         </TabsContent>
       </Tabs>
+
+      {maintenanceViewBooking && (
+        <AgentMaintenanceModal
+          booking={maintenanceViewBooking}
+          onClose={() => setMaintenanceViewBooking(null)}
+        />
+      )}
 
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
@@ -1918,8 +1944,8 @@ export default function AgentDashboard() {
 }
 
 function AgentAppointmentsTab({ user, listings = [] }) {
-  const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
-  const [slotsInputs, setSlotsInputs] = useState({}); // { appointmentId: ['slot1', 'slot2', 'slot3'] }
+  const listingMap = Object.fromEntries(listings.map((l) => [l.id, l]));
+  const [slotsInputs, setSlotsInputs] = useState({});
   const [suggestingId, setSuggestingId] = useState(null);
 
   const { data: appointments = [], isLoading, refetch } = useQuery({
@@ -1930,6 +1956,7 @@ function AgentAppointmentsTab({ user, listings = [] }) {
         .select('*')
         .eq('agent_id', user.id)
         .order('created_date', { ascending: false });
+
       if (error) throw error;
       return data || [];
     },
@@ -1942,9 +1969,10 @@ function AgentAppointmentsTab({ user, listings = [] }) {
       const { data, error } = await supabase.from('profiles').select('id, full_name, email');
       if (error) throw error;
       return data || [];
-    }
+    },
   });
-  const profileMap = Object.fromEntries(profiles.map(p => [p.id, p]));
+
+  const profileMap = Object.fromEntries(profiles.map((p) => [p.id, p]));
 
   const handleAccept = async (appointmentId) => {
     try {
@@ -1952,6 +1980,7 @@ function AgentAppointmentsTab({ user, listings = [] }) {
         .from('appointments')
         .update({ owner_accepted: false, agent_scheduled_slots: ['approved_by_agent'] })
         .eq('id', appointmentId);
+
       if (error) throw error;
       toast.success('Viewing date approved by agent! Awaiting owner confirmation.');
       refetch();
@@ -1963,7 +1992,10 @@ function AgentAppointmentsTab({ user, listings = [] }) {
 
   const handleSuggestSlots = async (appointmentId) => {
     const slots = slotsInputs[appointmentId] || [];
-    const validSlots = slots.filter(s => s && s.trim() !== '').map(s => new Date(s).toISOString());
+    const validSlots = slots
+      .filter((s) => s && s.trim() !== '')
+      .map((s) => new Date(s).toISOString());
+
     if (validSlots.length === 0) {
       toast.error('Please input at least one valid slot');
       return;
@@ -1974,9 +2006,10 @@ function AgentAppointmentsTab({ user, listings = [] }) {
         .from('appointments')
         .update({
           agent_scheduled_slots: validSlots,
-          owner_accepted: false
+          owner_accepted: false,
         })
         .eq('id', appointmentId);
+
       if (error) throw error;
       toast.success('Slots suggested to the tenant!');
       setSuggestingId(null);
@@ -1990,7 +2023,9 @@ function AgentAppointmentsTab({ user, listings = [] }) {
   if (isLoading) {
     return (
       <div className="space-y-3">
-        {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-16 w-full rounded-xl" />
+        ))}
       </div>
     );
   }
@@ -2029,7 +2064,7 @@ function AgentAppointmentsTab({ user, listings = [] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {appointments.map(app => {
+              {appointments.map((app) => {
                 const listing = listingMap[app.listing_id];
                 const tenant = profileMap[app.renter_id];
                 const tenantName = tenant?.full_name || tenant?.email || 'Tenant';
@@ -2039,7 +2074,10 @@ function AgentAppointmentsTab({ user, listings = [] }) {
                     <td className="px-4 py-4">
                       <div className="font-semibold text-slate-800">
                         {listing?.title ? (
-                          <Link to={`/listings/${app.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1">
+                          <Link
+                            to={`/listings/${app.listing_id}`}
+                            className="hover:text-primary transition-colors inline-flex items-center gap-1"
+                          >
                             {listing.title} <ExternalLink className="w-3.5 h-3.5 opacity-60" />
                           </Link>
                         ) : (
@@ -2080,45 +2118,49 @@ function AgentAppointmentsTab({ user, listings = [] }) {
                     </td>
                     <td className="px-4 py-4 text-right">
                       <div className="flex flex-col items-end gap-2">
-                        {!app.owner_accepted && suggestingId !== app.id && (!app.agent_scheduled_slots || !app.agent_scheduled_slots.includes('approved_by_agent')) && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleAccept(app.id)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs animate-transform active:scale-95"
-                            >
-                              Approve Request
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSuggestingId(app.id);
-                                setSlotsInputs(prev => ({
-                                  ...prev,
-                                  [app.id]: ['', '', '']
-                                }));
-                              }}
-                              className="text-xs"
-                            >
-                              Suggest Slots
-                            </Button>
-                          </div>
-                        )}
+                        {!app.owner_accepted &&
+                          suggestingId !== app.id &&
+                          (!app.agent_scheduled_slots || !app.agent_scheduled_slots.includes('approved_by_agent')) && (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleAccept(app.id)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs animate-transform active:scale-95"
+                              >
+                                Approve Request
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSuggestingId(app.id);
+                                  setSlotsInputs((prev) => ({
+                                    ...prev,
+                                    [app.id]: ['', '', ''],
+                                  }));
+                                }}
+                                className="text-xs"
+                              >
+                                Suggest Slots
+                              </Button>
+                            </div>
+                          )}
 
                         {suggestingId === app.id && (
                           <div className="bg-white p-4 rounded-xl border border-slate-200 text-left space-y-3 w-80 shadow-md mt-2">
                             <div>
-                              <span className="text-xs font-semibold text-slate-600 block mb-1">Propose Alternative Slots (Up to 3):</span>
+                              <span className="text-xs font-semibold text-slate-600 block mb-1">
+                                Propose Alternative Slots (Up to 3):
+                              </span>
                               <div className="space-y-2">
-                                {[0, 1, 2].map(idx => (
+                                {[0, 1, 2].map((idx) => (
                                   <input
                                     key={idx}
                                     type="datetime-local"
                                     value={slotsInputs[app.id]?.[idx] || ''}
                                     onChange={(e) => {
                                       const val = e.target.value;
-                                      setSlotsInputs(prev => {
+                                      setSlotsInputs((prev) => {
                                         const arr = [...(prev[app.id] || ['', '', ''])];
                                         arr[idx] = val;
                                         return { ...prev, [app.id]: arr };
@@ -2155,6 +2197,68 @@ function AgentAppointmentsTab({ user, listings = [] }) {
               })}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentMaintenanceModal({ booking, onClose }) {
+  const [mrSearch, setMrSearch] = React.useState('');
+  const [mrPage, setMrPage] = React.useState(1);
+  const mrPageSize = 5;
+
+  const allRequests = [...(booking.maintenance_requests || [])].reverse();
+  const filtered = allRequests.filter(r =>
+    (r.subject || '').toLowerCase().includes(mrSearch.toLowerCase()) ||
+    (r.details || '').toLowerCase().includes(mrSearch.toLowerCase())
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / mrPageSize));
+  const paginated = filtered.slice((mrPage - 1) * mrPageSize, mrPage * mrPageSize);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 p-6 space-y-4 h-[32rem] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold">🔧 Maintenance Requests</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <input
+            className="w-full pl-8 pr-3 py-1.5 text-sm border rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            placeholder="Search by subject or details..."
+            value={mrSearch}
+            onChange={e => { setMrSearch(e.target.value); setMrPage(1); }}
+          />
+        </div>
+        <div className="space-y-2 flex-1 overflow-y-auto pr-1 min-h-0">
+          {filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              {mrSearch ? 'No requests match your search.' : 'No maintenance requests yet.'}
+            </p>
+          ) : (
+            paginated.map((req, idx) => (
+              <div key={idx} className="border rounded-xl p-3 bg-slate-50 space-y-1">
+                <p className="font-semibold text-sm">{req.subject}</p>
+                <p className="text-sm text-slate-600 whitespace-pre-wrap">{req.details}</p>
+                <p className="text-[10px] text-slate-400">{req.created_at ? new Date(req.created_at).toLocaleString() : ''}</p>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="flex items-center justify-between border-t pt-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {totalPages > 1 && (
+              <>
+                <Button size="sm" variant="outline" disabled={mrPage === 1} onClick={() => setMrPage(mrPage - 1)}>Prev</Button>
+                <span>Page {mrPage} / {totalPages}</span>
+                <Button size="sm" variant="outline" disabled={mrPage === totalPages} onClick={() => setMrPage(mrPage + 1)}>Next</Button>
+              </>
+            )}
+            {filtered.length > 0 && <span className="text-xs text-slate-400">({filtered.length} total)</span>}
+          </div>
+          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
         </div>
       </div>
     </div>

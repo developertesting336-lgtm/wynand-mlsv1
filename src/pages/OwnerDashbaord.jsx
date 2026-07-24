@@ -915,6 +915,9 @@ export default function OwnerDashboard() {
   const [inspectionSigning, setInspectionSigning] = useState(false);
   const [inspectionUploading, setInspectionUploading] = useState(false);
 
+  // Maintenance view modal state
+  const [maintenanceViewBooking, setMaintenanceViewBooking] = useState(null);
+
   const [bookingsSearch, setBookingsSearch] = useState('');
   const [bookingsPage, setBookingsPage] = useState(1);
   const [bookingsPageSize, setBookingsPageSize] = useState(10);
@@ -1646,6 +1649,7 @@ export default function OwnerDashboard() {
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Agreement</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
+                              <th className="px-4 py-3 font-semibold text-muted-foreground">Maintenance</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                             </tr>
                           </thead>
@@ -1792,6 +1796,21 @@ export default function OwnerDashboard() {
                                       )
                                     ) : (
                                       <span className="text-xs text-muted-foreground italic">Awaits Move-in</span>
+                                    )}
+                                  </td>
+                                  {/* Maintenance Requests */}
+                                  <td className="px-4 py-4 align-top">
+                                    {(b.maintenance_requests || []).length === 0 ? (
+                                      <span className="text-xs text-muted-foreground italic">None</span>
+                                    ) : (
+                                      <Button
+                                        size="xs"
+                                        variant="outline"
+                                        className="text-xs whitespace-nowrap px-3 py-2"
+                                        onClick={() => setMaintenanceViewBooking(b)}
+                                      >
+                                        Show All ({b.maintenance_requests.length})
+                                      </Button>
                                     )}
                                   </td>
                                   <td className="px-4 py-3 text-right">
@@ -2130,7 +2149,6 @@ export default function OwnerDashboard() {
               </div>
 
               <div className="space-y-6">
-                {/* Generate Inventory */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700 block">
                     Generate Inventory
@@ -2147,7 +2165,6 @@ export default function OwnerDashboard() {
                   />
                 </div>
 
-                {/* Photos */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700 block">
                     Photos
@@ -2218,7 +2235,6 @@ export default function OwnerDashboard() {
                   </div>
                 </div>
 
-                {/* Meter Readings */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700 block font-semibold">
                     Meter Readings
@@ -2274,7 +2290,6 @@ export default function OwnerDashboard() {
                   </div>
                 </div>
 
-                {/* Keys Issued */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700 block">
                     Keys Issued
@@ -2292,7 +2307,6 @@ export default function OwnerDashboard() {
                   />
                 </div>
 
-                {/* Deposit Recorded */}
                 <div className="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
                   <input
                     id="inspect-deposit-check"
@@ -2312,11 +2326,9 @@ export default function OwnerDashboard() {
                   </div>
                 </div>
 
-                {/* Inspection Signed */}
                 <div className="space-y-3 border-t pt-4">
                   <h4 className="text-sm font-semibold text-slate-800">Inspection Signatures Status</h4>
                   <div className="grid grid-cols-3 gap-4">
-                    {/* Owner Signature Selector */}
                     <div className="p-3 border rounded-xl bg-slate-50/50">
                       <p className="text-xs font-bold text-slate-500 uppercase mb-2">Owner Signature</p>
                       {inspectionBooking.inspection_report?.ownerSignature ? (
@@ -2379,7 +2391,6 @@ export default function OwnerDashboard() {
                       )}
                     </div>
 
-                    {/* Tenant Signature Status */}
                     <div className="p-3 border rounded-xl bg-slate-50/50">
                       <p className="text-xs font-bold text-slate-500 uppercase mb-2">Tenant Signature</p>
                       {inspectionBooking.inspection_report?.tenantSignature ? (
@@ -2396,7 +2407,6 @@ export default function OwnerDashboard() {
                       )}
                     </div>
 
-                    {/* Agent Signature Status */}
                     <div className="p-3 border rounded-xl bg-slate-50/50">
                       <p className="text-xs font-bold text-slate-500 uppercase mb-2">Agent Signature</p>
                       {inspectionBooking.inspection_report?.agentSignature ? (
@@ -2416,7 +2426,6 @@ export default function OwnerDashboard() {
                 </div>
               </div>
 
-              {/* Modal Actions */}
               <div className="flex items-center justify-end border-t pt-4 mt-6">
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setInspectionBooking(null)}>
@@ -2426,11 +2435,9 @@ export default function OwnerDashboard() {
                     <Button
                       onClick={async () => {
                         setInspectionSigning(true);
-                        // Attempt to build a beautiful local PDF blob to upload to Supabase storage to share
                         let pdfUrl = inspectionBooking.inspection_report?.pdfUrl || null;
                         try {
                           const { generateBeautifulInspectionPDF } = await import('../utils/inspectionPdfGenerator');
-                          // Make PDF and obtain blob representation
                           const existingReport = inspectionBooking.inspection_report || {};
                           const draftReport = {
                             ...existingReport,
@@ -2440,12 +2447,12 @@ export default function OwnerDashboard() {
                             keysIssued: inspectionKeysIssued,
                             depositRecorded: inspectionDepositRecorded,
                           };
-                          
+
                           const doc = await generateBeautifulInspectionPDF(
                             inspectionBooking,
                             draftReport,
                             'Property',
-                            true // Return blob instead of saving directly to download
+                            true
                           );
                           const pdfBlob = doc.output('blob');
                           const file = new File([pdfBlob], `inspection_report_${inspectionBooking.id}.pdf`, { type: 'application/pdf' });
@@ -2493,6 +2500,82 @@ export default function OwnerDashboard() {
           </div>
         );
       })()}
+
+      {/* Maintenance Requests View Modal */}
+      {maintenanceViewBooking && (
+        <OwnerMaintenanceModal
+          booking={maintenanceViewBooking}
+          onClose={() => setMaintenanceViewBooking(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function OwnerMaintenanceModal({ booking, onClose }) {
+  const [mrSearch, setMrSearch] = React.useState('');
+  const [mrPage, setMrPage] = React.useState(1);
+  const mrPageSize = 5;
+
+  const allRequests = [...(booking.maintenance_requests || [])].reverse();
+  const filtered = allRequests.filter(r =>
+    (r.subject || '').toLowerCase().includes(mrSearch.toLowerCase()) ||
+    (r.details || '').toLowerCase().includes(mrSearch.toLowerCase())
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / mrPageSize));
+  const paginated = filtered.slice((mrPage - 1) * mrPageSize, mrPage * mrPageSize);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 p-6 space-y-4 h-[32rem] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold flex items-center gap-2">🔧 Maintenance Requests</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <input
+            className="w-full pl-8 pr-3 py-1.5 text-sm border rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            placeholder="Search by subject or details..."
+            value={mrSearch}
+            onChange={e => { setMrSearch(e.target.value); setMrPage(1); }}
+          />
+        </div>
+
+        {/* List */}
+        <div className="space-y-2 flex-1 overflow-y-auto pr-1 min-h-0">
+          {filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              {mrSearch ? 'No requests match your search.' : 'No maintenance requests yet.'}
+            </p>
+          ) : (
+            paginated.map((req, idx) => (
+              <div key={idx} className="border rounded-xl p-3 bg-slate-50 space-y-1">
+                <p className="font-semibold text-sm">{req.subject}</p>
+                <p className="text-sm text-slate-600 whitespace-pre-wrap">{req.details}</p>
+                <p className="text-[10px] text-slate-400">{req.created_at ? new Date(req.created_at).toLocaleString() : ''}</p>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between border-t pt-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {totalPages > 1 && (
+              <>
+                <Button size="sm" variant="outline" disabled={mrPage === 1} onClick={() => setMrPage(mrPage - 1)}>Prev</Button>
+                <span>Page {mrPage} / {totalPages}</span>
+                <Button size="sm" variant="outline" disabled={mrPage === totalPages} onClick={() => setMrPage(mrPage + 1)}>Next</Button>
+              </>
+            )}
+            {filtered.length > 0 && <span className="text-xs text-slate-400">({filtered.length} total)</span>}
+          </div>
+          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+        </div>
+      </div>
     </div>
   );
 }

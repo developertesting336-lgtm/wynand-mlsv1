@@ -60,6 +60,126 @@ function StatCard({ icon: Icon, label, value, color }) {
 
 // ── Inquiry row removed: InquiryKanban now handles chat layout ────────────────
 
+// ── Reusable Maintenance View Panel (used in all dashboards) ─────────────────
+function MaintenanceViewPanel({ booking, onClose, isTenant = false }) {
+  const [mrSearch, setMrSearch] = useState('');
+  const [mrPage, setMrPage] = useState(1);
+  const mrPageSize = 5;
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [subject, setSubject] = useState('');
+  const [details, setDetails] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const allRequests = [...(booking.maintenance_requests || [])].reverse();
+  const filtered = allRequests.filter(r =>
+    (r.subject || '').toLowerCase().includes(mrSearch.toLowerCase()) ||
+    (r.details || '').toLowerCase().includes(mrSearch.toLowerCase())
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / mrPageSize));
+  const paginated = filtered.slice((mrPage - 1) * mrPageSize, mrPage * mrPageSize);
+
+  const handleCreate = async () => {
+    if (!subject.trim() || !details.trim()) return;
+    setSaving(true);
+    try {
+      const existing = booking.maintenance_requests || [];
+      const updated = [...existing, { subject: subject.trim(), details: details.trim(), created_at: new Date().toISOString() }];
+      const { error } = await supabase.from('bookings').update({ maintenance_requests: updated }).eq('id', booking.id);
+      if (error) throw error;
+      booking.maintenance_requests = updated;
+      toast.success('Maintenance request submitted!');
+      setSubject('');
+      setDetails('');
+      setShowCreateForm(false);
+      setMrPage(1);
+    } catch (err) {
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3 h-[32rem] flex flex-col">
+      {/* Search + New Request */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <input
+            className="w-full pl-8 pr-3 py-1.5 text-sm border rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            placeholder="Search by subject or details..."
+            value={mrSearch}
+            onChange={e => { setMrSearch(e.target.value); setMrPage(1); }}
+          />
+        </div>
+        {isTenant && (
+          <Button size="sm" onClick={() => setShowCreateForm(v => !v)} className="text-xs whitespace-nowrap">
+            {showCreateForm ? 'Cancel' : '+ New Request'}
+          </Button>
+        )}
+      </div>
+
+      {/* Inline Create Form (tenant only) */}
+      {isTenant && showCreateForm && (
+        <div className="border rounded-xl p-3 bg-blue-50 space-y-2">
+          <p className="text-xs font-semibold text-slate-700">New Maintenance Request</p>
+          <input
+            className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            placeholder="Subject"
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+          />
+          <textarea
+            className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+            placeholder="Describe the issue..."
+            rows={3}
+            value={details}
+            onChange={e => setDetails(e.target.value)}
+          />
+          <div className="flex justify-end">
+            <Button size="sm" disabled={!subject.trim() || !details.trim() || saving} onClick={handleCreate} className="text-xs">
+              {saving ? 'Submitting...' : 'Submit'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      <div className="space-y-2 flex-1 overflow-y-auto pr-1 min-h-0">
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            {mrSearch ? 'No requests match your search.' : 'No maintenance requests yet.'}
+          </p>
+        ) : (
+          paginated.map((req, idx) => (
+            <div key={idx} className="border rounded-xl p-3 bg-slate-50 space-y-1">
+              <p className="font-semibold text-sm">{req.subject}</p>
+              <p className="text-sm text-slate-600 whitespace-pre-wrap">{req.details}</p>
+              <p className="text-[10px] text-slate-400">{req.created_at ? new Date(req.created_at).toLocaleString() : ''}</p>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Pagination + Close */}
+      <div className="flex items-center justify-between border-t pt-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          {totalPages > 1 && (
+            <>
+              <Button size="sm" variant="outline" disabled={mrPage === 1} onClick={() => setMrPage(mrPage - 1)}>Prev</Button>
+              <span>Page {mrPage} / {totalPages}</span>
+              <Button size="sm" variant="outline" disabled={mrPage === totalPages} onClick={() => setMrPage(mrPage + 1)}>Next</Button>
+            </>
+          )}
+          {filtered.length > 0 && <span className="text-xs text-slate-400">({filtered.length} total)</span>}
+        </div>
+        <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+      </div>
+    </div>
+  );
+}
+
+
 function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userProfile }) {
   const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
   const [payingId, setPayingId] = useState(null);
@@ -77,10 +197,30 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
   const [inspectionSelectedSignature, setInspectionSelectedSignature] = useState('');
   const [inspectionSigning, setInspectionSigning] = useState(false);
 
+  // States for maintenance requests modal
+  const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false);
+  const [selectedBookingForMaintenance, setSelectedBookingForMaintenance] = useState(null);
+  const [maintenanceSubject, setMaintenanceSubject] = useState('');
+  const [maintenanceDetails, setMaintenanceDetails] = useState('');
+  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
+  const [viewMaintenanceModalOpen, setViewMaintenanceModalOpen] = useState(false);
+  const [viewMaintenanceBooking, setViewMaintenanceBooking] = useState(null);
+
+  const openMaintenanceModal = (booking) => {
+    setSelectedBookingForMaintenance(booking);
+    setMaintenanceSubject('');
+    setMaintenanceDetails('');
+    setMaintenanceModalOpen(true);
+  };
+
+  const openViewMaintenanceModal = (booking) => {
+    setViewMaintenanceBooking(booking);
+    setViewMaintenanceModalOpen(true);
+  };
+
   // Pre-select first saved signature when opening the inspection modal
   useEffect(() => {
     if (inspectionBooking && userProfile?.signatures?.length) {
-      // If no signature selected yet, default to the first saved signature
       setInspectionSelectedSignature(prev => prev || userProfile.signatures[0]);
     }
   }, [inspectionBooking, userProfile?.signatures]);
@@ -181,6 +321,9 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
         setModalMoveOutDate={setModalMoveOutDate}
         totalPages={totalPages}
         setInspectionBooking={setInspectionBooking}
+        userProfile={userProfile}
+        openMaintenanceModal={openMaintenanceModal}
+        openViewMaintenanceModal={openViewMaintenanceModal}
       />
 
       {/* Set/Change Move-out Date Modal */}
@@ -394,11 +537,95 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Maintenance Request Modal */}
+      {maintenanceModalOpen && (
+        <Dialog open={maintenanceModalOpen} onOpenChange={(open) => { if (!open) setMaintenanceModalOpen(false); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create Maintenance Request</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div>
+                <label className="text-sm font-medium block mb-1">Subject</label>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="e.g. Leaking faucet in bathroom"
+                  value={maintenanceSubject}
+                  onChange={(e) => setMaintenanceSubject(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Details</label>
+                <textarea
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                  placeholder="Describe the issue in detail..."
+                  rows={4}
+                  value={maintenanceDetails}
+                  onChange={(e) => setMaintenanceDetails(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <Button variant="outline" onClick={() => setMaintenanceModalOpen(false)}>Cancel</Button>
+              <Button
+                disabled={!maintenanceSubject.trim() || !maintenanceDetails.trim() || maintenanceSaving}
+                onClick={async () => {
+                  setMaintenanceSaving(true);
+                  try {
+                    const existing = selectedBookingForMaintenance.maintenance_requests || [];
+                    const newRequest = {
+                      subject: maintenanceSubject.trim(),
+                      details: maintenanceDetails.trim(),
+                      created_at: new Date().toISOString(),
+                    };
+                    const updated = [...existing, newRequest];
+                    const { error } = await supabase
+                      .from('bookings')
+                      .update({ maintenance_requests: updated })
+                      .eq('id', selectedBookingForMaintenance.id);
+                    if (error) throw error;
+                    toast.success('Maintenance request submitted!');
+                    setMaintenanceModalOpen(false);
+                  } catch (err) {
+                    toast.error(`Failed: ${err.message}`);
+                  } finally {
+                    setMaintenanceSaving(false);
+                  }
+                }}
+              >
+                {maintenanceSaving ? 'Saving...' : 'Submit Request'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* View All Maintenance Requests Modal */}
+      {viewMaintenanceModalOpen && viewMaintenanceBooking && (
+        <Dialog open={viewMaintenanceModalOpen} onOpenChange={(open) => { if (!open) setViewMaintenanceModalOpen(false); }}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                🔧 Maintenance Requests
+                <span className="text-sm font-normal text-muted-foreground ml-1">
+                  — {viewMaintenanceBooking.listing_title || 'Property'}
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+            <MaintenanceViewPanel
+              booking={viewMaintenanceBooking}
+              onClose={() => setViewMaintenanceModalOpen(false)}
+              isTenant={true}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
 
-function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, totalPages, setInspectionBooking }) {
+function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, totalPages, setInspectionBooking, userProfile, openMaintenanceModal, openViewMaintenanceModal }) {
   const statusConfig = {
     pending: { label: 'Pending Approval', icon: Hourglass, cls: 'bg-amber-100 text-amber-700 border-amber-200' },
     lease_pending: { label: 'Sign Lease Agreement', icon: PenLine, cls: 'bg-blue-100 text-blue-700 border-blue-200 animate-pulse' },
@@ -454,7 +681,7 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Agreement</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Agent Signed</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
-                <th className="px-4 py-3 font-semibold text-muted-foreground">Maintenance</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground">Maintenance</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                 </tr>
               </thead>
@@ -647,6 +874,19 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
 
                       return <span className="text-xs text-muted-foreground italic">Pending Owner</span>;
                     })()}
+                  </td>
+                  {/* Maintenance Requests cell */}
+                  <td className="px-4 py-4 align-top">
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      className="text-xs whitespace-nowrap px-3 py-2"
+                      onClick={() => openViewMaintenanceModal(b)}
+                    >
+                      {(b.maintenance_requests || []).length > 0
+                        ? `Show All (${b.maintenance_requests.length})`
+                        : '+ New Request'}
+                    </Button>
                   </td>
                   <td className="px-4 py-3 text-right">
                     {(b.status === 'lease_pending' || (b.status === 'approved' && b.lease_status !== 'signed')) ? (
