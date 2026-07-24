@@ -60,7 +60,7 @@ function StatCard({ icon: Icon, label, value, color }) {
 
 // ── Inquiry row removed: InquiryKanban now handles chat layout ────────────────
 
-function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
+function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userProfile }) {
   const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
   const [payingId, setPayingId] = useState(null);
   const [search, setSearch] = useState('');
@@ -71,6 +71,11 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
   // States for move out date modal dialog
   const [selectedBookingForMoveOut, setSelectedBookingForMoveOut] = useState(null);
   const [modalMoveOutDate, setModalMoveOutDate] = useState('');
+
+  // States for inspection modal
+  const [inspectionBooking, setInspectionBooking] = useState(null);
+  const [inspectionSelectedSignature, setInspectionSelectedSignature] = useState('');
+  const [inspectionSigning, setInspectionSigning] = useState(false);
 
   const filteredBookings = bookings.filter(b => {
     const query = debouncedSearch.trim().toLowerCase();
@@ -167,6 +172,7 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
         setSelectedBookingForMoveOut={setSelectedBookingForMoveOut}
         setModalMoveOutDate={setModalMoveOutDate}
         totalPages={totalPages}
+        setInspectionBooking={setInspectionBooking}
       />
 
       {/* Set/Change Move-out Date Modal */}
@@ -210,11 +216,181 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Inspection Modal Dialog for Tenant */}
+      {inspectionBooking && (
+        <Dialog open={!!inspectionBooking} onOpenChange={() => setInspectionBooking(null)}>
+          <DialogContent className="sm:max-w-[650px] rounded-3xl p-6 max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">Move-in Inspection Report</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-5 py-4">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-sm space-y-2">
+                <p><strong>Property:</strong> {listingMap[inspectionBooking.listing_id]?.title || 'Property'}</p>
+                <p><strong>Move-in Date:</strong> {inspectionBooking.move_in_date}</p>
+              </div>
+
+              {/* Inventory */}
+              <div>
+                <h4 className="text-sm font-bold text-slate-800">1. Property Inventory & Condition</h4>
+                <p className="text-xs text-slate-500 mt-1 whitespace-pre-wrap leading-relaxed">
+                  {inspectionBooking.inspection_report?.inventory || 'No inventory details submitted.'}
+                </p>
+              </div>
+
+              {/* Photos */}
+              {inspectionBooking.inspection_report?.photos?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 mb-2">2. Inspection Photos</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {inspectionBooking.inspection_report.photos.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noreferrer noopener" className="block w-20 h-20 rounded-xl overflow-hidden border">
+                        <img src={url} alt="inspection" className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Meter Readings */}
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 mb-1">3. Meter Readings</h4>
+                <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-2xl">
+                  <p><strong>Electricity:</strong> {inspectionBooking.inspection_report?.meterReadings?.electricity || '—'} kWh</p>
+                  <p><strong>Water:</strong> {inspectionBooking.inspection_report?.meterReadings?.water || '—'} m³</p>
+                  <p><strong>Gas:</strong> {inspectionBooking.inspection_report?.meterReadings?.gas || '—'}</p>
+                  <p><strong>Other:</strong> {inspectionBooking.inspection_report?.meterReadings?.other || '—'}</p>
+                </div>
+              </div>
+
+              {/* Keys Issued */}
+              <div>
+                <h4 className="text-sm font-bold text-slate-800">4. Keys/Cards Handed Over</h4>
+                <p className="text-xs text-slate-600 mt-1">
+                  {inspectionBooking.inspection_report?.keysIssued || 'None recorded.'}
+                </p>
+              </div>
+
+              {/* Deposit Recorded */}
+              <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-2xl flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-xs font-semibold">
+                  {inspectionBooking.inspection_report?.depositRecorded ? 'Security Deposit fully paid & confirmed by Owner' : 'Deposit confirmation pending'}
+                </span>
+              </div>
+
+              {/* Signatures status */}
+              <div className="space-y-2 border-t pt-3">
+                <h4 className="text-sm font-bold text-slate-800">Signatures Status</h4>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  {/* Owner */}
+                  <div className="p-2 border rounded-xl bg-slate-50">
+                    <p className="font-bold text-slate-500 mb-1">Owner</p>
+                    {inspectionBooking.inspection_report?.ownerSignature ? (
+                      <img src={inspectionBooking.inspection_report.ownerSignature} alt="owner signature" className="h-8 mx-auto object-contain" />
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground italic">Pending</span>
+                    )}
+                  </div>
+                  {/* Tenant */}
+                  <div className="p-2 border rounded-xl bg-slate-50">
+                    <p className="font-bold text-slate-500 mb-1">Tenant (You)</p>
+                    {inspectionBooking.inspection_report?.tenantSignature ? (
+                      <img src={inspectionBooking.inspection_report.tenantSignature} alt="tenant signature" className="h-8 mx-auto object-contain" />
+                    ) : (
+                      <div className="space-y-2">
+                        <select
+                          className="w-full p-1 rounded border text-[10px] bg-white focus:outline-none"
+                          value={inspectionSelectedSignature}
+                          onChange={(e) => setInspectionSelectedSignature(e.target.value)}
+                        >
+                          <option value="">Select saved signature...</option>
+                          {(userProfile?.signatures || []).map((sig, idx) => (
+                            <option key={idx} value={sig}>Saved Signature {idx + 1}</option>
+                          ))}
+                        </select>
+                        {inspectionSelectedSignature && (
+                          <div className="border p-1 bg-white rounded flex justify-center">
+                            <img src={inspectionSelectedSignature} alt="selected signature preview" className="h-8 object-contain" />
+                          </div>
+                        )}
+                        <Button
+                          size="xs"
+                          className="w-full text-[10px] h-6"
+                          disabled={!inspectionSelectedSignature || inspectionSigning}
+                          onClick={async () => {
+                            setInspectionSigning(true);
+                            try {
+                              const existingReport = inspectionBooking.inspection_report || {};
+                              const updatedReport = {
+                                ...existingReport,
+                                tenantSignature: inspectionSelectedSignature,
+                                tenantSignatureDate: new Date().toISOString(),
+                              };
+
+                              // Generate beautiful PDF and upload to Supabase storage
+                              try {
+                                const { generateBeautifulInspectionPDF } = await import('../utils/inspectionPdfGenerator');
+                                const doc = await generateBeautifulInspectionPDF(
+                                  inspectionBooking,
+                                  updatedReport,
+                                  'Property',
+                                  true
+                                );
+                                const pdfBlob = doc.output('blob');
+                                const file = new File([pdfBlob], `inspection_report_${inspectionBooking.id}.pdf`, { type: 'application/pdf' });
+                                const res = await base44.integrations.Core.UploadFile({ file });
+                                if (res?.file_url) {
+                                  updatedReport.pdfUrl = res.file_url;
+                                }
+                              } catch (pdfErr) {
+                                console.warn('PDF regeneration/upload failed during Tenant signature:', pdfErr);
+                              }
+
+                              const { error } = await supabase
+                                .from('bookings')
+                                .update({ inspection_report: updatedReport })
+                                .eq('id', inspectionBooking.id);
+                              if (error) throw error;
+                              toast.success('Inspection report signed by Tenant');
+                              inspectionBooking.inspection_report = updatedReport;
+                              setInspectionBooking({ ...inspectionBooking });
+                            } catch (err) {
+                              toast.error(`Sign failed: ${err.message}`);
+                            } finally {
+                              setInspectionSigning(false);
+                            }
+                          }}
+                        >
+                          Sign
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {/* Agent */}
+                  <div className="p-2 border rounded-xl bg-slate-50">
+                    <p className="font-bold text-slate-500 mb-1">Agent</p>
+                    {inspectionBooking.inspection_report?.agentSignature ? (
+                      <img src={inspectionBooking.inspection_report.agentSignature} alt="agent signature" className="h-8 mx-auto object-contain" />
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground italic">Pending</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end items-center border-t pt-4">
+              <Button variant="outline" onClick={() => setInspectionBooking(null)}>Close</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
 
-function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, totalPages }) {
+function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, totalPages, setInspectionBooking }) {
   const statusConfig = {
     pending: { label: 'Pending Approval', icon: Hourglass, cls: 'bg-amber-100 text-amber-700 border-amber-200' },
     lease_pending: { label: 'Sign Lease Agreement', icon: PenLine, cls: 'bg-blue-100 text-blue-700 border-blue-200 animate-pulse' },
@@ -264,13 +440,12 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
               <thead>
                 <tr className="bg-muted/50 text-left">
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
-                  <th className="px-4 py-3 font-semibold text-muted-foreground">Owner</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Move-in Date</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Move-out Date</th>
-                  <th className="px-4 py-3 font-semibold text-muted-foreground">Lease</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Agreement</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Agent Signed</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                 </tr>
               </thead>
@@ -299,9 +474,6 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                         "{b.message}"
                       </p>
                     )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-sm font-medium">{ownerName}</div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {b.move_in_date ? format(new Date(b.move_in_date + 'T00:00:00'), 'MMMM d, yyyy') : 'N/A'}
@@ -350,9 +522,6 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                       );
                     })()}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {b.lease_duration_months} months
-                  </td>
                   <td className="px-4 py-3">
                     {b.end_lease ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-slate-100 text-slate-700 border-slate-200">
@@ -393,6 +562,82 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                       {agentSigned ? <CheckCircle className="w-3.5 h-3.5" /> : <Hourglass className="w-3.5 h-3.5" />}
                       {agentSigned ? 'Signed' : 'Pending'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {(() => {
+                      const moveInDateObj = new Date(b.move_in_date + 'T00:00:00');
+                      const todayDateObj = new Date();
+                      todayDateObj.setHours(0, 0, 0, 0);
+                      const isMoveInArrived = todayDateObj >= moveInDateObj;
+
+                      if (!isMoveInArrived) {
+                        return <span className="text-xs text-muted-foreground italic">Awaits Move-in</span>;
+                      }
+
+                      if (b.inspection_report) {
+                        const needsSign = !b.inspection_report.tenantSignature;
+                        return (
+                          <div className="flex flex-col gap-1 items-start">
+                            {needsSign ? (
+                              <span className="text-xs text-amber-600 font-semibold flex items-center gap-1 animate-pulse">
+                                <Hourglass className="w-3 h-3" /> Under Column to Sign
+                              </span>
+                            ) : (
+                              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" /> Generated
+                              </span>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                className="text-[10px] h-6 px-2 rounded-lg"
+                                onClick={() => {
+                                  setInspectionBooking(b);
+                                  setInspectionSelectedSignature(userProfile?.signatures?.[0] || '');
+                                }}
+                              >
+                                {needsSign ? 'Sign Report' : 'View Report'}
+                              </Button>
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+                                title="Download PDF"
+                                onClick={async () => {
+                                  try {
+                                    const { generateBeautifulInspectionPDF } = await import('../utils/inspectionPdfGenerator');
+                                    await generateBeautifulInspectionPDF(
+                                      b,
+                                      b.inspection_report,
+                                      listing?.title || 'Property'
+                                    );
+                                    toast.success('Inspection report PDF downloaded');
+                                  } catch (pdfErr) {
+                                    toast.error('Failed to export PDF');
+                                  }
+                                }}
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </Button>
+                              {b.inspection_report?.pdfUrl && (
+                                <a
+                                  href={b.inspection_report.pdfUrl}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                  title="View Report PDF"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return <span className="text-xs text-muted-foreground italic">Pending Owner</span>;
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {(b.status === 'lease_pending' || (b.status === 'approved' && b.lease_status !== 'signed')) ? (
@@ -1431,7 +1676,7 @@ export default function UserDashboard() {
 
         {/* Bookings Tab */}
         <TabsContent value="bookings" className="pt-6">
-          <BookingsTab bookings={myBookings} isLoading={bookingsLoading} listings={allListings} userEmail={user.email} />
+          <BookingsTab bookings={myBookings} isLoading={bookingsLoading} listings={allListings} userEmail={user.email} userProfile={user} />
         </TabsContent>
 
         {/* Appointments Tab */}

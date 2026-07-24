@@ -83,6 +83,11 @@ export default function AgentDashboard() {
   const [agentSigningBooking, setAgentSigningBooking] = useState(null);
   const [agentSigning, setAgentSigning] = useState(false);
   const [agentSignatures, setAgentSignatures] = useState([]);
+
+  // Inspection states
+  const [inspectionBooking, setInspectionBooking] = useState(null);
+  const [inspectionSelectedSignature, setInspectionSelectedSignature] = useState('');
+  const [inspectionSigning, setInspectionSigning] = useState(false);
   const openEditModal = (listing) => setEditingListing(listing);
   const closeEditModal = () => setEditingListing(null);
   const openAgreementEdit = (booking) => {
@@ -147,7 +152,7 @@ export default function AgentDashboard() {
       if (error) {
         throw error;
       }
-    console.log(data, '541452')
+      console.log(data, '541452')
       const ownerVerificationRow = data?.find((row) => row.user_id === ownerUserId) || null;
       console.log(ownerVerificationRow, 'ownerVerificationRow');
       const renterVerificationRow = data?.find((row) => row.user_id === renterUserId) || null;
@@ -305,7 +310,7 @@ export default function AgentDashboard() {
           console.error('Failed to load agent signatures:', err);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const { data: myListings = [] } = useQuery({
@@ -341,10 +346,10 @@ export default function AgentDashboard() {
       console.log('=== AGENT DASHBOARD BOOKINGS QUERY ===');
       console.log('Logged in user ID:', user?.id);
       console.log('Logged in user email:', user?.email);
-      
+
       const listingIds = myListings.map(l => l.id);
       let query = supabase.from('bookings').select('*').order('created_date', { ascending: false });
-      
+
       if (listingIds.length > 0) {
         query = query.or(`agent_id.eq.${user.id},listing_id.in.(${listingIds.join(',')})`);
       } else {
@@ -352,9 +357,9 @@ export default function AgentDashboard() {
       }
 
       const { data, error } = await query;
-      
+
       console.log('Bookings query result:', { data, error, count: data?.length });
-      
+
       if (error) {
         console.error('Bookings query error:', error);
         throw error;
@@ -677,9 +682,9 @@ export default function AgentDashboard() {
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <StripeConnectBanner 
-        user={user} 
-        onboardingLoading={onboardingLoading} 
+      <StripeConnectBanner
+        user={user}
+        onboardingLoading={onboardingLoading}
         handleStripeOnboard={handleStripeOnboard}
         title="Set up Your Payments"
         description="To receive payments connect your bank account through Stripe."
@@ -852,7 +857,7 @@ export default function AgentDashboard() {
               </Button>
             </div>
           )}
-          
+
           <Tabs value={inquiryTab} onValueChange={setInquiryTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="all" className="gap-1.5">
@@ -881,7 +886,7 @@ export default function AgentDashboard() {
                 const [updated] = await base44.entities.User.filter({ id: user.id });
                 if (updated) setUser(updated);
               } catch (e) {
-                base44.auth.me().then(setUser).catch(() => {});
+                base44.auth.me().then(setUser).catch(() => { });
               }
             }} />
             <AddReferralForm agent={user} listings={myListings} />
@@ -1108,6 +1113,7 @@ export default function AgentDashboard() {
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Documents</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Agreement</th>
+                              <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                             </tr>
                           </thead>
@@ -1160,6 +1166,82 @@ export default function AgentDashboard() {
                                     ) : (
                                       <span className="text-xs text-muted-foreground italic">Pending...</span>
                                     )}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {(() => {
+                                      const moveInDateObj = new Date(b.move_in_date + 'T00:00:00');
+                                      const todayDateObj = new Date();
+                                      todayDateObj.setHours(0, 0, 0, 0);
+                                      const isMoveInArrived = todayDateObj >= moveInDateObj;
+
+                                      if (!isMoveInArrived) {
+                                        return <span className="text-xs text-muted-foreground italic">Awaits Move-in</span>;
+                                      }
+
+                                      if (b.inspection_report) {
+                                        const needsSign = !b.inspection_report.agentSignature;
+                                        return (
+                                          <div className="flex flex-col gap-1 items-start">
+                                            {needsSign ? (
+                                              <span className="text-xs text-amber-600 font-semibold flex items-center gap-1 animate-pulse">
+                                                <Hourglass className="w-3 h-3" /> Under Column to Sign
+                                              </span>
+                                            ) : (
+                                              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                                                <CheckCircle className="w-3 h-3" /> Generated
+                                              </span>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                              <Button
+                                                size="xs"
+                                                variant="outline"
+                                                className="text-[10px] h-6 px-2 rounded-lg"
+                                                onClick={() => {
+                                                  setInspectionBooking(b);
+                                                  setInspectionSelectedSignature(user?.signatures?.[0] || '');
+                                                }}
+                                              >
+                                                {needsSign ? 'Sign Report' : 'View Report'}
+                                              </Button>
+                                              <Button
+                                                size="xs"
+                                                variant="ghost"
+                                                className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+                                                title="Download PDF"
+                                                onClick={async () => {
+                                                  try {
+                                                    const { generateBeautifulInspectionPDF } = await import('../utils/inspectionPdfGenerator');
+                                                    await generateBeautifulInspectionPDF(
+                                                      b,
+                                                      b.inspection_report,
+                                                      'Property'
+                                                    );
+                                                    toast.success('Inspection report PDF downloaded');
+                                                  } catch (pdfErr) {
+                                                    toast.error('Failed to export PDF');
+                                                  }
+                                                }}
+                                              >
+                                                <Download className="w-3.5 h-3.5" />
+                                              </Button>
+                                              {b.inspection_report?.pdfUrl && (
+                                                <a
+                                                  href={b.inspection_report.pdfUrl}
+                                                  target="_blank"
+                                                  rel="noreferrer noopener"
+                                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                                  title="View Report PDF"
+                                                >
+                                                  <FileText className="w-3.5 h-3.5" />
+                                                </a>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+
+                                      return <span className="text-xs text-muted-foreground italic">Pending Owner</span>;
+                                    })()}
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                     {(() => {
@@ -1660,6 +1742,177 @@ export default function AgentDashboard() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Inspection Modal Dialog for Agent */}
+      {inspectionBooking && (
+        <Dialog open={!!inspectionBooking} onOpenChange={() => setInspectionBooking(null)}>
+          <DialogContent className="sm:max-w-[650px] rounded-3xl p-6 max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">Move-in Inspection Report (Agent View)</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-5 py-4">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-sm space-y-2">
+                <p><strong>Property:</strong> {listingMap[inspectionBooking.listing_id]?.title || 'Property'}</p>
+                <p><strong>Move-in Date:</strong> {inspectionBooking.move_in_date}</p>
+              </div>
+
+              {/* Inventory */}
+              <div>
+                <h4 className="text-sm font-bold text-slate-800">1. Property Inventory & Condition</h4>
+                <p className="text-xs text-slate-500 mt-1 whitespace-pre-wrap leading-relaxed">
+                  {inspectionBooking.inspection_report?.inventory || 'No inventory details submitted.'}
+                </p>
+              </div>
+
+              {/* Photos */}
+              {inspectionBooking.inspection_report?.photos?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 mb-2">2. Inspection Photos</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {inspectionBooking.inspection_report.photos.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noreferrer noopener" className="block w-20 h-20 rounded-xl overflow-hidden border">
+                        <img src={url} alt="inspection" className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Meter Readings */}
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 mb-1">3. Meter Readings</h4>
+                <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-2xl">
+                  <p><strong>Electricity:</strong> {inspectionBooking.inspection_report?.meterReadings?.electricity || '—'} kWh</p>
+                  <p><strong>Water:</strong> {inspectionBooking.inspection_report?.meterReadings?.water || '—'} m³</p>
+                  <p><strong>Gas:</strong> {inspectionBooking.inspection_report?.meterReadings?.gas || '—'}</p>
+                  <p><strong>Other:</strong> {inspectionBooking.inspection_report?.meterReadings?.other || '—'}</p>
+                </div>
+              </div>
+
+              {/* Keys Issued */}
+              <div>
+                <h4 className="text-sm font-bold text-slate-800">4. Keys/Cards Handed Over</h4>
+                <p className="text-xs text-slate-600 mt-1">
+                  {inspectionBooking.inspection_report?.keysIssued || 'None recorded.'}
+                </p>
+              </div>
+
+              {/* Deposit Recorded */}
+              <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-2xl flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-xs font-semibold">
+                  {inspectionBooking.inspection_report?.depositRecorded ? 'Security Deposit fully paid & confirmed by Owner' : 'Deposit confirmation pending'}
+                </span>
+              </div>
+
+              {/* Signatures status */}
+              <div className="space-y-2 border-t pt-3">
+                <h4 className="text-sm font-bold text-slate-800">Signatures Status</h4>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  {/* Owner */}
+                  <div className="p-2 border rounded-xl bg-slate-50">
+                    <p className="font-bold text-slate-500 mb-1">Owner</p>
+                    {inspectionBooking.inspection_report?.ownerSignature ? (
+                      <img src={inspectionBooking.inspection_report.ownerSignature} alt="owner signature" className="h-8 mx-auto object-contain" />
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground italic">Pending</span>
+                    )}
+                  </div>
+                  {/* Tenant */}
+                  <div className="p-2 border rounded-xl bg-slate-50">
+                    <p className="font-bold text-slate-500 mb-1">Tenant</p>
+                    {inspectionBooking.inspection_report?.tenantSignature ? (
+                      <img src={inspectionBooking.inspection_report.tenantSignature} alt="tenant signature" className="h-8 mx-auto object-contain" />
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground italic">Pending</span>
+                    )}
+                  </div>
+                  {/* Agent */}
+                  <div className="p-2 border rounded-xl bg-slate-50">
+                    <p className="font-bold text-slate-500 mb-1">Agent (You)</p>
+                    {inspectionBooking.inspection_report?.agentSignature ? (
+                      <img src={inspectionBooking.inspection_report.agentSignature} alt="agent signature" className="h-8 mx-auto object-contain" />
+                    ) : (
+                      <div className="space-y-2">
+                        <select
+                          className="w-full p-1 rounded border text-[10px] bg-white focus:outline-none"
+                          value={inspectionSelectedSignature}
+                          onChange={(e) => setInspectionSelectedSignature(e.target.value)}
+                        >
+                          <option value="">Select saved signature...</option>
+                          {(user?.signatures || []).map((sig, idx) => (
+                            <option key={idx} value={sig}>Saved Signature {idx + 1}</option>
+                          ))}
+                        </select>
+                        {inspectionSelectedSignature && (
+                          <div className="border p-1 bg-white rounded flex justify-center">
+                            <img src={inspectionSelectedSignature} alt="selected signature preview" className="h-8 object-contain" />
+                          </div>
+                        )}
+                        <Button
+                          size="xs"
+                          className="w-full text-[10px] h-6"
+                          disabled={!inspectionSelectedSignature || inspectionSigning}
+                          onClick={async () => {
+                            setInspectionSigning(true);
+                            try {
+                              const existingReport = inspectionBooking.inspection_report || {};
+                              const updatedReport = {
+                                ...existingReport,
+                                agentSignature: inspectionSelectedSignature,
+                                agentSignatureDate: new Date().toISOString(),
+                              };
+
+                              // Generate beautiful PDF and upload to Supabase storage
+                              try {
+                                const { generateBeautifulInspectionPDF } = await import('../utils/inspectionPdfGenerator');
+                                const doc = await generateBeautifulInspectionPDF(
+                                  inspectionBooking,
+                                  updatedReport,
+                                  'Property',
+                                  true
+                                );
+                                const pdfBlob = doc.output('blob');
+                                const file = new File([pdfBlob], `inspection_report_${inspectionBooking.id}.pdf`, { type: 'application/pdf' });
+                                const res = await base44.integrations.Core.UploadFile({ file });
+                                if (res?.file_url) {
+                                  updatedReport.pdfUrl = res.file_url;
+                                }
+                              } catch (pdfErr) {
+                                console.warn('PDF regeneration/upload failed during Agent signature:', pdfErr);
+                              }
+
+                              const { error } = await supabase
+                                .from('bookings')
+                                .update({ inspection_report: updatedReport })
+                                .eq('id', inspectionBooking.id);
+                              if (error) throw error;
+                              toast.success('Inspection report signed by Agent');
+                              inspectionBooking.inspection_report = updatedReport;
+                              setInspectionBooking({ ...inspectionBooking });
+                              queryClient.invalidateQueries({ queryKey: ['agent-bookings'] });
+                            } catch (err) {
+                              toast.error(`Sign failed: ${err.message}`);
+                            } finally {
+                              setInspectionSigning(false);
+                            }
+                          }}
+                        >
+                          Sign
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end items-center border-t pt-4">
+              <Button variant="outline" onClick={() => setInspectionBooking(null)}>Close</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -1765,145 +2018,145 @@ function AgentAppointmentsTab({ user, listings = [] }) {
 
       <div className="border rounded-2xl overflow-hidden bg-card shadow-sm">
         <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50 text-xs uppercase tracking-wider">
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Tenant</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Requested Date & Time</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {appointments.map(app => {
-              const listing = listingMap[app.listing_id];
-              const tenant = profileMap[app.renter_id];
-              const tenantName = tenant?.full_name || tenant?.email || 'Tenant';
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50 text-xs uppercase tracking-wider">
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Tenant</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Requested Date & Time</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {appointments.map(app => {
+                const listing = listingMap[app.listing_id];
+                const tenant = profileMap[app.renter_id];
+                const tenantName = tenant?.full_name || tenant?.email || 'Tenant';
 
-              return (
-                <tr key={app.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-4">
-                    <div className="font-semibold text-slate-800">
-                      {listing?.title ? (
-                        <Link to={`/listings/${app.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1">
-                          {listing.title} <ExternalLink className="w-3.5 h-3.5 opacity-60" />
-                        </Link>
+                return (
+                  <tr key={app.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-slate-800">
+                        {listing?.title ? (
+                          <Link to={`/listings/${app.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1">
+                            {listing.title} <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">Unknown Property</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="font-medium text-slate-700">{tenantName}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{tenant?.email}</div>
+                    </td>
+                    <td className="px-4 py-4 font-semibold text-slate-700">
+                      {app.appointment_date ? (
+                        format(new Date(app.appointment_date), 'MMMM d, yyyy · h:mm a')
                       ) : (
-                        <span className="text-muted-foreground">Unknown Property</span>
+                        <span className="text-amber-600 font-medium">To be scheduled</span>
                       )}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="font-medium text-slate-700">{tenantName}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{tenant?.email}</div>
-                  </td>
-                  <td className="px-4 py-4 font-semibold text-slate-700">
-                    {app.appointment_date ? (
-                      format(new Date(app.appointment_date), 'MMMM d, yyyy · h:mm a')
-                    ) : (
-                      <span className="text-amber-600 font-medium">To be scheduled</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4">
-                    {app.owner_accepted ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                        Confirmed
-                      </span>
-                    ) : app.agent_scheduled_slots?.includes('approved_by_agent') ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse">
-                        Awaiting Owner
-                      </span>
-                    ) : app.agent_scheduled_slots?.length > 0 ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
-                        Alternative Proposed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-                        Pending Approval
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-right">
-                    <div className="flex flex-col items-end gap-2">
-                      {!app.owner_accepted && suggestingId !== app.id && (!app.agent_scheduled_slots || !app.agent_scheduled_slots.includes('approved_by_agent')) && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleAccept(app.id)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs animate-transform active:scale-95"
-                          >
-                            Approve Request
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSuggestingId(app.id);
-                              setSlotsInputs(prev => ({
-                                ...prev,
-                                [app.id]: ['', '', '']
-                              }));
-                            }}
-                            className="text-xs"
-                          >
-                            Suggest Slots
-                          </Button>
-                        </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      {app.owner_accepted ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          Confirmed
+                        </span>
+                      ) : app.agent_scheduled_slots?.includes('approved_by_agent') ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse">
+                          Awaiting Owner
+                        </span>
+                      ) : app.agent_scheduled_slots?.length > 0 ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                          Alternative Proposed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                          Pending Approval
+                        </span>
                       )}
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <div className="flex flex-col items-end gap-2">
+                        {!app.owner_accepted && suggestingId !== app.id && (!app.agent_scheduled_slots || !app.agent_scheduled_slots.includes('approved_by_agent')) && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleAccept(app.id)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs animate-transform active:scale-95"
+                            >
+                              Approve Request
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSuggestingId(app.id);
+                                setSlotsInputs(prev => ({
+                                  ...prev,
+                                  [app.id]: ['', '', '']
+                                }));
+                              }}
+                              className="text-xs"
+                            >
+                              Suggest Slots
+                            </Button>
+                          </div>
+                        )}
 
-                      {suggestingId === app.id && (
-                        <div className="bg-white p-4 rounded-xl border border-slate-200 text-left space-y-3 w-80 shadow-md mt-2">
-                          <div>
-                            <span className="text-xs font-semibold text-slate-600 block mb-1">Propose Alternative Slots (Up to 3):</span>
-                            <div className="space-y-2">
-                              {[0, 1, 2].map(idx => (
-                                <input
-                                  key={idx}
-                                  type="datetime-local"
-                                  value={slotsInputs[app.id]?.[idx] || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setSlotsInputs(prev => {
-                                      const arr = [...(prev[app.id] || ['', '', ''])];
-                                      arr[idx] = val;
-                                      return { ...prev, [app.id]: arr };
-                                    });
-                                  }}
-                                  className="w-full text-xs h-9 px-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
-                                />
-                              ))}
+                        {suggestingId === app.id && (
+                          <div className="bg-white p-4 rounded-xl border border-slate-200 text-left space-y-3 w-80 shadow-md mt-2">
+                            <div>
+                              <span className="text-xs font-semibold text-slate-600 block mb-1">Propose Alternative Slots (Up to 3):</span>
+                              <div className="space-y-2">
+                                {[0, 1, 2].map(idx => (
+                                  <input
+                                    key={idx}
+                                    type="datetime-local"
+                                    value={slotsInputs[app.id]?.[idx] || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setSlotsInputs(prev => {
+                                        const arr = [...(prev[app.id] || ['', '', ''])];
+                                        arr[idx] = val;
+                                        return { ...prev, [app.id]: arr };
+                                      });
+                                    }}
+                                    className="w-full text-xs h-9 px-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setSuggestingId(null)}
+                                className="h-8 text-xs"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleSuggestSlots(app.id)}
+                                className="bg-primary text-primary-foreground font-semibold h-8 text-xs px-3"
+                              >
+                                Submit Slots
+                              </Button>
                             </div>
                           </div>
-                          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setSuggestingId(null)}
-                              className="h-8 text-xs"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleSuggestSlots(app.id)}
-                              className="bg-primary text-primary-foreground font-semibold h-8 text-xs px-3"
-                            >
-                              Submit Slots
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
-  </div>
   );
 }

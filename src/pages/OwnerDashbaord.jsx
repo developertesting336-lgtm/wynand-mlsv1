@@ -904,6 +904,17 @@ export default function OwnerDashboard() {
   const [bookingRequestsPage, setBookingRequestsPage] = useState(1);
   const [bookingRequestsPageSize, setBookingRequestsPageSize] = useState(10);
 
+  // Inspection Report states
+  const [inspectionBooking, setInspectionBooking] = useState(null);
+  const [inspectionInventory, setInspectionInventory] = useState('');
+  const [inspectionPhotos, setInspectionPhotos] = useState([]);
+  const [inspectionMeterReadings, setInspectionMeterReadings] = useState({ electricity: '', water: '', gas: '', other: '' });
+  const [inspectionKeysIssued, setInspectionKeysIssued] = useState('');
+  const [inspectionDepositRecorded, setInspectionDepositRecorded] = useState(false);
+  const [inspectionSelectedSignature, setInspectionSelectedSignature] = useState('');
+  const [inspectionSigning, setInspectionSigning] = useState(false);
+  const [inspectionUploading, setInspectionUploading] = useState(false);
+
   const [bookingsSearch, setBookingsSearch] = useState('');
   const [bookingsPage, setBookingsPage] = useState(1);
   const [bookingsPageSize, setBookingsPageSize] = useState(10);
@@ -1634,6 +1645,7 @@ export default function OwnerDashboard() {
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Lease</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Agreement</th>
+                              <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                             </tr>
                           </thead>
@@ -1643,6 +1655,13 @@ export default function OwnerDashboard() {
                               const listing = listingMap[b.listing_id] || allListingMap[b.listing_id];
                               const statusLabel = b.status === 'lease_pending' ? 'Lease Pending' : b.status === 'approved' ? 'Approved' : 'Confirmed';
                               const statusCls = b.status === 'lease_pending' ? 'bg-blue-100 text-blue-700' : b.status === 'approved' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700';
+
+                              // Check if move_in_date has arrived or is in past
+                              const moveInDateObj = new Date(b.move_in_date + 'T00:00:00');
+                              const todayDateObj = new Date();
+                              todayDateObj.setHours(0, 0, 0, 0);
+                              const isMoveInArrived = todayDateObj >= moveInDateObj;
+
                               return (
                                 <tr key={b.id} className="hover:bg-muted/30 transition-colors">
                                   <td className="px-4 py-3 font-medium">
@@ -1684,6 +1703,95 @@ export default function OwnerDashboard() {
                                       </div>
                                     ) : (
                                       <span className="text-xs text-muted-foreground italic">Pending...</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {isMoveInArrived ? (
+                                      b.inspection_report ? (
+                                        <div className="flex flex-col gap-1 items-start">
+                                          <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                                            <CheckCircle className="w-3 h-3" /> Generated
+                                          </span>
+                                          <div className="flex items-center gap-2">
+                                            {(() => {
+                                              const isSignedByAll = !!(
+                                                b.inspection_report?.ownerSignature &&
+                                                b.inspection_report?.tenantSignature &&
+                                                b.inspection_report?.agentSignature
+                                              );
+                                              return (
+                                                <Button
+                                                  size="xs"
+                                                  variant="outline"
+                                                  className={`text-[10px] h-6 px-2 rounded-lg ${isSignedByAll ? 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-400' : ''}`}
+                                                  onClick={() => {
+                                                    setInspectionBooking(b);
+                                                    setInspectionInventory(b.inspection_report?.inventory || '');
+                                                    setInspectionPhotos(b.inspection_report?.photos || []);
+                                                    setInspectionMeterReadings(b.inspection_report?.meterReadings || { electricity: '', water: '', gas: '', other: '' });
+                                                    setInspectionKeysIssued(b.inspection_report?.keysIssued || '');
+                                                    setInspectionDepositRecorded(b.inspection_report?.depositRecorded || false);
+                                                    setInspectionSelectedSignature(user?.signatures?.[0] || '');
+                                                  }}
+                                                >
+                                                  {isSignedByAll ? 'View Report' : 'View / Edit'}
+                                                </Button>
+                                              );
+                                            })()}
+                                            <Button
+                                              size="xs"
+                                              variant="ghost"
+                                              className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+                                              title="Download PDF"
+                                              onClick={async () => {
+                                                try {
+                                                  const { generateBeautifulInspectionPDF } = await import('../utils/inspectionPdfGenerator');
+                                                  await generateBeautifulInspectionPDF(
+                                                    b,
+                                                    b.inspection_report,
+                                                    listing?.title || 'Property'
+                                                  );
+                                                  toast.success('Inspection report PDF downloaded');
+                                                } catch (pdfErr) {
+                                                  toast.error('Failed to export PDF');
+                                                }
+                                              }}
+                                            >
+                                              <Download className="w-3.5 h-3.5" />
+                                            </Button>
+                                            {b.inspection_report?.pdfUrl && (
+                                              <a
+                                                href={b.inspection_report?.pdfUrl}
+                                                target="_blank"
+                                                rel="noreferrer noopener"
+                                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                                title="View Report PDF"
+                                              >
+                                                <FileText className="w-3.5 h-3.5" />
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="text-xs font-semibold py-1 px-2.5 h-auto whitespace-nowrap bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary"
+                                          onClick={() => {
+                                            setInspectionBooking(b);
+                                            setInspectionInventory('');
+                                            setInspectionPhotos([]);
+                                            setInspectionMeterReadings({ electricity: '', water: '', gas: '', other: '' });
+                                            setInspectionKeysIssued('');
+                                            setInspectionDepositRecorded(false);
+                                            setInspectionSelectedSignature(user?.signatures?.[0] || '');
+                                          }}
+                                        >
+                                          Create Report
+                                        </Button>
+                                      )
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground italic">Awaits Move-in</span>
                                     )}
                                   </td>
                                   <td className="px-4 py-3 text-right">
@@ -1989,6 +2097,402 @@ export default function OwnerDashboard() {
           </div>
         </div>
       )}
+
+      {/* Move-in Inspection Report Modal */}
+      {inspectionBooking && (() => {
+        const isSignedByAll = !!(
+          inspectionBooking.inspection_report?.ownerSignature &&
+          inspectionBooking.inspection_report?.tenantSignature &&
+          inspectionBooking.inspection_report?.agentSignature
+        );
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4 border-b pb-3">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800">Move-in Inspection Report</h2>
+                  {isSignedByAll && (
+                    <span className="text-xs text-emerald-600 font-semibold block mt-0.5">
+                      ✓ Completed & Locked (All parties have signed)
+                    </span>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Property: {listingMap[inspectionBooking.listing_id]?.title || allListingMap[inspectionBooking.listing_id]?.title || 'Property'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setInspectionBooking(null)}
+                  className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-slate-100 transition"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Generate Inventory */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 block">
+                    Generate Inventory
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Create a record of the property's furniture, appliances, fixtures, and their condition.
+                  </p>
+                  <textarea
+                    className="w-full min-h-[100px] p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/10 text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                    placeholder="e.g. Living room: 1 grey sofa (good condition), Kitchen: 1 Samsung refrigerator (new, clean), etc."
+                    value={inspectionInventory}
+                    onChange={(e) => setInspectionInventory(e.target.value)}
+                    disabled={isSignedByAll}
+                  />
+                </div>
+
+                {/* Photos */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 block">
+                    Photos
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Take and store photos of the property's condition at move-in. (Max file size: 50MB per photo)
+                  </p>
+                  <div className="flex flex-wrap gap-3 items-center">
+                    {!isSignedByAll && (
+                      <label className="flex flex-col items-center justify-center w-28 h-28 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 hover:border-primary/40 transition">
+                        <PlusCircle className="w-6 h-6 text-slate-400" />
+                        <span className="text-[10px] text-slate-500 mt-1">Upload Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (files.length === 0) return;
+                            setInspectionUploading(true);
+                            try {
+                              const newUrls = [...inspectionPhotos];
+                              for (const file of files) {
+                                if (file.size > 50 * 1024 * 1024) {
+                                  toast.error(`File ${file.name} is larger than 50MB`);
+                                  continue;
+                                }
+                                const res = await base44.integrations.Core.UploadFile({ file });
+                                if (res?.file_url) {
+                                  newUrls.push(res.file_url);
+                                }
+                              }
+                              setInspectionPhotos(newUrls);
+                              toast.success('Photos uploaded successfully');
+                            } catch (err) {
+                              console.error(err);
+                              toast.error('Failed to upload some photos');
+                            } finally {
+                              setInspectionUploading(false);
+                            }
+                          }}
+                          disabled={inspectionUploading}
+                        />
+                      </label>
+                    )}
+
+                    {inspectionPhotos.map((url, i) => (
+                      <div key={i} className="relative w-28 h-28 rounded-2xl border bg-slate-50 overflow-hidden group">
+                        <img src={url} alt="inspection preview" className="w-full h-full object-cover" />
+                        {!isSignedByAll && (
+                          <button
+                            type="button"
+                            onClick={() => setInspectionPhotos(inspectionPhotos.filter((_, idx) => idx !== i))}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition shadow-sm"
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+
+                    {inspectionUploading && (
+                      <div className="w-28 h-28 border flex items-center justify-center rounded-2xl bg-slate-50">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Meter Readings */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 block font-semibold">
+                    Meter Readings
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Record electricity, water, gas, or other utility meter readings.
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-slate-500 block mb-1">Electricity (kWh)</label>
+                      <input
+                        type="text"
+                        className="w-full p-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/10 disabled:bg-slate-50 disabled:text-slate-500"
+                        placeholder="e.g. 12450"
+                        value={inspectionMeterReadings.electricity || ''}
+                        onChange={(e) => setInspectionMeterReadings({ ...inspectionMeterReadings, electricity: e.target.value })}
+                        disabled={isSignedByAll}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 block mb-1">Water (m³)</label>
+                      <input
+                        type="text"
+                        className="w-full p-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/10 disabled:bg-slate-50 disabled:text-slate-500"
+                        placeholder="e.g. 345.2"
+                        value={inspectionMeterReadings.water || ''}
+                        onChange={(e) => setInspectionMeterReadings({ ...inspectionMeterReadings, water: e.target.value })}
+                        disabled={isSignedByAll}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 block mb-1">Gas</label>
+                      <input
+                        type="text"
+                        className="w-full p-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/10 disabled:bg-slate-50 disabled:text-slate-500"
+                        placeholder="e.g. 89%"
+                        value={inspectionMeterReadings.gas || ''}
+                        onChange={(e) => setInspectionMeterReadings({ ...inspectionMeterReadings, gas: e.target.value })}
+                        disabled={isSignedByAll}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 block mb-1">Other (e.g. Internet ONT/Serial)</label>
+                      <input
+                        type="text"
+                        className="w-full p-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/10 disabled:bg-slate-50 disabled:text-slate-500"
+                        placeholder="ONT details"
+                        value={inspectionMeterReadings.other || ''}
+                        onChange={(e) => setInspectionMeterReadings({ ...inspectionMeterReadings, other: e.target.value })}
+                        disabled={isSignedByAll}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Keys Issued */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 block">
+                    Keys Issued
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Record the keys, fobs, or access cards handed over to the tenant.
+                  </p>
+                  <input
+                    type="text"
+                    className="w-full p-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/10 disabled:bg-slate-50 disabled:text-slate-500"
+                    placeholder="e.g. 2 Front Door Keys, 1 RFID Garage Card, 1 Mailbox Key"
+                    value={inspectionKeysIssued}
+                    onChange={(e) => setInspectionKeysIssued(e.target.value)}
+                    disabled={isSignedByAll}
+                  />
+                </div>
+
+                {/* Deposit Recorded */}
+                <div className="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                  <input
+                    id="inspect-deposit-check"
+                    type="checkbox"
+                    className="w-5 h-5 rounded text-primary focus:ring-primary border-slate-200 disabled:opacity-55"
+                    checked={inspectionDepositRecorded}
+                    onChange={(e) => setInspectionDepositRecorded(e.target.checked)}
+                    disabled={isSignedByAll}
+                  />
+                  <div>
+                    <label htmlFor="inspect-deposit-check" className="text-sm font-semibold text-slate-800 block cursor-pointer select-none">
+                      Security Deposit Confirmed & Recorded
+                    </label>
+                    <span className="text-xs text-slate-500">
+                      Confirm that the security deposit has been fully received or registered.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Inspection Signed */}
+                <div className="space-y-3 border-t pt-4">
+                  <h4 className="text-sm font-semibold text-slate-800">Inspection Signatures Status</h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    {/* Owner Signature Selector */}
+                    <div className="p-3 border rounded-xl bg-slate-50/50">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-2">Owner Signature</p>
+                      {inspectionBooking.inspection_report?.ownerSignature ? (
+                        <div className="space-y-1">
+                          <img
+                            src={inspectionBooking.inspection_report.ownerSignature}
+                            alt="owner sig"
+                            className="h-12 object-contain bg-white rounded border border-slate-200 p-1"
+                          />
+                          <span className="text-[10px] text-emerald-600 font-semibold block">Signed</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <select
+                            className="w-full p-1.5 rounded border border-slate-200 text-xs bg-white focus:outline-none"
+                            value={inspectionSelectedSignature}
+                            onChange={(e) => setInspectionSelectedSignature(e.target.value)}
+                          >
+                            <option value="">Select saved signature...</option>
+                            {(user?.signatures || []).map((sig, idx) => (
+                              <option key={idx} value={sig}>Saved Signature {idx + 1}</option>
+                            ))}
+                          </select>
+                          {inspectionSelectedSignature && (
+                            <div className="border p-1 bg-white rounded flex justify-center">
+                              <img src={inspectionSelectedSignature} alt="selected signature preview" className="h-10 object-contain" />
+                            </div>
+                          )}
+                          <Button
+                            size="sm"
+                            className="w-full text-xs font-semibold py-1 px-2.5 h-auto whitespace-nowrap"
+                            disabled={!inspectionSelectedSignature || inspectionSigning}
+                            onClick={async () => {
+                              setInspectionSigning(true);
+                              try {
+                                const existingReport = inspectionBooking.inspection_report || {};
+                                const updatedReport = {
+                                  ...existingReport,
+                                  ownerSignature: inspectionSelectedSignature,
+                                  ownerSignatureDate: new Date().toISOString(),
+                                };
+                                const { error } = await supabase
+                                  .from('bookings')
+                                  .update({ inspection_report: updatedReport })
+                                  .eq('id', inspectionBooking.id);
+                                if (error) throw error;
+                                toast.success('Inspection report signed by Owner');
+                                inspectionBooking.inspection_report = updatedReport;
+                                setInspectionBooking({ ...inspectionBooking });
+                              } catch (err) {
+                                toast.error(`Sign failed: ${err.message}`);
+                              } finally {
+                                setInspectionSigning(false);
+                              }
+                            }}
+                          >
+                            Sign Now
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Tenant Signature Status */}
+                    <div className="p-3 border rounded-xl bg-slate-50/50">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-2">Tenant Signature</p>
+                      {inspectionBooking.inspection_report?.tenantSignature ? (
+                        <div className="space-y-1">
+                          <img
+                            src={inspectionBooking.inspection_report.tenantSignature}
+                            alt="tenant sig"
+                            className="h-12 object-contain bg-white rounded border border-slate-200 p-1"
+                          />
+                          <span className="text-[10px] text-emerald-600 font-semibold block">Signed</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Pending tenant signature...</span>
+                      )}
+                    </div>
+
+                    {/* Agent Signature Status */}
+                    <div className="p-3 border rounded-xl bg-slate-50/50">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-2">Agent Signature</p>
+                      {inspectionBooking.inspection_report?.agentSignature ? (
+                        <div className="space-y-1">
+                          <img
+                            src={inspectionBooking.inspection_report.agentSignature}
+                            alt="agent sig"
+                            className="h-12 object-contain bg-white rounded border border-slate-200 p-1"
+                          />
+                          <span className="text-[10px] text-emerald-600 font-semibold block">Signed</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Pending agent signature...</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end border-t pt-4 mt-6">
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setInspectionBooking(null)}>
+                    Close
+                  </Button>
+                  {!isSignedByAll && (
+                    <Button
+                      onClick={async () => {
+                        setInspectionSigning(true);
+                        // Attempt to build a beautiful local PDF blob to upload to Supabase storage to share
+                        let pdfUrl = inspectionBooking.inspection_report?.pdfUrl || null;
+                        try {
+                          const { generateBeautifulInspectionPDF } = await import('../utils/inspectionPdfGenerator');
+                          // Make PDF and obtain blob representation
+                          const existingReport = inspectionBooking.inspection_report || {};
+                          const draftReport = {
+                            ...existingReport,
+                            inventory: inspectionInventory,
+                            photos: inspectionPhotos,
+                            meterReadings: inspectionMeterReadings,
+                            keysIssued: inspectionKeysIssued,
+                            depositRecorded: inspectionDepositRecorded,
+                          };
+                          
+                          const doc = await generateBeautifulInspectionPDF(
+                            inspectionBooking,
+                            draftReport,
+                            'Property',
+                            true // Return blob instead of saving directly to download
+                          );
+                          const pdfBlob = doc.output('blob');
+                          const file = new File([pdfBlob], `inspection_report_${inspectionBooking.id}.pdf`, { type: 'application/pdf' });
+                          const res = await base44.integrations.Core.UploadFile({ file });
+                          if (res?.file_url) {
+                            pdfUrl = res.file_url;
+                          }
+                        } catch (err) {
+                          console.warn('Silent PDF upload fail, will proceed with saving data:', err);
+                        }
+
+                        try {
+                          const existingReport = inspectionBooking.inspection_report || {};
+                          const updatedReport = {
+                            ...existingReport,
+                            inventory: inspectionInventory,
+                            photos: inspectionPhotos,
+                            meterReadings: inspectionMeterReadings,
+                            keysIssued: inspectionKeysIssued,
+                            depositRecorded: inspectionDepositRecorded,
+                            pdfUrl,
+                          };
+
+                          const { error } = await supabase
+                            .from('bookings')
+                            .update({ inspection_report: updatedReport })
+                            .eq('id', inspectionBooking.id);
+                          if (error) throw error;
+                          toast.success('Inspection report saved successfully!');
+                          queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
+                          setInspectionBooking(null);
+                        } catch (err) {
+                          toast.error(`Save failed: ${err.message}`);
+                        } finally {
+                          setInspectionSigning(false);
+                        }
+                      }}
+                    >
+                      Save Report
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

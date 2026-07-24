@@ -72,6 +72,7 @@ create table public.bookings (
   lease_status text null default 'pending'::text,
   lease_pdf_url text null,
   agreement_conditions jsonb null,
+  inspection_report jsonb null,
   end_lease boolean not null default false,
   constraint bookings_pkey primary key (id),
   constraint bookings_agent_id_fkey foreign KEY (agent_id) references profiles (id),
