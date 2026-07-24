@@ -279,9 +279,9 @@ export default function Navbar() {
                       >
                         <Bell className="h-5 w-5 text-muted-foreground" />
                         {unreadCount > 0 && (
-                          <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                          <span className="absolute -top-1 -right-1 min-w-[18px] h-5 rounded-full bg-red-500 px-1.5 flex items-center justify-center text-[10px] font-semibold text-white">
+                            <span className="animate-ping absolute inset-0 rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative z-10">{unreadCount}</span>
                           </span>
                         )}
                       </Button>

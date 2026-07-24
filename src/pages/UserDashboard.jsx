@@ -22,6 +22,7 @@ import ReviewForm from '@/components/reviews/ReviewForm';
 import TenantVerification from '@/components/profile/TenantVerification';
 import StripeConnectBanner from '@/components/StripeConnectBanner';
 import SignLeaseButton from '@/components/tenant/SignLeaseButton';
+import MoveOutReportModal from '@/components/reports/MoveOutReportModal';
 import { useStripeOnboarding } from '@/hooks/useStripeOnboarding';
 import ReferralPaymentsTab from '@/components/ReferralPaymentsTab';
 import InquiryReplies from '@/components/inquiries/InquiryReplies';
@@ -208,6 +209,7 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
   const [inspectionBooking, setInspectionBooking] = useState(null);
   const [inspectionSelectedSignature, setInspectionSelectedSignature] = useState('');
   const [inspectionSigning, setInspectionSigning] = useState(false);
+  const [moveOutBooking, setMoveOutBooking] = useState(null);
 
   // States for maintenance requests modal
   const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false);
@@ -331,14 +333,26 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
         handlePayment={handlePayment}
         setSelectedBookingForMoveOut={setSelectedBookingForMoveOut}
         setModalMoveOutDate={setModalMoveOutDate}
+        setMoveOutBooking={setMoveOutBooking}
         totalPages={totalPages}
         setInspectionBooking={setInspectionBooking}
+        setInspectionSelectedSignature={setInspectionSelectedSignature}
         userProfile={userProfile}
         openMaintenanceModal={openMaintenanceModal}
         openViewMaintenanceModal={openViewMaintenanceModal}
       />
-
-      {/* Set/Change Move-out Date Modal */}
+      <MoveOutReportModal
+        booking={moveOutBooking}
+        listing={moveOutBooking ? listingMap[moveOutBooking.listing_id] : null}
+        userRole="tenant"
+        userProfile={userProfile}
+        open={!!moveOutBooking}
+        onClose={() => setMoveOutBooking(null)}
+        onSaved={(updatedReport) => {
+          if (!moveOutBooking) return;
+          setMoveOutBooking((current) => current ? { ...current, move_out_report: updatedReport } : current);
+        }}
+      />
       <Dialog open={!!selectedBookingForMoveOut} onOpenChange={(open) => !open && setSelectedBookingForMoveOut(null)}>
         <DialogContent className="sm:max-w-[420px] rounded-3xl p-6">
           <DialogHeader>
@@ -651,7 +665,7 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
   );
 }
 
-function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, totalPages, setInspectionBooking, userProfile, openMaintenanceModal, openViewMaintenanceModal }) {
+function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, setMoveOutBooking, totalPages, setInspectionBooking, setInspectionSelectedSignature, userProfile, openMaintenanceModal, openViewMaintenanceModal }) {
   const statusConfig = {
     pending: { label: 'Pending Approval', icon: Hourglass, cls: 'bg-amber-100 text-amber-700 border-amber-200' },
     lease_pending: { label: 'Sign Lease Agreement', icon: PenLine, cls: 'bg-blue-100 text-blue-700 border-blue-200 animate-pulse' },
@@ -707,6 +721,7 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Agreement</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Agent Signed</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
+                  <th className="px-4 py-3 font-semibold text-muted-foreground">Move-out Report</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Maintenance</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                 </tr>
@@ -856,7 +871,7 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                                 className="text-[10px] h-6 px-2 rounded-lg"
                                 onClick={() => {
                                   setInspectionBooking(b);
-                                  setInspectionSelectedSignature(userProfile?.signatures?.[0] || '');
+                                  setInspectionSelectedSignature?.(userProfile?.signatures?.[0] || '');
                                 }}
                               >
                                 {needsSign ? 'Sign Report' : 'View Report'}
@@ -900,6 +915,48 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
 
                       return <span className="text-xs text-muted-foreground italic">Pending Owner</span>;
                     })()}
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    {b.move_out_date ? (
+                      b.move_out_report ? (
+                        (() => {
+                          const tenantNeedsSign = !b.move_out_report?.tenantSignature;
+                          return (
+                            <div className="flex flex-col gap-2 items-start">
+                              <span className={`text-xs font-semibold ${tenantNeedsSign ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                {tenantNeedsSign ? 'Under Column to Sign' : 'Available'}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="xs"
+                                  variant="outline"
+                                  className="text-[10px] h-6 px-2 rounded-lg"
+                                  onClick={() => setMoveOutBooking(b)}
+                                >
+                                  {tenantNeedsSign ? 'Sign Report' : 'View Report'}
+                                </Button>
+                                {b.move_out_report?.pdfUrl && (
+                                  <a
+                                    href={b.move_out_report.pdfUrl}
+                                    target="_blank"
+                                    rel="noreferrer noopener"
+                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                    title="Download Move-out Report"
+                                    download={`move_out_report_${b.id}.pdf`}
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Pending</span>
+                      )
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">No move-out date</span>
+                    )}
                   </td>
                   {/* Maintenance Requests cell */}
                   <td className="px-4 py-4 align-top">

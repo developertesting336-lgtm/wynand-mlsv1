@@ -27,6 +27,7 @@ import TenantVerification from '@/components/profile/TenantVerification';
 import EditPropertyModal from '@/components/owner/EditPropertyModal';
 import LeaseDetailsForm from '@/components/owner/LeaseDetailsForm';
 import SignaturePad from '@/components/owner/SignaturePad';
+import MoveOutReportModal from '@/components/reports/MoveOutReportModal';
 
 import { format } from 'date-fns';
 import { NEIGHBORHOOD_LABELS } from '@/lib/constants';
@@ -88,6 +89,7 @@ export default function AgentDashboard() {
   const [inspectionBooking, setInspectionBooking] = useState(null);
   const [inspectionSelectedSignature, setInspectionSelectedSignature] = useState('');
   const [inspectionSigning, setInspectionSigning] = useState(false);
+  const [moveOutBooking, setMoveOutBooking] = useState(null);
 
   // Maintenance view modal state
   const [maintenanceViewBooking, setMaintenanceViewBooking] = useState(null);
@@ -696,9 +698,9 @@ export default function AgentDashboard() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold tracking-tight">My Dashboard</h1>
         <div className="flex gap-2">
-          <Link to="/agent-billing">
+          {/* <Link to="/agent-billing">
             <Button variant="outline" className="gap-2"><CreditCard className="w-4 h-4" /> Billing</Button>
-          </Link>
+          </Link> */}
           <Link to="/submit-property">
             <Button className="gap-2"><PlusCircle className="w-4 h-4" /> New Listing</Button>
           </Link>
@@ -1117,6 +1119,7 @@ export default function AgentDashboard() {
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Documents</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Agreement</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
+                              <th className="px-4 py-3 font-semibold text-muted-foreground">Move-out Report</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Maintenance</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                             </tr>
@@ -1141,11 +1144,11 @@ export default function AgentDashboard() {
                                   </td>
                                   <td className="px-4 py-3">
                                     <div className="text-sm">{owner?.full_name || 'Unknown'}</div>
-                                    <div className="text-xs text-muted-foreground">{owner?.email || ''}</div>
+                                    {/* <div className="text-xs text-muted-foreground">{owner?.email || ''}</div> */}
                                   </td>
                                   <td className="px-4 py-3">
                                     <div className="text-sm">{tenant?.full_name || 'Unknown'}</div>
-                                    <div className="text-xs text-muted-foreground">{tenant?.email || ''}</div>
+                                    {/* <div className="text-xs text-muted-foreground">{tenant?.email || ''}</div> */}
                                   </td>
                                   <td className="px-4 py-3">
                                     <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${statusCls}`}>
@@ -1246,6 +1249,41 @@ export default function AgentDashboard() {
 
                                       return <span className="text-xs text-muted-foreground italic">Pending Owner</span>;
                                     })()}
+                                  </td>
+                                  <td className="px-4 py-3 align-top">
+                                    {b.move_out_date ? (
+                                      b.move_out_report ? (
+                                        <div className="flex flex-col gap-2 items-start">
+                                          <span className="text-xs text-emerald-600 font-semibold">Report generated</span>
+                                          <div className="flex items-center gap-2">
+                                            <Button
+                                              size="xs"
+                                              variant="outline"
+                                              className="text-[10px] h-6 px-2 rounded-lg"
+                                              onClick={() => setMoveOutBooking(b)}
+                                            >
+                                              {b.move_out_report?.agentSignature ? 'View Report' : 'Sign Report'}
+                                            </Button>
+                                            {b.move_out_report?.pdfUrl && (
+                                              <a
+                                                href={b.move_out_report.pdfUrl}
+                                                target="_blank"
+                                                rel="noreferrer noopener"
+                                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                                title="Download Move-out Report"
+                                                download={`move_out_report_${b.id}.pdf`}
+                                              >
+                                                <Download className="w-3.5 h-3.5" />
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground italic">Awaiting owner</span>
+                                      )
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground italic">No move-out date</span>
+                                    )}
                                   </td>
                                   {/* Maintenance Requests */}
                                   <td className="px-4 py-4 align-top">
@@ -1938,6 +1976,20 @@ export default function AgentDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {moveOutBooking && (
+        <MoveOutReportModal
+          booking={moveOutBooking}
+          listing={listingMap[moveOutBooking.listing_id]}
+          userRole="agent"
+          userProfile={user}
+          open={!!moveOutBooking}
+          onClose={() => setMoveOutBooking(null)}
+          onSaved={(updatedReport) => {
+            setMoveOutBooking((prev) => prev ? { ...prev, move_out_report: updatedReport } : prev);
+          }}
+        />
       )}
     </div>
   );

@@ -107,6 +107,7 @@ export default function LeaseDetailsForm({
   const parsedAddress = getParsedAddressInfo();
 
   const [formData, setFormData] = useState(buildInitialFormData());
+  const [uploadingOwnerDocs, setUploadingOwnerDocs] = useState(false);
 
   useEffect(() => {
     setFormData(buildInitialFormData());
@@ -129,6 +130,7 @@ export default function LeaseDetailsForm({
       return;
     }
 
+    setUploadingOwnerDocs(true);
     try {
       const uploadedUrls = [];
       for (const file of files) {
@@ -147,6 +149,8 @@ export default function LeaseDetailsForm({
     } catch (err) {
       console.error('Failed to upload owner documents:', err);
       toast.error('Failed to upload documents. Please try again.');
+    } finally {
+      setUploadingOwnerDocs(false);
     }
   };
 
@@ -435,7 +439,7 @@ export default function LeaseDetailsForm({
                 </span>
               </div>
 
-              <label htmlFor="ownerDocs" className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-4 cursor-pointer hover:border-primary transition-colors">
+              <label htmlFor="ownerDocs" className={`flex items-center justify-between gap-3 rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-4 cursor-pointer hover:border-primary transition-colors ${uploadingOwnerDocs ? 'opacity-80 pointer-events-none' : ''}`}>
                 <div className="flex items-center gap-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <FileText className="w-5 h-5" />
@@ -445,7 +449,9 @@ export default function LeaseDetailsForm({
                     <p className="text-xs text-muted-foreground">Drag files here or click to choose PDFs and images.</p>
                   </div>
                 </div>
-                <span className="rounded-full bg-primary text-white px-4 py-2 text-sm font-medium">Choose Files</span>
+                <span className="rounded-full bg-primary text-white px-4 py-2 text-sm font-medium">
+                  {uploadingOwnerDocs ? 'Uploading…' : 'Choose Files'}
+                </span>
               </label>
               <input
                 id="ownerDocs"
@@ -453,6 +459,7 @@ export default function LeaseDetailsForm({
                 multiple
                 accept="application/pdf,image/*"
                 onChange={handleDocumentUpload}
+                disabled={uploadingOwnerDocs}
                 className="sr-only"
               />
 

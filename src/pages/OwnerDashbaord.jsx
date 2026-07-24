@@ -29,6 +29,7 @@ import InquiryKanban from '@/components/inquiries/InquiryKanban';
 import PaidBookingChat from '@/components/chat/PaidBookingChat';
 import LeaseDetailsForm from '@/components/owner/LeaseDetailsForm';
 import SignaturePad from '@/components/owner/SignaturePad';
+import MoveOutReportModal from '@/components/reports/MoveOutReportModal';
 
 const LISTING_STATUS = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -914,6 +915,7 @@ export default function OwnerDashboard() {
   const [inspectionSelectedSignature, setInspectionSelectedSignature] = useState('');
   const [inspectionSigning, setInspectionSigning] = useState(false);
   const [inspectionUploading, setInspectionUploading] = useState(false);
+  const [moveOutBooking, setMoveOutBooking] = useState(null);
 
   // Maintenance view modal state
   const [maintenanceViewBooking, setMaintenanceViewBooking] = useState(null);
@@ -1649,6 +1651,7 @@ export default function OwnerDashboard() {
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Agreement</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
+                              <th className="px-4 py-3 font-semibold text-muted-foreground">Move-out Report</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground">Maintenance</th>
                               <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                             </tr>
@@ -1727,7 +1730,7 @@ export default function OwnerDashboard() {
                                                 <Button
                                                   size="xs"
                                                   variant="outline"
-                                                  className={`text-[10px] h-6 px-2 rounded-lg ${isSignedByAll ? 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-400' : ''}`}
+                                                  className={`text-[10px] h-6 px-2 rounded-lg`}
                                                   onClick={() => {
                                                     setInspectionBooking(b);
                                                     setInspectionInventory(b.inspection_report?.inventory || '');
@@ -1796,6 +1799,58 @@ export default function OwnerDashboard() {
                                       )
                                     ) : (
                                       <span className="text-xs text-muted-foreground italic">Awaits Move-in</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {b.move_out_date ? (
+                                      b.move_out_report ? (
+                                        <div className="flex flex-col gap-2 items-start">
+                                          <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                                            <CheckCircle className="w-3 h-3" /> Available
+                                          </span>
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            {(() => {
+                                              const isSignedByAll = !!(
+                                                b.move_out_report?.ownerSignature &&
+                                                b.move_out_report?.tenantSignature &&
+                                                b.move_out_report?.agentSignature
+                                              );
+                                              return (
+                                                <Button
+                                                  size="xs"
+                                                  variant="outline"
+                                                  className="text-[10px] h-6 px-2 rounded-lg"
+                                                  onClick={() => setMoveOutBooking(b)}
+                                                >
+                                                  {isSignedByAll ? 'View Report' : 'View / Edit'}
+                                                </Button>
+                                              );
+                                            })()}
+                                            {b.move_out_report?.pdfUrl && (
+                                              <a
+                                                href={b.move_out_report.pdfUrl}
+                                                download={`move_out_report_${b.id}.pdf`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                                              >
+                                                <Download className="w-3.5 h-3.5" />
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <Button
+                                          size="xs"
+                                          variant="outline"
+                                          className="text-[10px] h-6 px-2 rounded-lg"
+                                          onClick={() => setMoveOutBooking(b)}
+                                        >
+                                          Create Report
+                                        </Button>
+                                      )
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground italic">No move-out date</span>
                                     )}
                                   </td>
                                   {/* Maintenance Requests */}
@@ -2523,6 +2578,19 @@ export default function OwnerDashboard() {
         <OwnerMaintenanceModal
           booking={maintenanceViewBooking}
           onClose={() => setMaintenanceViewBooking(null)}
+        />
+      )}
+      {moveOutBooking && (
+        <MoveOutReportModal
+          booking={moveOutBooking}
+          listing={listingMap[moveOutBooking.listing_id] || allListingMap[moveOutBooking.listing_id]}
+          userRole="owner"
+          userProfile={user}
+          open={!!moveOutBooking}
+          onClose={() => setMoveOutBooking(null)}
+          onSaved={(updatedReport) => {
+            setMoveOutBooking((prev) => prev ? { ...prev, move_out_report: updatedReport } : prev);
+          }}
         />
       )}
     </div>
