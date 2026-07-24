@@ -1190,11 +1190,11 @@ export default function OwnerDashboard() {
         <StatCard icon={Calendar} label="Pending Requests" value={pendingCount} color="bg-amber-100 text-amber-600" />
       </div>
 
-      <Tabs value={activeTab} onValueChange={(val) => {
+      <Tabs className="text-sm" value={activeTab} onValueChange={(val) => {
         setActiveTab(val);
         localStorage.setItem('owner_dashboard_active_tab', val);
       }}>
-        <TabsList className="mb-6 flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl">
+        <TabsList className="mb-6 flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl text-sm">
           <TabsTrigger value="properties" className="gap-1.5">
             <Home className="w-4 h-4" /> Properties ({myListings.length})
           </TabsTrigger>
@@ -1331,7 +1331,7 @@ export default function OwnerDashboard() {
           ) : (
             <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <Tabs value={bookingTab} onValueChange={(value) => setBookingTab(value)} className="space-y-4">
-                <TabsList className="flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl">
+                <TabsList className="flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl text-sm">
                   <TabsTrigger value="requests" className="gap-1.5">
                     <Hourglass className="w-4 h-4" /> Booking Requests
                     <span className="ml-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
@@ -1808,7 +1808,7 @@ export default function OwnerDashboard() {
                                           <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
                                             <CheckCircle className="w-3 h-3" /> Available
                                           </span>
-                                          <div className="flex flex-wrap items-center gap-2">
+                                          <div className="flex flex-nowrap items-center gap-2">
                                             {(() => {
                                               const isSignedByAll = !!(
                                                 b.move_out_report?.ownerSignature &&
@@ -1832,7 +1832,7 @@ export default function OwnerDashboard() {
                                                 download={`move_out_report_${b.id}.pdf`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                                                className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline whitespace-nowrap"
                                               >
                                                 <Download className="w-3.5 h-3.5" />
                                               </a>

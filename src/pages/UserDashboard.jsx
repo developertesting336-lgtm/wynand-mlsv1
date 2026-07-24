@@ -1864,11 +1864,11 @@ export default function UserDashboard() {
     
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(val) => {
+      <Tabs className="text-sm" value={activeTab} onValueChange={(val) => {
         setActiveTab(val);
         localStorage.setItem('tenant_dashboard_active_tab', val);
       }}>
-        <TabsList className="mb-8 flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl">
+        <TabsList className="mb-8 flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl text-sm">
           <TabsTrigger value="favorites" className="gap-1.5">
             <Heart className="w-4 h-4" /> Favorites
             {savedListings.length > 0 && (

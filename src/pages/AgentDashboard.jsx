@@ -725,7 +725,7 @@ export default function AgentDashboard() {
         ))}
       </div>
 
-      <Tabs value={activeTab} onValueChange={(val) => {
+      <Tabs className="text-sm" value={activeTab} onValueChange={(val) => {
         setActiveTab(val);
         localStorage.setItem('agent_dashboard_active_tab', val);
       }}>
@@ -864,7 +864,7 @@ export default function AgentDashboard() {
           )}
 
           <Tabs value={inquiryTab} onValueChange={setInquiryTab}>
-            <TabsList className="mb-4">
+            <TabsList className="mb-4 text-sm">
               <TabsTrigger value="all" className="gap-1.5">
                 All Inquiries ({myInquiries.length})
               </TabsTrigger>
@@ -924,7 +924,7 @@ export default function AgentDashboard() {
           ) : (
             <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <Tabs value={bookingTab} onValueChange={(value) => setBookingTab(value)} className="space-y-4">
-                <TabsList className="flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl">
+                <TabsList className="flex w-full md:w-auto overflow-x-auto whitespace-nowrap justify-start h-auto p-1 bg-muted rounded-xl text-sm">
                   <TabsTrigger value="requests" className="gap-1.5">
                     <Hourglass className="w-4 h-4" /> Booking Requests
                     <span className="ml-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
