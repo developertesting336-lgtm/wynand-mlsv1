@@ -2481,6 +2481,23 @@ export default function OwnerDashboard() {
                             .update({ inspection_report: updatedReport })
                             .eq('id', inspectionBooking.id);
                           if (error) throw error;
+
+                          const propertyTitle = allListingMap?.[inspectionBooking.listing_id]?.title || inspectionBooking.listing_title || 'your property';
+                          const notificationTargets = [inspectionBooking.renter_id, inspectionBooking.agent_id].filter(Boolean);
+
+                          await Promise.allSettled(
+                            notificationTargets.map(async (targetUserId) => {
+                              const url = targetUserId === inspectionBooking.renter_id ? '/user-dashboard' : '/agent-dashboard';
+                              await sendPushNotification(
+                                targetUserId,
+                                'Inspection report ready to sign',
+                                `${propertyTitle} inspection report has been generated. Please sign it.`,
+                                url,
+                                'inspection_report'
+                              );
+                            })
+                          );
+
                           toast.success('Inspection report saved successfully!');
                           queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
                           setInspectionBooking(null);

@@ -29,6 +29,7 @@ import InquiryKanban from '@/components/inquiries/InquiryKanban';
 import PaidBookingChat from '@/components/chat/PaidBookingChat';
 import { toast } from 'sonner';
 import { NEIGHBORHOOD_LABELS } from '@/lib/constants';
+import { sendPushNotification } from '@/utils/pushNotification';
 
 function useDebouncedValue(value, delay = 500) {
   const [debounced, setDebounced] = useState(value);
@@ -61,7 +62,7 @@ function StatCard({ icon: Icon, label, value, color }) {
 // ── Inquiry row removed: InquiryKanban now handles chat layout ────────────────
 
 // ── Reusable Maintenance View Panel (used in all dashboards) ─────────────────
-function MaintenanceViewPanel({ booking, onClose, isTenant = false }) {
+function MaintenanceViewPanel({ booking, onClose, isTenant = false, tenantName = 'Tenant', listingTitle = 'your property' }) {
   const [mrSearch, setMrSearch] = useState('');
   const [mrPage, setMrPage] = useState(1);
   const mrPageSize = 5;
@@ -86,6 +87,17 @@ function MaintenanceViewPanel({ booking, onClose, isTenant = false }) {
       const updated = [...existing, { subject: subject.trim(), details: details.trim(), created_at: new Date().toISOString() }];
       const { error } = await supabase.from('bookings').update({ maintenance_requests: updated }).eq('id', booking.id);
       if (error) throw error;
+
+      if (booking.owner_id) {
+        await sendPushNotification(
+          booking.owner_id,
+          'New maintenance request',
+          `${tenantName} has submitted a maintenance request for ${listingTitle}.`,
+          '/owner-dashboard',
+          'maintenance'
+        );
+      }
+
       booking.maintenance_requests = updated;
       toast.success('Maintenance request submitted!');
       setSubject('');
@@ -585,6 +597,18 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
                       .update({ maintenance_requests: updated })
                       .eq('id', selectedBookingForMaintenance.id);
                     if (error) throw error;
+
+                    if (selectedBookingForMaintenance.owner_id) {
+                      const propertyTitle = listingMap[selectedBookingForMaintenance.listing_id]?.title || selectedBookingForMaintenance.listing_title || 'your property';
+                      await sendPushNotification(
+                        selectedBookingForMaintenance.owner_id,
+                        'New maintenance request',
+                        `${userProfile?.full_name || 'Tenant'} has submitted a maintenance request for ${propertyTitle}.`,
+                        '/owner-dashboard',
+                        'maintenance'
+                      );
+                    }
+
                     toast.success('Maintenance request submitted!');
                     setMaintenanceModalOpen(false);
                   } catch (err) {
@@ -617,6 +641,8 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
               booking={viewMaintenanceBooking}
               onClose={() => setViewMaintenanceModalOpen(false)}
               isTenant={true}
+              tenantName={userProfile?.full_name || 'Tenant'}
+              listingTitle={listingMap[viewMaintenanceBooking.listing_id]?.title || viewMaintenanceBooking.listing_title || 'your property'}
             />
           </DialogContent>
         </Dialog>
