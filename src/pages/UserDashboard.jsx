@@ -77,6 +77,14 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
   const [inspectionSelectedSignature, setInspectionSelectedSignature] = useState('');
   const [inspectionSigning, setInspectionSigning] = useState(false);
 
+  // Pre-select first saved signature when opening the inspection modal
+  useEffect(() => {
+    if (inspectionBooking && userProfile?.signatures?.length) {
+      // If no signature selected yet, default to the first saved signature
+      setInspectionSelectedSignature(prev => prev || userProfile.signatures[0]);
+    }
+  }, [inspectionBooking, userProfile?.signatures]);
+
   const filteredBookings = bookings.filter(b => {
     const query = debouncedSearch.trim().toLowerCase();
     if (!query) return true;
@@ -446,6 +454,7 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Agreement</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Agent Signed</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Maintenance</th>
                   <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Action</th>
                 </tr>
               </thead>
