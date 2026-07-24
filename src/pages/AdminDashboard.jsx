@@ -9,13 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Home, Users, ShieldCheck, CheckCircle,
-  XCircle, Eye, Clock, Trash2, Star, FileText, CreditCard, Calendar, Search,
+  Home, Users, ShieldCheck, Eye, Star, FileText, CreditCard, Calendar, Search,
   ExternalLink, MapPin, BarChart3, Building2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { NEIGHBORHOOD_LABELS } from '@/lib/constants';
+import { AdminMaintenanceModal } from '@/pages/AdminDashboardModalHelper';
 import { toast } from 'sonner';
 
 function useDebouncedValue(value, delay = 500) {
@@ -307,6 +306,7 @@ export default function AdminDashboard() {
   const [usersSearch, setUsersSearch] = useState('');
   const [propertiesSearch, setPropertiesSearch] = useState('');
   const [bookingsSearch, setBookingsSearch] = useState('');
+  const [maintenanceViewBooking, setMaintenanceViewBooking] = useState(null);
   const [paymentsSearch, setPaymentsSearch] = useState('');
   const [auditLogsSearch, setAuditLogsSearch] = useState('');
   const [auditLogsPage, setAuditLogsPage] = useState(1);
@@ -580,6 +580,9 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Status</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Agreement</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Maintenance</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Move-out Report</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -587,6 +590,7 @@ export default function AdminDashboard() {
                     const owner = profileMap[booking.owner_id];
                     const tenant = profileMap[booking.renter_id];
                     const listing = listingMap[booking.listing_id];
+                    const maintenanceCount = (booking.maintenance_requests || []).length;
                     return (
                       <tr key={booking.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3 font-medium">{listing?.title || booking.listing_id?.slice(0, 8) || 'Unknown'}</td>
@@ -616,6 +620,38 @@ export default function AdminDashboard() {
                             </a>
                           ) : (
                             <span className="text-xs text-muted-foreground italic">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {booking.inspection_report?.pdfUrl ? (
+                            <a href={booking.inspection_report.pdfUrl} target="_blank" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                              <FileText className="w-3 h-3" /> View
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Pending</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {maintenanceCount > 0 ? (
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              className="text-xs whitespace-nowrap px-3 py-2"
+                              onClick={() => setMaintenanceViewBooking(booking)}
+                            >
+                              View ({maintenanceCount})
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">None</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {booking.move_out_report?.pdfUrl ? (
+                            <a href={booking.move_out_report.pdfUrl} target="_blank" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                              <FileText className="w-3 h-3" /> View
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">N/A</span>
                           )}
                         </td>
                       </tr>
@@ -1483,6 +1519,9 @@ export default function AdminDashboard() {
           )}
         </TabsContent>
       </Tabs>
+      {maintenanceViewBooking && (
+        <AdminMaintenanceModal booking={maintenanceViewBooking} onClose={() => setMaintenanceViewBooking(null)} />
+      )}
     </div>
   );
 }
