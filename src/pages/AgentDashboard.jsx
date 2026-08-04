@@ -696,7 +696,11 @@ export default function AgentDashboard() {
       />
 
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">My Dashboard</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Agent Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-0.5 font-medium">{user?.full_name}{user?.full_name && user?.email ? ` (${user.email})` : user?.email}</p>
+          <p className="text-xs text-primary font-medium mt-1">( Agents will pay 10% fees on their commission + 16% IVA on that fees to Pvverified )</p>
+        </div>
         <div className="flex gap-2">
           {/* <Link to="/agent-billing">
             <Button variant="outline" className="gap-2"><CreditCard className="w-4 h-4" /> Billing</Button>
@@ -816,13 +820,7 @@ export default function AgentDashboard() {
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                {!listing.is_featured && (
-                                  <Link to="/agent-billing">
-                                    <Button size="sm" variant="outline" className="gap-1">
-                                      <Star className="w-3 h-3" /> Boost
-                                    </Button>
-                                  </Link>
-                                )}
+
                                 {canEditListing(listing) && (
                                   <Button size="sm" variant="outline" onClick={() => openEditModal(listing)} className="gap-1">
                                     <Pencil className="w-3.5 h-3.5" /> Edit

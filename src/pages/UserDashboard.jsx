@@ -1846,10 +1846,8 @@ export default function UserDashboard() {
             <User className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold leading-tight">
-              Welcome back{user.full_name ? `, ${user.full_name.split(' ')[0]}` : ''}
-            </h1>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
+            <h1 className="text-2xl font-bold leading-tight">Renter Dashboard</h1>
+            <p className="text-sm text-muted-foreground font-medium">{user.full_name}{user.full_name && user.email ? ` (${user.email})` : user.email}</p>
           </div>
         </div>
       </div>

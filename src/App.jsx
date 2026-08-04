@@ -60,9 +60,9 @@ const AuthenticatedApp = () => {
           </RoleBasedRoute>
         } />
 
-        {/* Owner + Agent routes */}
+        {/* Owner-only routes */}
         <Route path="/owner-dashboard" element={
-          <RoleBasedRoute allowedRoles={['owner', 'agent']}>
+          <RoleBasedRoute allowedRoles={['owner']}>
             <OwnerDashboard />
           </RoleBasedRoute>
         } />

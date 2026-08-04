@@ -78,7 +78,7 @@ export default function Refer() {
 </table>
 <p>Please review in the Admin Dashboard.</p>
       `.trim(),
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Confirm to referrer
     base44.integrations.Core.SendEmail({
@@ -91,7 +91,7 @@ export default function Refer() {
             <p>If the transaction closes successfully, you'll earn a <strong>15% referral fee</strong> on the commission.</p>
 <p style="color:#888;font-size:12px;margin-top:24px">PV Verified Rentals · Puerto Vallarta</p>
       `.trim(),
-    }).catch(() => {});
+    }).catch(() => { });
 
     setSubmitted(true);
     setLoading(false);
@@ -125,12 +125,17 @@ export default function Refer() {
       <div className="bg-gradient-to-br from-primary/10 via-accent/5 to-background border-b">
         <div className="max-w-4xl mx-auto px-4 py-14 text-center">
           <Badge className="mb-4 bg-primary/10 text-primary border-0 text-sm px-4 py-1">Referral Program</Badge>
-      <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-        Earn a <span className="text-primary">15% Referral Fee</span>
-      </h1>
-      <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-        Know someone buying or selling property in Puerto Vallarta? Refer them to us and earn 15% of our commission when the deal closes — open to agents and the public alike.
-      </p>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+            Earn a <span className="text-primary">15% Referral Fee</span>
+          </h1>
+          {currentUser?.role === 'agent' && (
+            <p className="text-sm font-semibold text-primary mb-4">
+              Agents will pay 10% fees on their commission + 16% IVA on that fees to Pvverified
+            </p>
+          )}
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+            Know someone buying or selling property in Puerto Vallarta? Refer them to us and earn 15% of our commission when the deal closes — open to agents and the public alike.
+          </p>
         </div>
       </div>
 
@@ -155,7 +160,7 @@ export default function Refer() {
         </div>
 
         {/* Example earnings */}
-        <Card className="mb-10 border-primary/20 bg-primary/5">
+        {/* <Card className="mb-10 border-primary/20 bg-primary/5">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp className="w-5 h-5 text-primary" />
@@ -177,7 +182,7 @@ export default function Refer() {
             </div>
             <p className="text-xs text-muted-foreground mt-3">* Based on a 6% sales commission. Actual amounts may vary.</p>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Form */}
         <Card>
@@ -216,11 +221,10 @@ export default function Refer() {
                       key={t}
                       type="button"
                       onClick={() => set('referral_type', t)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                        form.referral_type === t
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background border-input hover:bg-muted'
-                      }`}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${form.referral_type === t
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background border-input hover:bg-muted'
+                        }`}
                     >
                       {t === 'buyer' ? '🏠 Buyer' : '💰 Seller'}
                     </button>
@@ -263,9 +267,9 @@ export default function Refer() {
                 <Button type="submit" disabled={loading} className="w-full h-12 text-base">
                   {loading ? 'Submitting...' : 'Submit Referral & Earn 15%'}
                 </Button>
-                <p className="text-xs text-muted-foreground text-center mt-3">
+                {/* <p className="text-xs text-muted-foreground text-center mt-3">
                   By submitting you agree to our referral terms. Commission is paid within 30 days of deal closing.
-                </p>
+                </p> */}
               </div>
             </form>
           </CardContent>

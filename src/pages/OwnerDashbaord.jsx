@@ -1168,7 +1168,7 @@ export default function OwnerDashboard() {
       <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Owner Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Manage your properties and booking requests</p>
+          <p className="text-muted-foreground text-sm mt-0.5 font-medium">{user?.full_name}{user?.full_name && user?.email ? ` (${user.email})` : user?.email}</p>
         </div>
         <Link to="/submit-property">
           <Button className="gap-2"><PlusCircle className="w-4 h-4" /> Add Property</Button>
