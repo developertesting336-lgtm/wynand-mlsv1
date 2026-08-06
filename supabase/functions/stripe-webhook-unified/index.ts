@@ -379,12 +379,12 @@ serve(async (req: any) => {
                 .select('id', { count: 'exact', head: true })
                 .eq('booking_id', bookingId)
                 .eq('payment_type', 'monthly_rent');
-              
+
               const isBookingPayment = metadata.paymentType === 'booking';
               const monthsToAdd = (countError || existingCount === null) ? 0 : existingCount;
-              
+
               const moveIn = new Date(moveInDate);
-              
+
               // If it's the very first booking payment, we charge deposit + 2 months rent (first + last month rent).
               // So the coverage is startDate (moveInDate) to endDate (moveInDate + 2 months).
               // For subsequent monthly rent payments (monthsToAdd > 0), the offset starts from (monthsToAdd + 1)
@@ -401,10 +401,10 @@ serve(async (req: any) => {
                 targetMonthStart = moveIn.getUTCMonth();
                 targetMonthEnd = moveIn.getUTCMonth() + initialRentCoverageMonths;
               } else {
-                targetMonthStart = moveIn.getUTCMonth() + monthsToAdd - 1 + initialRentCoverageMonths;
-                targetMonthEnd = moveIn.getUTCMonth() + monthsToAdd + initialRentCoverageMonths;
+                targetMonthStart = moveIn.getUTCMonth() + monthsToAdd + initialRentCoverageMonths;
+                targetMonthEnd = moveIn.getUTCMonth() + monthsToAdd + initialRentCoverageMonths + 1;
               }
-              
+
               const startDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthStart, moveIn.getUTCDate()));
               const endDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthEnd, moveIn.getUTCDate()));
 
@@ -416,7 +416,7 @@ serve(async (req: any) => {
               const startDay = startDate.getUTCDate();
               const startMonthName = monthNames[startDate.getUTCMonth()];
               const startYear = startDate.getUTCFullYear();
-              
+
               const endDay = endDate.getUTCDate();
               const endMonthName = monthNames[endDate.getUTCMonth()];
               const endYear = endDate.getUTCFullYear();
@@ -460,10 +460,10 @@ serve(async (req: any) => {
                   try {
                     const isMonthlyRent = (metadata?.paymentType === 'monthly_rent');
                     const pushTitle = isMonthlyRent ? 'Rent Payment Received' : 'Booking Deposit Paid';
-                    const pushBody = isMonthlyRent 
+                    const pushBody = isMonthlyRent
                       ? `Monthly rent of ${currency.toUpperCase()} $${(amountCents / 100).toFixed(2)} has been paid by the tenant.`
                       : `Booking deposit of ${currency.toUpperCase()} $${(amountCents / 100).toFixed(2)} has been paid.`;
-                    
+
                     const pushResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push`, {
                       method: 'POST',
                       headers: {
