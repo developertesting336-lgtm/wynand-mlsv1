@@ -835,14 +835,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8 relative">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 right-4 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            aria-label="Close modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
           {/* Header */}
           <div className="flex flex-col items-center mb-6 text-center">
             <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center mb-3">

@@ -82,6 +82,24 @@ export async function checkPushSubscription(userId) {
     return 'unsupported';
   }
 
+  // If userId is provided, check database first to prevent redundant prompt popups.
+  // If the user already has a registered fcm/web-push subscription token in the DB, consider them subscribed.
+  if (userId) {
+    try {
+      const { data, error } = await supabase
+        .from('user_push_subscriptions')
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      if (data && !error) {
+        return 'subscribed';
+      }
+    } catch (err) {
+      console.warn('Error querying DB push subscription:', err);
+    }
+  }
+
   // 1. If browser permission is default (never asked / reset), user is unsubscribed on this browser
   if (Notification.permission === 'default') {
     return 'unsubscribed';

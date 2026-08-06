@@ -1738,7 +1738,28 @@ export default function UserDashboard() {
   const { onboardingLoading, handleStripeOnboard } = useStripeOnboarding(user);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {}).finally(() => setAuthLoading(false));
+    base44.auth.me().then(async (u) => {
+      setUser(u);
+      setAuthLoading(false);
+      
+      if (u && (u.role === 'renter' || u.role === 'tenant')) {
+        // Fetch verification state to check if they completed uploads
+        const { data } = await supabase
+          .from('verifications')
+          .select('profile_photo, identity_documents, id_document_url')
+          .eq('user_id', u.id)
+          .maybeSingle();
+
+        const hasPhoto = data?.profile_photo || u.photo_url;
+        const hasId = data?.identity_documents?.length > 0 || data?.id_document_url || u.id_document_url;
+
+        if (!hasPhoto || !hasId) {
+          setActiveTab('verification');
+        }
+      }
+    }).catch(() => {
+      setAuthLoading(false);
+    });
 
     // Handle payment success/cancel redirects
     const params = new URLSearchParams(window.location.search);
@@ -1790,6 +1811,54 @@ export default function UserDashboard() {
     queryFn: () => base44.entities.Payment.filter({ payer_id: user.id }, '-created_date', 100),
     enabled: !!user?.id,
   });
+
+  const { data: myAppointments = [] } = useQuery({
+    queryKey: ['dashboard-appointments', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('renter_id', user.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: myReferrals = [] } = useQuery({
+    queryKey: ['referral-payments-count', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('referral_payments')
+        .select('id')
+        .eq('referrer_id', user.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch reviews to calculate reviewable listings count
+  const { data: allBookingsForReviews = [] } = useQuery({
+    queryKey: ['user-bookings-reviews-count', user?.id],
+    queryFn: () => base44.entities.Booking.filter({ renter_id: user.id }, '-created_date', 100),
+    enabled: !!user?.id,
+  });
+  const { data: existingReviews = [] } = useQuery({
+    queryKey: ['all-reviews-count', user?.id],
+    queryFn: () => base44.entities.PropertyReview.filter({ reviewer_id: user.id }, '-created_date', 100),
+    enabled: !!user?.id,
+  });
+  const approvedBookingsForReviews = allBookingsForReviews.filter(b =>
+    b.status === 'approved' ||
+    b.status === 'confirmed' ||
+    b.status === 'resolved' ||
+    b.status === 'ended' ||
+    b.end_lease === true
+  );
+  const reviewableListingIds = [...new Set(approvedBookingsForReviews.map(b => b.listing_id))];
+  const reviewedListingIds = new Set(existingReviews.map(r => r.listing_id));
+  const pendingReviewsCount = reviewableListingIds.filter(id => !reviewedListingIds.has(id)).length;
 
   const savedListings = allListings.filter(l => favoriteIds.has(l.id));
   const debouncedFavoritesSearch = useDebouncedValue(favoritesSearch, 500);
@@ -1885,9 +1954,19 @@ export default function UserDashboard() {
           </TabsTrigger>
           <TabsTrigger value="bookings" className="gap-1.5">
             <Calendar className="w-4 h-4" /> Bookings
+            {myBookings.length > 0 && (
+              <span className="ml-1 bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {myBookings.length}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="appointments" className="gap-1.5">
             <Calendar className="w-4 h-4" /> Appointments
+            {myAppointments.length > 0 && (
+              <span className="ml-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {myAppointments.length}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="chat" className="gap-1.5">
             <MessageSquare className="w-4 h-4" /> Chat
@@ -1905,9 +1984,19 @@ export default function UserDashboard() {
           </TabsTrigger>
           <TabsTrigger value="reviews" className="gap-1.5">
             <Star className="w-4 h-4" /> Reviews
+            {pendingReviewsCount > 0 && (
+              <span className="ml-1 bg-yellow-500 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {pendingReviewsCount}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="referral-payments" className="gap-1.5">
             <CreditCard className="w-4 h-4" /> Referral Earnings
+            {myReferrals.length > 0 && (
+              <span className="ml-1 bg-indigo-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {myReferrals.length}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="verification" className="gap-1.5">
             <ShieldCheck className="w-4 h-4" /> Verification

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Home, Users, ShieldCheck, Eye, Star, FileText, CreditCard, Calendar, Search,
-  ExternalLink, MapPin, BarChart3, Building2
+  ExternalLink, MapPin, BarChart3, Building2, Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -1135,19 +1135,28 @@ export default function AdminDashboard() {
               <p className="text-xs text-muted-foreground mt-2">{confirmAction?.listing?.address || confirmAction?.listing?.neighborhood}</p>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
-              <Button onClick={async () => {
-                if (!confirmAction) return;
+              <Button variant="outline" disabled={confirmAction?.loading} onClick={() => setConfirmAction(null)}>Cancel</Button>
+              <Button disabled={confirmAction?.loading} onClick={async () => {
+                if (!confirmAction || confirmAction.loading) return;
                 const { listing, action } = confirmAction;
+                setConfirmAction(prev => ({ ...prev, loading: true }));
                 try {
                   const status = action === 'approve' ? 'approved' : 'rejected';
                   await updateListing.mutateAsync({ id: listing.id, data: { status } });
-                } catch (err) {
-                  // mutation handles toasts
-                } finally {
                   setConfirmAction(null);
+                } catch (err) {
+                  setConfirmAction(prev => ({ ...prev, loading: false }));
                 }
-              }}>{confirmAction?.action === 'approve' ? 'Confirm Approve' : 'Confirm Disapprove'}</Button>
+              }}>
+                {confirmAction?.loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                    Updating...
+                  </>
+                ) : (
+                  confirmAction?.action === 'approve' ? 'Confirm Approve' : 'Confirm Disapprove'
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1165,18 +1174,27 @@ export default function AdminDashboard() {
               <p className="text-xs text-muted-foreground mt-2">{confirmUserAction?.user?.email}</p>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setConfirmUserAction(null)}>Cancel</Button>
-              <Button onClick={async () => {
-                if (!confirmUserAction) return;
+              <Button variant="outline" disabled={confirmUserAction?.loading} onClick={() => setConfirmUserAction(null)}>Cancel</Button>
+              <Button disabled={confirmUserAction?.loading} onClick={async () => {
+                if (!confirmUserAction || confirmUserAction.loading) return;
                 const { user, verified } = confirmUserAction;
+                setConfirmUserAction(prev => ({ ...prev, loading: true }));
                 try {
                   await updateUserVerification.mutateAsync({ id: user.id, verified });
-                } catch (err) {
-                  // mutation handles toasts
-                } finally {
                   setConfirmUserAction(null);
+                } catch (err) {
+                  setConfirmUserAction(prev => ({ ...prev, loading: false }));
                 }
-              }}>{confirmUserAction?.verified ? 'Confirm Verify' : 'Confirm Unverify'}</Button>
+              }}>
+                {confirmUserAction?.loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                    Updating...
+                  </>
+                ) : (
+                  confirmUserAction?.verified ? 'Confirm Verify' : 'Confirm Unverify'
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

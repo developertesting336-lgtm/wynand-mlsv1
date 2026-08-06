@@ -993,6 +993,13 @@ export default function OwnerDashboard() {
     mutationFn: async ({ bookingId, agreementConditions }) => {
       setUpdatingState({ id: bookingId, action: 'approve' });
       await saveAgreementConditions.mutateAsync({ bookingId, conditions: agreementConditions });
+      
+      const { data: bookingData } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .single();
+
       const { error } = await supabase
         .from('bookings')
         .update({ status: 'lease_pending', lease_status: 'pending_renter', updated_date: new Date().toISOString() })
@@ -1000,6 +1007,21 @@ export default function OwnerDashboard() {
       if (error) throw new Error(error.message);
       const res = await supabase.functions.invoke('anvil-send-lease', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
+
+      // Send push notification to agent if associated
+      if (bookingData && bookingData.agent_id) {
+        const listingTitle = myListings.find((listing) => listing.id === bookingData.listing_id)?.title || 'Property';
+        sendPushNotification(
+          bookingData.agent_id,
+          'Lease Agreement Created',
+          `The owner has created a lease agreement for "${listingTitle}". Please review and sign.`,
+          '/agent-dashboard',
+          'lease_pending'
+        ).catch((notificationError) => {
+          console.error('Agent lease created push notification error:', notificationError);
+        });
+      }
+
       return res.data;
     },
     onSuccess: () => {
@@ -1020,8 +1042,30 @@ export default function OwnerDashboard() {
     mutationFn: async ({ bookingId, agreementConditions }) => {
       setUpdatingState({ id: bookingId, action: 'update' });
       await saveAgreementConditions.mutateAsync({ bookingId, conditions: agreementConditions });
+
+      const { data: bookingData } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .single();
+
       const res = await supabase.functions.invoke('anvil-send-lease', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
+
+      // Send push notification to agent if associated
+      if (bookingData && bookingData.agent_id) {
+        const listingTitle = myListings.find((listing) => listing.id === bookingData.listing_id)?.title || 'Property';
+        sendPushNotification(
+          bookingData.agent_id,
+          'Lease Agreement Updated',
+          `The owner has updated the lease agreement for "${listingTitle}". Please review and sign.`,
+          '/agent-dashboard',
+          'lease_pending'
+        ).catch((notificationError) => {
+          console.error('Agent lease updated push notification error:', notificationError);
+        });
+      }
+
       return res.data;
     },
     onSuccess: () => {
@@ -2488,6 +2532,7 @@ export default function OwnerDashboard() {
                   </Button>
                   {!isSignedByAll && (
                     <Button
+                      disabled={inspectionSigning}
                       onClick={async () => {
                         setInspectionSigning(true);
                         let pdfUrl = inspectionBooking.inspection_report?.pdfUrl || null;
@@ -2563,7 +2608,14 @@ export default function OwnerDashboard() {
                         }
                       }}
                     >
-                      Save Report
+                      {inspectionSigning ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Report'
+                      )}
                     </Button>
                   )}
                 </div>

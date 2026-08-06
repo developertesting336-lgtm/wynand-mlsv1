@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { generateBeautifulMoveOutPDF } from '@/utils/moveOutPdfGenerator';
 import { sendPushNotification } from '@/utils/pushNotification';
 import { format } from 'date-fns';
+import { Loader2 } from 'lucide-react';
 
 function formatSignatureDate(dateStr) {
   if (!dateStr) return 'N/A';
@@ -421,10 +422,17 @@ export default function MoveOutReportModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button variant="outline" disabled={saving} onClick={onClose}>Close</Button>
           {canEdit && (
             <Button onClick={handleReportSave} disabled={saving || !booking.move_out_date}>
-              {saving ? 'Saving...' : 'Save Report'}
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                  Saving...
+                </>
+              ) : (
+                'Save Report'
+              )}
             </Button>
           )}
         </DialogFooter>

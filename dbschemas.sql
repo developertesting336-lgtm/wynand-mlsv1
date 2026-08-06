@@ -18,12 +18,6 @@ create table public.agent_referrals (
 ) TABLESPACE pg_default;
 
 
-
-
-
-
-
-
 create table public.agent_reviews (
   id uuid not null,
   rating numeric not null,
@@ -36,10 +30,6 @@ create table public.agent_reviews (
 ) TABLESPACE pg_default;
 
 
-
-
-
-
 create table public.audit_logs (
   id uuid not null default gen_random_uuid (),
   user_id uuid null,
@@ -50,9 +40,6 @@ create table public.audit_logs (
   constraint audit_logs_pkey primary key (id),
   constraint audit_logs_user_id_fkey foreign KEY (user_id) references profiles (id) on update CASCADE on delete set null
 ) TABLESPACE pg_default;
-
-
-
 
 
 create table public.bookings (
@@ -89,12 +76,6 @@ update on bookings for EACH row
 execute FUNCTION log_table_change ();
 
 
-
-
-
-
-
-
 create table public.favorites (
   id uuid not null,
   listing_id text not null,
@@ -102,12 +83,6 @@ create table public.favorites (
   user_id uuid not null,
   constraint favorites_pkey primary key (user_id, listing_id)
 ) TABLESPACE pg_default;
-
-
-
-
-
-
 
 
 create table public.inquiries (
@@ -126,11 +101,6 @@ create table public.inquiries (
 create index IF not exists idx_inquiries_listing_owner_id on public.inquiries using btree (listing_owner_id) TABLESPACE pg_default;
 
 
-
-
-
-
-
 create table public.inquiry_replies (
   id uuid not null default gen_random_uuid (),
   inquiry_id uuid not null,
@@ -145,13 +115,7 @@ create table public.inquiry_replies (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_inquiry_replies_inquiry_id on public.inquiry_replies using btree (inquiry_id) TABLESPACE pg_default;
-
 create index IF not exists idx_inquiry_replies_recipient_type on public.inquiry_replies using btree (recipient_type) TABLESPACE pg_default;
-
-
-
-
-
 
 
 create table public.listings (
@@ -193,10 +157,6 @@ create table public.listings (
 ) TABLESPACE pg_default;
 
 
-
-
-
-
 create table public.notifications (
   id uuid not null default gen_random_uuid (),
   user_id uuid not null,
@@ -210,11 +170,7 @@ create table public.notifications (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_notifications_user_id on public.notifications using btree (user_id) TABLESPACE pg_default;
-
 create index IF not exists idx_notifications_created_at on public.notifications using btree (created_at) TABLESPACE pg_default;
-
-
-
 
 
 create table public.payments (
@@ -242,11 +198,8 @@ create table public.payments (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_payments_booking_id on public.payments using btree (booking_id) TABLESPACE pg_default;
-
 create index IF not exists idx_payments_payee_id on public.payments using btree (payee_id) TABLESPACE pg_default;
-
 create index IF not exists idx_payments_payer_id on public.payments using btree (payer_id) TABLESPACE pg_default;
-
 create index IF not exists idx_payments_payout_status on public.payments using btree (payout_status) TABLESPACE pg_default;
 
 create trigger audit_payments_trigger
@@ -255,11 +208,6 @@ or DELETE
 or
 update on payments for EACH row
 execute FUNCTION log_table_change ();
-
-
-
-
-
 
 
 create table public.platform_earnings (
@@ -278,14 +226,7 @@ create table public.platform_earnings (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_platform_earnings_booking on public.platform_earnings using btree (booking_id) TABLESPACE pg_default;
-
 create index IF not exists idx_platform_earnings_user on public.platform_earnings using btree (user_id) TABLESPACE pg_default;
-
-
-
-
-
-
 
 
 create table public.profiles (
@@ -311,11 +252,6 @@ create table public.profiles (
 ) TABLESPACE pg_default;
 
 
-
-
-
-
-
 create table public.property_reviews (
   id uuid not null,
   listing_id uuid not null,
@@ -328,12 +264,6 @@ create table public.property_reviews (
   constraint property_reviews_pkey primary key (id),
   constraint unique_property_review unique (reviewer_id, listing_id)
 ) TABLESPACE pg_default;
-
-
-
-
-
-
 
 
 create table public.referral_payments (
@@ -357,13 +287,8 @@ create table public.referral_payments (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_referral_payments_booking on public.referral_payments using btree (booking_id) TABLESPACE pg_default;
-
 create index IF not exists idx_referral_payments_referrer on public.referral_payments using btree (referrer_id) TABLESPACE pg_default;
-
 create index IF not exists idx_referral_payments_status on public.referral_payments using btree (payout_status) TABLESPACE pg_default;
-
-
-
 
 
 create table public.sale_referrals (
@@ -386,9 +311,6 @@ create table public.sale_referrals (
   constraint sale_referrals_pkey primary key (id),
   constraint sale_referrals_referrer_id_fkey foreign KEY (referrer_id) references profiles (id) on delete CASCADE
 ) TABLESPACE pg_default;
-
-
-
 
 
 create table public.subscriptions (
@@ -418,10 +340,6 @@ update on subscriptions for EACH row
 execute FUNCTION log_table_change ();
 
 
-
-
-
-
 create table public.user_push_subscriptions (
   id uuid not null default gen_random_uuid (),
   user_id uuid not null,
@@ -435,11 +353,6 @@ create table public.user_push_subscriptions (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_user_push_subscriptions_user_id on public.user_push_subscriptions using btree (user_id) TABLESPACE pg_default;
-
-
-
-
-
 
 
 create table public.verifications (

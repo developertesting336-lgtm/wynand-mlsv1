@@ -420,7 +420,7 @@ serve(async (req: any) => {
             }
           }
 
-          const { error: insertError } = await supabase.from('payments').insert({
+          const { data: insertedPayment, error: insertError } = await supabase.from('payments').insert({
             booking_id: bookingId,
             listing_id: listingId,
             payer_id: payerId,
@@ -435,12 +435,12 @@ serve(async (req: any) => {
             stripe_payment_intent_id: paymentIntentId,
             payment_type: metadata.paymentType || 'booking',
             payment_for_month_year: paymentForMonthYear,
-          });
+          }).select('id').maybeSingle();
 
           if (insertError) {
             console.error('Failed to insert payment record:', insertError.message);
           } else {
-            console.log('Successfully inserted payment record.');
+            console.log('Successfully inserted payment record.', insertedPayment?.id);
             if (bookingId) {
               const { error: bookingUpdateError } = await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', bookingId);
               if (bookingUpdateError) {
@@ -468,6 +468,7 @@ serve(async (req: any) => {
                       stripeSessionId,
                       stripePaymentIntentId: paymentIntentId,
                       paymentForMonthYear,
+                      invoiceId: insertedPayment?.id || null,
                     }),
                   });
 
