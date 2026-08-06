@@ -104,6 +104,10 @@ const renderPaymentEmail = ({ recipientName, recipientType, renterName, ownerNam
             <tr><td style="padding:6px 0;color:#71808c;">Owner</td><td style="padding:6px 0;text-align:right;color:#17212b;">${escapeHtml(ownerName || '—')}</td></tr>
             <tr><td style="padding:6px 0;color:#71808c;">Lease duration</td><td style="padding:6px 0;text-align:right;color:#17212b;">${escapeHtml(leaseDuration)}</td></tr>
             <tr><td style="padding:6px 0;color:#71808c;">Monthly rent</td><td style="padding:6px 0;text-align:right;color:#17212b;">${escapeHtml(String(monthlyRent))}</td></tr>
+            
+            ${conditions.securityDepositAmount ? `<tr><td style="padding:6px 0;color:#71808c;">Security Deposit</td><td style="padding:6px 0;text-align:right;color:#17212b;">${escapeHtml(formatMoney(parseFloat(conditions.securityDepositAmount), currency))}</td></tr>` : ''}
+            ${conditions.advancePaymentMonths && parseFloat(conditions.advanceMonthsPayment) > 0 ? `<tr><td style="padding:6px 0;color:#71808c;">Advance Payment (${conditions.advancePaymentMonths} Months)</td><td style="padding:6px 0;text-align:right;color:#17212b;">${escapeHtml(formatMoney(parseFloat(conditions.advanceMonthsPayment), currency))}</td></tr>` : ''}
+            
             <tr><td style="padding:12px 0 5px;border-top:1px solid #e6edf2;color:#71808c;">Amount paid</td><td style="padding:12px 0 5px;border-top:1px solid #e6edf2;text-align:right;font-size:18px;font-weight:bold;color:#11804b;">${escapeHtml(formatMoney(amount, currency))}</td></tr>
             <tr><td style="padding:5px 0;color:#71808c;">Payment date</td><td style="padding:5px 0;text-align:right;color:#17212b;">${escapeHtml(formatDate(paymentDate))}</td></tr>
           </table>

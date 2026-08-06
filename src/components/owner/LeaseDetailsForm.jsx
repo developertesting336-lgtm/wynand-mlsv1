@@ -83,6 +83,9 @@ export default function LeaseDetailsForm({
     propertyUnit: getInitialValue('propertyUnit', listing?.unit || ''),
     landlordSignature: getInitialValue('landlordSignature', ''),
     owner_docs: getInitialValue('owner_docs', []),
+    lastMonthRent: getInitialValue('lastMonthRent', ''),
+    advancePaymentMonths: getInitialValue('advancePaymentMonths', ''),
+    advanceMonthsPayment: getInitialValue('advanceMonthsPayment', ''),
   });
 
   // Parse address if it exists to prefill city and state
@@ -172,6 +175,9 @@ export default function LeaseDetailsForm({
     // Transform radio selections into boolean fields for PDF
     const transformedData = {
       ...formData,
+      lastMonthRent: formData.lastMonthRent === '' || formData.lastMonthRent === undefined ? 0 : Number(formData.lastMonthRent),
+      advancePaymentMonths: formData.advancePaymentMonths === '' || formData.advancePaymentMonths === undefined ? 0 : Number(formData.advancePaymentMonths),
+      advanceMonthsPayment: formData.advanceMonthsPayment === '' || formData.advanceMonthsPayment === undefined ? 0 : Number(formData.advanceMonthsPayment),
       fullyFurnished: formData.propertyFurnishingType === 'Fully Furnished',
       semiFurnished: formData.propertyFurnishingType === 'Semi-Furnished',
       unFurnished: formData.propertyFurnishingType === 'Unfurnished',
@@ -274,6 +280,31 @@ export default function LeaseDetailsForm({
               <div>
                 <Label htmlFor="securityDepositAmount">Security Deposit (MXN $)</Label>
                 <Input id="securityDepositAmount" type="number" step="0.01" value={formData.securityDepositAmount} onChange={(e) => handleChange('securityDepositAmount', e.target.value)} required />
+              </div>
+              <div>
+                <Label htmlFor="lastMonthRent">Last Month's Rent (MXN $) <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
+                <Input id="lastMonthRent" type="number" step="0.01" value={formData.lastMonthRent} onChange={(e) => handleChange('lastMonthRent', e.target.value)} placeholder="e.g. 15000" />
+              </div>
+              <div>
+                <Label htmlFor="advancePaymentMonths">Advance Payment (Months) <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
+                <Input 
+                  id="advancePaymentMonths" 
+                  type="number" 
+                  min="0" 
+                  max="99" 
+                  value={formData.advancePaymentMonths} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.length <= 2) {
+                      handleChange('advancePaymentMonths', val);
+                    }
+                  }} 
+                  placeholder="e.g. 2" 
+                />
+              </div>
+              <div>
+                <Label htmlFor="advanceMonthsPayment">Advance Months Payment (MXN $) <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
+                <Input id="advanceMonthsPayment" type="number" step="0.01" value={formData.advanceMonthsPayment} onChange={(e) => handleChange('advanceMonthsPayment', e.target.value)} placeholder="e.g. 30000" />
               </div>
               <div>
                 <Label htmlFor="rentDueDateDay">Rent Due Date (day of month)</Label>

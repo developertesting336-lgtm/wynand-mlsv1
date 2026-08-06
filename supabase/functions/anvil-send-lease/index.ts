@@ -243,6 +243,9 @@ serve(async (req) => {
         gracePeriodDays: conditions.gracePeriodDays || "5",
         paymentMethod: conditions.paymentMethod || "Bank Transfer",
         securityDepositAmount: conditions.securityDepositAmount || depositAmount.toFixed(2),
+        lastMonthRent: conditions.lastMonthRent || "N/A",
+        advancePaymentMonths: conditions.advancePaymentMonths || "N/A",
+        advanceMonthsPayment: conditions.advanceMonthsPayment || "N/A",
 
         fullyFurnished: mark(conditions.fullyFurnished),
         semiFurnished: mark(conditions.semiFurnished),

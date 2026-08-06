@@ -337,16 +337,18 @@ serve(async (req: any) => {
           let ownerId = null;
           let agentId = null;
           let moveInDate = null;
+          let agreementConditions = {};
           if (bookingId) {
             const { data: booking } = await supabase
               .from('bookings')
-              .select('owner_id, agent_id, move_in_date')
+              .select('owner_id, agent_id, move_in_date, agreement_conditions')
               .eq('id', bookingId)
               .maybeSingle();
             if (booking) {
               ownerId = booking.owner_id || null;
               agentId = booking.agent_id || null;
               moveInDate = booking.move_in_date || null;
+              agreementConditions = booking.agreement_conditions || {};
             }
           }
 
@@ -390,12 +392,17 @@ serve(async (req: any) => {
               let targetMonthStart = moveIn.getUTCMonth();
               let targetMonthEnd = moveIn.getUTCMonth() + 1;
 
+              const advMonths = parseInt(agreementConditions.advancePaymentMonths) || 0;
+              // The initial booking covers only the advance payment months count (e.g. 2 months).
+              // If no advance months are paid, it covers 0 months, meaning the next rent payment starts immediately on move-in.
+              const initialRentCoverageMonths = advMonths;
+
               if (monthsToAdd === 0) {
                 targetMonthStart = moveIn.getUTCMonth();
-                targetMonthEnd = moveIn.getUTCMonth() + 2;
+                targetMonthEnd = moveIn.getUTCMonth() + initialRentCoverageMonths;
               } else {
-                targetMonthStart = moveIn.getUTCMonth() + monthsToAdd + 2;
-                targetMonthEnd = moveIn.getUTCMonth() + monthsToAdd + 3;
+                targetMonthStart = moveIn.getUTCMonth() + monthsToAdd - 1 + initialRentCoverageMonths;
+                targetMonthEnd = moveIn.getUTCMonth() + monthsToAdd + initialRentCoverageMonths;
               }
               
               const startDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthStart, moveIn.getUTCDate()));
@@ -447,6 +454,39 @@ serve(async (req: any) => {
                 console.error('Failed to update booking status:', bookingUpdateError.message);
               } else {
                 console.log('Successfully updated booking status to confirmed.');
+
+                // Send push notification to owner notifying about the payment
+                if (ownerId) {
+                  try {
+                    const isMonthlyRent = (metadata?.paymentType === 'monthly_rent');
+                    const pushTitle = isMonthlyRent ? 'Rent Payment Received' : 'Booking Deposit Paid';
+                    const pushBody = isMonthlyRent 
+                      ? `Monthly rent of ${currency.toUpperCase()} $${(amountCents / 100).toFixed(2)} has been paid by the tenant.`
+                      : `Booking deposit of ${currency.toUpperCase()} $${(amountCents / 100).toFixed(2)} has been paid.`;
+                    
+                    const pushResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                      },
+                      body: JSON.stringify({
+                        user_id: ownerId,
+                        title: pushTitle,
+                        body: pushBody,
+                        url: '/owner-dashboard',
+                        type: 'payment'
+                      })
+                    });
+                    if (!pushResponse.ok) {
+                      console.error('Owner push notification failed:', pushResponse.status, await pushResponse.text());
+                    } else {
+                      console.log('Push notification sent to owner:', ownerId);
+                    }
+                  } catch (pushErr) {
+                    console.error('Failed to dispatch owner push notification:', pushErr);
+                  }
+                }
 
                 const emailServerUrl = Deno.env.get('EMAIL_SERVER_URL') || 'https://email.pvverified.com';
                 const emailHeaders: Record<string, string> = { 'Content-Type': 'application/json' };

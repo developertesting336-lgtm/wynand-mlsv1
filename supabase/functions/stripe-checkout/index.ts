@@ -147,9 +147,11 @@ serve(async (req) => {
       let finalRentAmount = rentAmount;
 
       if (booking.move_in_date) {
-        const moveIn = new Date(booking.move_in_date);
-        const targetMonthStart = moveIn.getUTCMonth() + monthsPaid + 2;
-        const targetMonthEnd = moveIn.getUTCMonth() + monthsPaid + 3;
+        const agreement = booking.agreement_conditions || {};
+        const advMonths = parseInt(agreement.advancePaymentMonths) || 0;
+        const offset = advMonths > 0 ? (advMonths + 1) : 1;
+        const targetMonthStart = moveIn.getUTCMonth() + monthsPaid + offset;
+        const targetMonthEnd = moveIn.getUTCMonth() + monthsPaid + offset + 1;
 
         const startDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthStart, moveIn.getUTCDate()));
         const endDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthEnd, moveIn.getUTCDate()));
@@ -181,7 +183,9 @@ serve(async (req) => {
         quantity: 1,
       });
     } else {
-      amountToCharge = depositAmount + (rentAmount * 2);
+      const advanceMonthsPaymentVal = parseFloat(agreement.advanceMonthsPayment) || 0;
+      amountToCharge = depositAmount + advanceMonthsPaymentVal;
+
       if (depositAmount > 0) {
         lineItems.push({
           price_data: {
@@ -195,26 +199,16 @@ serve(async (req) => {
           quantity: 1,
         });
       }
-      if (rentAmount > 0) {
+      if (advanceMonthsPaymentVal > 0) {
+        const advanceMonthsCount = parseInt(agreement.advancePaymentMonths) || 1;
         lineItems.push({
           price_data: {
             currency: 'mxn',
             product_data: {
-              name: 'First Month Rent',
-              description: `First month rent for ${listing.title} · platform fee is added on rent`,
+              name: 'Advance Payment',
+              description: `Advance payment (${advanceMonthsCount} months) for ${listing.title}`,
             },
-            unit_amount: Math.round(rentAmount * 100),
-          },
-          quantity: 1,
-        });
-        lineItems.push({
-          price_data: {
-            currency: 'mxn',
-            product_data: {
-              name: 'Last Month Rent',
-              description: `Last month rent for ${listing.title}`,
-            },
-            unit_amount: Math.round(rentAmount * 100),
+            unit_amount: Math.round(advanceMonthsPaymentVal * 100),
           },
           quantity: 1,
         });

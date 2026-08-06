@@ -736,8 +736,8 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
               // Use agreement_conditions for payment amounts
               const conditions = b.agreement_conditions || {};
               const depositAmount = parseFloat(conditions.securityDepositAmount) || 0;
-              const rentAmount = parseFloat(conditions.monthlyRent?.toString().replace(/[^0-9.]/g, '')) || 0;
-              const totalAmount = depositAmount + (rentAmount * 2);
+              const advanceMonthsPaymentVal = parseFloat(conditions.advanceMonthsPayment) || 0;
+              const totalAmount = depositAmount + advanceMonthsPaymentVal;
               const agentSigned = Boolean(conditions.agentSignature);
 
               return (
@@ -1272,11 +1272,12 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
               if (booking.move_in_date) {
                 try {
                   const moveIn = new Date(booking.move_in_date);
-                  // Calculate upcoming monthly billing period
-                  // If monthsPaid === 0, the next upcoming rent payment should start covering from month index 2 onwards
-                  // since months 0 and 1 (first + last month rent) were already paid in the booking checkout.
-                  const targetMonthStart = moveIn.getUTCMonth() + monthsPaid + 2;
-                  const targetMonthEnd = moveIn.getUTCMonth() + monthsPaid + 3;
+                  const advMonths = parseInt(agreement.advancePaymentMonths) || 0;
+                  // If there are advance months paid in the initial payment, offset the start date by those months count.
+                  // If no advance months are paid, the next rent payment is due immediately on move-in (offset of 0).
+                  const offset = advMonths;
+                  const targetMonthStart = moveIn.getUTCMonth() + monthsPaid + offset;
+                  const targetMonthEnd = moveIn.getUTCMonth() + monthsPaid + offset + 1;
 
                   const startDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthStart, moveIn.getUTCDate()));
                   const endDate = new Date(Date.UTC(moveIn.getUTCFullYear(), targetMonthEnd, moveIn.getUTCDate()));
