@@ -420,9 +420,10 @@ serve(async (req) => {
                         commissionCents = payment.amount_centavos;
                     }
                     const platformFeeCents = Math.round(commissionCents * 0.10);
-                    const ivaCents = Math.round(platformFeeCents * 0.16);
+                    const remainingCommissionCents = commissionCents - platformFeeCents;
+                    const ivaCents = Math.round(remainingCommissionCents * 0.16);
 
-                    referralPayoutAmount = commissionCents - platformFeeCents - ivaCents;
+                    referralPayoutAmount = remainingCommissionCents - ivaCents;
                     ownerPayoutAmount = payment.amount_centavos - commissionCents;
                     platformPayoutAmount = platformFeeCents + ivaCents;
 
@@ -486,9 +487,10 @@ serve(async (req) => {
                         commissionCents = payment.amount_centavos;
                     }
                     const platformFeeCents = Math.round(commissionCents * 0.10);
-                    const ivaCents = Math.round(platformFeeCents * 0.16);
+                    const remainingCommissionCents = commissionCents - platformFeeCents;
+                    const ivaCents = Math.round(remainingCommissionCents * 0.16);
 
-                    referralPayoutAmount = commissionCents - platformFeeCents - ivaCents;
+                    referralPayoutAmount = remainingCommissionCents - ivaCents;
                     ownerPayoutAmount = payment.amount_centavos - commissionCents;
                     platformPayoutAmount = platformFeeCents + ivaCents;
 

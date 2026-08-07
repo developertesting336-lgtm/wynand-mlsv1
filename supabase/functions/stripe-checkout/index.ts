@@ -183,8 +183,9 @@ serve(async (req) => {
         quantity: 1,
       });
     } else {
+      const lastMonthRentVal = parseFloat(agreement.lastMonthRent) || 0;
       const advanceMonthsPaymentVal = parseFloat(agreement.advanceMonthsPayment) || 0;
-      amountToCharge = depositAmount + advanceMonthsPaymentVal;
+      amountToCharge = depositAmount + lastMonthRentVal + advanceMonthsPaymentVal;
 
       if (depositAmount > 0) {
         lineItems.push({
@@ -195,6 +196,19 @@ serve(async (req) => {
               description: `Deposit for ${listing.title}`,
             },
             unit_amount: Math.round(depositAmount * 100),
+          },
+          quantity: 1,
+        });
+      }
+      if (lastMonthRentVal > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'mxn',
+            product_data: {
+              name: "Last Month's Rent",
+              description: `Last month's rent for ${listing.title}`,
+            },
+            unit_amount: Math.round(lastMonthRentVal * 100),
           },
           quantity: 1,
         });

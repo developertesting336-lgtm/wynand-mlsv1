@@ -476,7 +476,7 @@ export default function AdminDashboard() {
 
   const formatCurrency = (value) => (
     <>
-      ${(value / 100).toFixed(2)}
+      ${(value / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       <span className="text-xs font-normal text-muted-foreground ml-1">MXN</span>
     </>
   );
@@ -1374,7 +1374,8 @@ export default function AdminDashboard() {
                   {paginatedPayments.map(p => {
                     const payer = paymentPayerMap[p.payer_id];
                     const payee = paymentPayerMap[p.payee_id];
-                    const amount = p.amount_centavos ? (p.amount_centavos / 100).toFixed(2) : (p.amount_mxn || 0).toFixed(2);
+                    const amountVal = p.amount_centavos ? (p.amount_centavos / 100) : (p.amount_mxn || 0);
+                    const amountFormatted = amountVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     return (
                       <tr key={p.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{p.stripe_payment_intent_id?.slice(-8) || '—'}</td>
@@ -1387,7 +1388,7 @@ export default function AdminDashboard() {
                           <div className="text-xs text-muted-foreground">{payee?.email || ''}</div>
                         </td>
                         <td className="px-4 py-3 font-semibold text-emerald-600">
-                          ${amount}
+                          ${amountFormatted}
                           <span className="text-xs font-normal text-muted-foreground ml-1">MXN</span>
                         </td>
                         <td className="px-4 py-3"><Badge variant="outline">{p.status || 'succeeded'}</Badge></td>

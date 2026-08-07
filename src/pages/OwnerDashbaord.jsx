@@ -657,31 +657,21 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
                  ownerDisplayAmount = rentAmount; // Net rent to owner (platform fee was added on top)
                  description = 'Monthly Rent (Platform fee added to renter payment)';
                } else {
-                 // Booking payment (deposit + first + last month rent)
-                 if (rentAmount > 0) {
-                   if (hasAgentOrReferral) {
-                     ownerDisplayAmount = depositAmount + rentAmount;
-                     description = 'Deposit + First Month Rent (Last month rent went to Agent commission)';
-                   } else {
-                     const totalPaidByTenant = depositAmount + (rentAmount * 2);
-                     const platformFee = (rentAmount * 2) * 0.10;
-                     const iva = platformFee * 0.16;
-                     ownerDisplayAmount = totalPaidByTenant - platformFee - iva;
-                     description = 'Deposit + 2 Months Rent (Net payout after 10% platform fee and 16% IVA on rent)';
-                   }
-                 } else {
-                   // Fallback
-                   if (hasAgentOrReferral) {
-                     ownerDisplayAmount = amountUsd * 0.80;
-                     description = '80% of total payment';
-                   } else {
-                     const platformFee = amountUsd * 0.10;
-                     const iva = platformFee * 0.16;
-                     ownerDisplayAmount = amountUsd - platformFee - iva;
-                     description = 'Net payout after 10% platform fee and 16% IVA';
-                   }
-                 }
-               }
+                  // Booking payment (deposit + last month rent + advance payment)
+                  const lastMonthRent = parseFloat(conditions.lastMonthRent || 0);
+                  const advanceMonthsPayment = parseFloat(conditions.advanceMonthsPayment || 0);
+                  const totalPaidByTenant = depositAmount + lastMonthRent + advanceMonthsPayment;
+
+                  if (hasAgentOrReferral) {
+                    ownerDisplayAmount = depositAmount + lastMonthRent + advanceMonthsPayment;
+                    description = 'Deposit + Last Month Rent + Advance Payment';
+                  } else {
+                    const platformFee = (lastMonthRent + advanceMonthsPayment) * 0.10;
+                    const iva = platformFee * 0.16;
+                    ownerDisplayAmount = totalPaidByTenant - platformFee - iva;
+                    description = 'Deposit + Last Month Rent + Advance Payment (Net payout after 10% platform fee and 16% IVA on rent)';
+                  }
+                }
 
               return (
                 <tr key={p.id} className="hover:bg-muted/30 transition-colors">
@@ -1022,6 +1012,20 @@ export default function OwnerDashboard() {
         });
       }
 
+      // Send push notification to tenant/renter
+      if (bookingData && bookingData.renter_id) {
+        const listingTitle = myListings.find((listing) => listing.id === bookingData.listing_id)?.title || 'Property';
+        sendPushNotification(
+          bookingData.renter_id,
+          'Lease Agreement Ready',
+          `A lease agreement has been created for "${listingTitle}". Please review and sign.`,
+          '/dashboard',
+          'lease_pending'
+        ).catch((notificationError) => {
+          console.error('Tenant lease created push notification error:', notificationError);
+        });
+      }
+
       return res.data;
     },
     onSuccess: () => {
@@ -1063,6 +1067,20 @@ export default function OwnerDashboard() {
           'lease_pending'
         ).catch((notificationError) => {
           console.error('Agent lease updated push notification error:', notificationError);
+        });
+      }
+
+      // Send push notification to tenant/renter
+      if (bookingData && bookingData.renter_id) {
+        const listingTitle = myListings.find((listing) => listing.id === bookingData.listing_id)?.title || 'Property';
+        sendPushNotification(
+          bookingData.renter_id,
+          'Lease Agreement Updated',
+          `The owner has updated the lease agreement for "${listingTitle}". Please review and sign.`,
+          '/dashboard',
+          'lease_pending'
+        ).catch((notificationError) => {
+          console.error('Tenant lease updated push notification error:', notificationError);
         });
       }
 

@@ -736,8 +736,9 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
               // Use agreement_conditions for payment amounts
               const conditions = b.agreement_conditions || {};
               const depositAmount = parseFloat(conditions.securityDepositAmount) || 0;
+              const lastMonthRentVal = parseFloat(conditions.lastMonthRent) || 0;
               const advanceMonthsPaymentVal = parseFloat(conditions.advanceMonthsPayment) || 0;
-              const totalAmount = depositAmount + advanceMonthsPaymentVal;
+              const totalAmount = depositAmount + lastMonthRentVal + advanceMonthsPaymentVal;
               const agentSigned = Boolean(conditions.agentSignature);
 
               return (
