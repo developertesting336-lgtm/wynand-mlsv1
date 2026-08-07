@@ -71,7 +71,8 @@ serve(async (req) => {
 
 
     const agreementConditions = booking.agreement_conditions || {};
-    const agentSigned = Boolean(agreementConditions.agentSignature);
+    // If there is no agent associated with the booking, then it's considered already "signed" by the agent so renter can pay.
+    const agentSigned = booking.agent_id ? Boolean(agreementConditions.agentSignature) : true;
 
     if (isMonthlyRent) {
       if (booking.status !== 'confirmed') {

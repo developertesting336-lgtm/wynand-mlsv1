@@ -1134,7 +1134,7 @@ export default function AgentDashboard() {
                                 !b.agreement_conditions?.tenantSignature &&
                                 listing?.owner_email?.trim().toLowerCase() === listing?.agent_email?.trim().toLowerCase() &&
                                 listing?.owner_email?.trim().toLowerCase() === user?.email?.trim().toLowerCase();
-                              const needsAgentSignature = b.agreement_conditions && !b.agreement_conditions?.agentSignature;
+                              const needsAgentSignature = b.agent_id && b.agreement_conditions && !b.agreement_conditions?.agentSignature;
                               return (
                                 <tr key={b.id} className="hover:bg-muted/30 transition-colors">
                                   <td className="px-4 py-3 font-medium">

@@ -274,7 +274,11 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
         })
       });
 
+      console.log(res);
+
+
       let data = res.data;
+
       if (res && typeof res.json === 'function') {
         try {
           data = await res.json();
@@ -728,306 +732,311 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
               </thead>
               <tbody className="divide-y divide-border">
                 {paginatedBookings.map(b => {
-              const listing = listingMap[b.listing_id];
-              const ownerEmail = b.owner_email || listing?.owner_email || '—';
-              const ownerName = listing?.owner_name || 'Owner';
-              const { label, icon: Icon, cls } = statusConfig[b.status] || statusConfig.pending;
-              
-              // Use agreement_conditions for payment amounts
-              const conditions = b.agreement_conditions || {};
-              const depositAmount = parseFloat(conditions.securityDepositAmount) || 0;
-              const lastMonthRentVal = parseFloat(conditions.lastMonthRent) || 0;
-              const advanceMonthsPaymentVal = parseFloat(conditions.advanceMonthsPayment) || 0;
-              const totalAmount = depositAmount + lastMonthRentVal + advanceMonthsPaymentVal;
-              const agentSigned = Boolean(conditions.agentSignature);
+                  const listing = listingMap[b.listing_id];
+                  const ownerEmail = b.owner_email || listing?.owner_email || '—';
+                  const ownerName = listing?.owner_name || 'Owner';
+                  const { label, icon: Icon, cls } = statusConfig[b.status] || statusConfig.pending;
 
-              return (
-                <tr key={b.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-medium">
-                    <Link to={`/listings/${b.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1 font-semibold">
-                      {listing?.title || b.listing_title || 'Property'} <ExternalLink className="w-3 h-3 opacity-60" />
-                    </Link>
-                    {b.message && (
-                      <p className="text-xs text-muted-foreground italic mt-1 max-w-[200px] truncate" title={b.message}>
-                        "{b.message}"
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {b.move_in_date ? format(new Date(b.move_in_date + 'T00:00:00'), 'MMMM d, yyyy') : 'N/A'}
-                  </td>
-                  <td className="px-4 py-3">
-                    {b.end_lease ? (
-                      <span className="text-muted-foreground text-sm font-medium">
-                        {b.move_out_date ? format(new Date(b.move_out_date + 'T00:00:00'), 'MMMM d, yyyy') : '—'}
-                      </span>
-                    ) : (() => {
-                      // Check if the remaining time until move-out is less than 30 days from now
-                      let isWithin30Days = false;
-                      if (b.move_out_date) {
-                        const now = new Date();
-                        const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-                        const mOutParts = b.move_out_date.split('-');
-                        const mOutUtc = Date.UTC(parseInt(mOutParts[0]), parseInt(mOutParts[1]) - 1, parseInt(mOutParts[2]));
-                        const diffTime = mOutUtc - todayUtc;
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        if (diffDays < 30) {
-                          isWithin30Days = true;
-                        }
-                      }
-                      
-                      return (
-                        <div className="flex flex-col items-start gap-1">
-                          {b.move_out_date && (
-                            <span className="text-xs text-slate-700 font-medium">
-                              {format(new Date(b.move_out_date + 'T00:00:00'), 'MMM d, yyyy')}
-                            </span>
-                          )}
-                          {!isWithin30Days && (
-                            <Button
-                              variant="outline"
-                              size="xs"
-                              onClick={() => {
-                                setSelectedBookingForMoveOut(b);
-                                setModalMoveOutDate(b.move_out_date || '');
-                              }}
-                              className="text-[10px] h-6 px-2 rounded-lg text-primary hover:text-primary"
-                            >
-                              {b.move_out_date ? 'Change Date' : 'Set Move-out Date'}
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td className="px-4 py-3">
-                    {b.end_lease ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-slate-100 text-slate-700 border-slate-200">
-                        <CheckCircle className="w-3.5 h-3.5 text-slate-500" /> Lease Ended
-                      </span>
-                    ) : (
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
-                        <Icon className="w-3.5 h-3.5" /> {label}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {b.lease_pdf_url ? (
-                      <div className="inline-flex items-center gap-3">
-                        <a
-                          href={b.lease_pdf_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                        >
-                          <FileText className="w-3.5 h-3.5" /> View
-                        </a>
-                        <a
-                          href={b.lease_pdf_url}
-                          download={`lease_${b.id}.pdf`}
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
-                          title="Download lease"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </a>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground italic">Pending...</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${agentSigned ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                      {agentSigned ? <CheckCircle className="w-3.5 h-3.5" /> : <Hourglass className="w-3.5 h-3.5" />}
-                      {agentSigned ? 'Signed' : 'Pending'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {(() => {
-                      const moveInDateObj = new Date(b.move_in_date + 'T00:00:00');
-                      const todayDateObj = new Date();
-                      todayDateObj.setHours(0, 0, 0, 0);
-                      const isMoveInArrived = todayDateObj >= moveInDateObj;
+                  // Use agreement_conditions for payment amounts
+                  const conditions = b.agreement_conditions || {};
+                  const depositAmount = parseFloat(conditions.securityDepositAmount) || 0;
+                  const lastMonthRentVal = parseFloat(conditions.lastMonthRent) || 0;
+                  const advanceMonthsPaymentVal = parseFloat(conditions.advanceMonthsPayment) || 0;
+                  const totalAmount = depositAmount + lastMonthRentVal + advanceMonthsPaymentVal;
+                  // If there is no agent associated with the booking, then it's considered already "signed" by the agent so renter can pay.
+                  const agentSigned = b.agent_id ? Boolean(conditions.agentSignature) : true;
 
-                      if (!isMoveInArrived) {
-                        return <span className="text-xs text-muted-foreground italic">Awaits Move-in</span>;
-                      }
+                  return (
+                    <tr key={b.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 font-medium">
+                        <Link to={`/listings/${b.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1 font-semibold">
+                          {listing?.title || b.listing_title || 'Property'} <ExternalLink className="w-3 h-3 opacity-60" />
+                        </Link>
+                        {b.message && (
+                          <p className="text-xs text-muted-foreground italic mt-1 max-w-[200px] truncate" title={b.message}>
+                            "{b.message}"
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {b.move_in_date ? format(new Date(b.move_in_date + 'T00:00:00'), 'MMMM d, yyyy') : 'N/A'}
+                      </td>
+                      <td className="px-4 py-3">
+                        {b.end_lease ? (
+                          <span className="text-muted-foreground text-sm font-medium">
+                            {b.move_out_date ? format(new Date(b.move_out_date + 'T00:00:00'), 'MMMM d, yyyy') : '—'}
+                          </span>
+                        ) : (() => {
+                          // Check if the remaining time until move-out is less than 30 days from now
+                          let isWithin30Days = false;
+                          if (b.move_out_date) {
+                            const now = new Date();
+                            const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+                            const mOutParts = b.move_out_date.split('-');
+                            const mOutUtc = Date.UTC(parseInt(mOutParts[0]), parseInt(mOutParts[1]) - 1, parseInt(mOutParts[2]));
+                            const diffTime = mOutUtc - todayUtc;
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            if (diffDays < 30) {
+                              isWithin30Days = true;
+                            }
+                          }
 
-                      if (b.inspection_report) {
-                        const needsSign = !b.inspection_report.tenantSignature;
-                        return (
-                          <div className="flex flex-col gap-1 items-start">
-                            {needsSign ? (
-                              <span className="text-xs text-amber-600 font-semibold flex items-center gap-1 animate-pulse">
-                                <Hourglass className="w-3 h-3" /> Under Column to Sign
-                              </span>
-                            ) : (
-                              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                                <CheckCircle className="w-3 h-3" /> Generated
-                              </span>
-                            )}
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                className="text-[10px] h-6 px-2 rounded-lg"
-                                onClick={() => {
-                                  setInspectionBooking(b);
-                                  setInspectionSelectedSignature?.(userProfile?.signatures?.[0] || '');
-                                }}
-                              >
-                                {needsSign ? 'Sign Report' : 'View Report'}
-                              </Button>
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
-                                title="Download PDF"
-                                onClick={async () => {
-                                  try {
-                                    const { generateBeautifulInspectionPDF } = await import('../utils/inspectionPdfGenerator');
-                                    await generateBeautifulInspectionPDF(
-                                      b,
-                                      b.inspection_report,
-                                      listing?.title || 'Property'
-                                    );
-                                    toast.success('Inspection report PDF downloaded');
-                                  } catch (pdfErr) {
-                                    toast.error('Failed to export PDF');
-                                  }
-                                }}
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </Button>
-                              {b.inspection_report?.pdfUrl && (
-                                <a
-                                  href={b.inspection_report.pdfUrl}
-                                  target="_blank"
-                                  rel="noreferrer noopener"
-                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                  title="View Report PDF"
+                          return (
+                            <div className="flex flex-col items-start gap-1">
+                              {b.move_out_date && (
+                                <span className="text-xs text-slate-700 font-medium">
+                                  {format(new Date(b.move_out_date + 'T00:00:00'), 'MMM d, yyyy')}
+                                </span>
+                              )}
+                              {!isWithin30Days && (
+                                <Button
+                                  variant="outline"
+                                  size="xs"
+                                  onClick={() => {
+                                    setSelectedBookingForMoveOut(b);
+                                    setModalMoveOutDate(b.move_out_date || '');
+                                  }}
+                                  className="text-[10px] h-6 px-2 rounded-lg text-primary hover:text-primary"
                                 >
-                                  <FileText className="w-3.5 h-3.5" />
-                                </a>
+                                  {b.move_out_date ? 'Change Date' : 'Set Move-out Date'}
+                                </Button>
                               )}
                             </div>
-                          </div>
-                        );
-                      }
-
-                      return <span className="text-xs text-muted-foreground italic">Pending Owner</span>;
-                    })()}
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    {b.move_out_date ? (
-                      b.move_out_report ? (
-                        (() => {
-                          const tenantNeedsSign = !b.move_out_report?.tenantSignature;
-                          return (
-                            <div className="flex flex-col gap-2 items-start">
-                              <span className={`text-xs font-semibold ${tenantNeedsSign ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                {tenantNeedsSign ? 'Under Column to Sign' : 'Available'}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  size="xs"
-                                  variant="outline"
-                                  className="text-[10px] h-6 px-2 rounded-lg"
-                                  onClick={() => setMoveOutBooking(b)}
-                                >
-                                  {tenantNeedsSign ? 'Sign Report' : 'View Report'}
-                                </Button>
-                                {b.move_out_report?.pdfUrl && (
-                                  <a
-                                    href={b.move_out_report.pdfUrl}
-                                    target="_blank"
-                                    rel="noreferrer noopener"
-                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                    title="Download Move-out Report"
-                                    download={`move_out_report_${b.id}.pdf`}
-                                  >
-                                    <Download className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                              </div>
-                            </div>
                           );
-                        })()
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">Pending</span>
-                      )
-                    ) : (
-                      <span className="text-xs text-muted-foreground italic">No move-out date</span>
-                    )}
-                  </td>
-                  {/* Maintenance Requests cell */}
-                  <td className="px-4 py-4 align-top">
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      className="text-xs whitespace-nowrap px-3 py-2"
-                      onClick={() => openViewMaintenanceModal(b)}
-                    >
-                      {(b.maintenance_requests || []).length > 0
-                        ? `Show All (${b.maintenance_requests.length})`
-                        : '+ New Request'}
-                    </Button>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {(b.status === 'lease_pending' || (b.status === 'approved' && b.lease_status !== 'signed')) ? (
-                      <SignLeaseButton booking={b} listing={listing} onSigned={() => {}} />
-                    ) : b.status === 'approved' && totalAmount > 0 ? (
-                      <Button
-                        size="sm"
-                        onClick={() => handlePayment(b.id)}
-                        disabled={payingId === b.id || !agentSigned}
-                        title={agentSigned ? 'Proceed to payment' : 'Payment is available after the agent signs the agreement'}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-transform active:scale-[0.98] py-1 px-2.5 h-auto whitespace-nowrap disabled:opacity-70 disabled:cursor-not-allowed"
-                      >
-                        {payingId === b.id ? (
-                          <span className="flex items-center gap-1.5">
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            {agentSigned ? `Pay $${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Awaiting agent signature'}
-                            <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
+                        })()}
+                      </td>
+                      <td className="px-4 py-3">
+                        {b.end_lease ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-slate-100 text-slate-700 border-slate-200">
+                            <CheckCircle className="w-3.5 h-3.5 text-slate-500" /> Lease Ended
                           </span>
                         ) : (
-                          <>
-                            {agentSigned ? (
-                              <>
-                                Pay ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
-                              </>
-                            ) : 'Awaiting agent signature'}
-                          </>
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
+                            <Icon className="w-3.5 h-3.5" /> {label}
+                          </span>
                         )}
-                      </Button>
-                    ) : b.status === 'confirmed' ? (
-                      <span className="text-xs text-emerald-600 font-medium">Completed</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground mt-4">
-          <div>Page {page} of {totalPages}</div>
-          <div className="inline-flex items-center gap-2">
-            <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)}>
-              Previous
-            </Button>
-            <Button size="sm" variant="outline" disabled={page === totalPages} onClick={() => setPage(page + 1)}>
-              Next
-            </Button>
+                      </td>
+                      <td className="px-4 py-3">
+                        {b.lease_pdf_url ? (
+                          <div className="inline-flex items-center gap-3">
+                            <a
+                              href={b.lease_pdf_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              <FileText className="w-3.5 h-3.5" /> View
+                            </a>
+                            <a
+                              href={b.lease_pdf_url}
+                              download={`lease_${b.id}.pdf`}
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+                              title="Download lease"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Pending...</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {!b.agent_id ? (
+                          <span className="text-xs text-muted-foreground italic">N/A</span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${agentSigned ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                            {agentSigned ? <CheckCircle className="w-3.5 h-3.5" /> : <Hourglass className="w-3.5 h-3.5" />}
+                            {agentSigned ? 'Signed' : 'Pending'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const moveInDateObj = new Date(b.move_in_date + 'T00:00:00');
+                          const todayDateObj = new Date();
+                          todayDateObj.setHours(0, 0, 0, 0);
+                          const isMoveInArrived = todayDateObj >= moveInDateObj;
+
+                          if (!isMoveInArrived) {
+                            return <span className="text-xs text-muted-foreground italic">Awaits Move-in</span>;
+                          }
+
+                          if (b.inspection_report) {
+                            const needsSign = !b.inspection_report.tenantSignature;
+                            return (
+                              <div className="flex flex-col gap-1 items-start">
+                                {needsSign ? (
+                                  <span className="text-xs text-amber-600 font-semibold flex items-center gap-1 animate-pulse">
+                                    <Hourglass className="w-3 h-3" /> Under Column to Sign
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" /> Generated
+                                  </span>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="xs"
+                                    variant="outline"
+                                    className="text-[10px] h-6 px-2 rounded-lg"
+                                    onClick={() => {
+                                      setInspectionBooking(b);
+                                      setInspectionSelectedSignature?.(userProfile?.signatures?.[0] || '');
+                                    }}
+                                  >
+                                    {needsSign ? 'Sign Report' : 'View Report'}
+                                  </Button>
+                                  <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+                                    title="Download PDF"
+                                    onClick={async () => {
+                                      try {
+                                        const { generateBeautifulInspectionPDF } = await import('../utils/inspectionPdfGenerator');
+                                        await generateBeautifulInspectionPDF(
+                                          b,
+                                          b.inspection_report,
+                                          listing?.title || 'Property'
+                                        );
+                                        toast.success('Inspection report PDF downloaded');
+                                      } catch (pdfErr) {
+                                        toast.error('Failed to export PDF');
+                                      }
+                                    }}
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </Button>
+                                  {b.inspection_report?.pdfUrl && (
+                                    <a
+                                      href={b.inspection_report.pdfUrl}
+                                      target="_blank"
+                                      rel="noreferrer noopener"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                      title="View Report PDF"
+                                    >
+                                      <FileText className="w-3.5 h-3.5" />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return <span className="text-xs text-muted-foreground italic">Pending Owner</span>;
+                        })()}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        {b.move_out_date ? (
+                          b.move_out_report ? (
+                            (() => {
+                              const tenantNeedsSign = !b.move_out_report?.tenantSignature;
+                              return (
+                                <div className="flex flex-col gap-2 items-start">
+                                  <span className={`text-xs font-semibold ${tenantNeedsSign ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                    {tenantNeedsSign ? 'Under Column to Sign' : 'Available'}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="xs"
+                                      variant="outline"
+                                      className="text-[10px] h-6 px-2 rounded-lg"
+                                      onClick={() => setMoveOutBooking(b)}
+                                    >
+                                      {tenantNeedsSign ? 'Sign Report' : 'View Report'}
+                                    </Button>
+                                    {b.move_out_report?.pdfUrl && (
+                                      <a
+                                        href={b.move_out_report.pdfUrl}
+                                        target="_blank"
+                                        rel="noreferrer noopener"
+                                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                        title="Download Move-out Report"
+                                        download={`move_out_report_${b.id}.pdf`}
+                                      >
+                                        <Download className="w-3.5 h-3.5" />
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Pending</span>
+                          )
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">No move-out date</span>
+                        )}
+                      </td>
+                      {/* Maintenance Requests cell */}
+                      <td className="px-4 py-4 align-top">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          className="text-xs whitespace-nowrap px-3 py-2"
+                          onClick={() => openViewMaintenanceModal(b)}
+                        >
+                          {(b.maintenance_requests || []).length > 0
+                            ? `Show All (${b.maintenance_requests.length})`
+                            : '+ New Request'}
+                        </Button>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {(b.status === 'lease_pending' || (b.status === 'approved' && b.lease_status !== 'signed')) ? (
+                          <SignLeaseButton booking={b} listing={listing} onSigned={() => { }} />
+                        ) : b.status === 'approved' && totalAmount > 0 ? (
+                          <Button
+                            size="sm"
+                            onClick={() => handlePayment(b.id)}
+                            disabled={payingId === b.id || !agentSigned}
+                            title={agentSigned ? 'Proceed to payment' : 'Payment is available after the agent signs the agreement'}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-transform active:scale-[0.98] py-1 px-2.5 h-auto whitespace-nowrap disabled:opacity-70 disabled:cursor-not-allowed"
+                          >
+                            {payingId === b.id ? (
+                              <span className="flex items-center gap-1.5">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                {agentSigned ? `Pay $${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Awaiting agent signature'}
+                                <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
+                              </span>
+                            ) : (
+                              <>
+                                {agentSigned ? (
+                                  <>
+                                    Pay ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
+                                  </>
+                                ) : 'Awaiting agent signature'}
+                              </>
+                            )}
+                          </Button>
+                        ) : b.status === 'confirmed' ? (
+                          <span className="text-xs text-emerald-600 font-medium">Completed</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground mt-4">
+              <div>Page {page} of {totalPages}</div>
+              <div className="inline-flex items-center gap-2">
+                <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)}>
+                  Previous
+                </Button>
+                <Button size="sm" variant="outline" disabled={page === totalPages} onClick={() => setPage(page + 1)}>
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
-    </>
-  )}
-  </div>
+    </div>
   );
 }
 
@@ -1258,7 +1267,7 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
               const listing = listingMap[booking.listing_id];
               const agreement = booking.agreement_conditions || {};
               const rentAmount = parseFloat((agreement.monthlyRent || '').toString().replace(/[^0-9.]/g, '')) || 0;
-              
+
               // Count existing payments for this booking (only monthly rents, excluding initial booking payment)
               const bookingPayments = payments.filter(p => p.booking_id === booking.id && p.payment_type === 'monthly_rent');
               const monthsPaid = bookingPayments.length;
@@ -1269,7 +1278,7 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
               let activationDateText = '';
               let isLastMonthPaid = false;
               let displayRentAmount = rentAmount;
-              
+
               if (booking.move_in_date) {
                 try {
                   const moveIn = new Date(booking.move_in_date);
@@ -1297,7 +1306,7 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
                     if (startDate >= moveOut) {
                       isLastMonthPaid = true;
                       isButtonEnabled = false;
-                    } 
+                    }
                     // If move out falls inside this upcoming billing period, cap the end date of this period to the move out date
                     else if (moveOut > startDate && moveOut < endDate) {
                       adjustedEndDate = moveOut;
@@ -1312,7 +1321,7 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
                   const startDay = startDate.getUTCDate();
                   const startMonthName = monthNames[startDate.getUTCMonth()];
                   const startYear = startDate.getUTCFullYear();
-                  
+
                   const endDay = adjustedEndDate.getUTCDate();
                   const endMonthName = monthNames[adjustedEndDate.getUTCMonth()];
                   const endYear = adjustedEndDate.getUTCFullYear();
@@ -1328,17 +1337,17 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
 
                   const diffMs = startMs - currentMs;
                   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-                   if (!isLastMonthPaid) {
-                     isButtonEnabled = diffDays <= 3;
-                   }
+                  if (!isLastMonthPaid) {
+                    isButtonEnabled = diffDays <= 3;
+                  }
 
                   // 3 days before start date:
                   const activationDate = new Date(startDate.getTime() - 3 * 24 * 60 * 60 * 1000);
                   const actDay = activationDate.getUTCDate();
                   const actMonthName = monthNames[activationDate.getUTCMonth()];
                   const actYear = activationDate.getUTCFullYear();
-                  activationDateText = isLastMonthPaid 
-                    ? 'Final month rent pre-paid' 
+                  activationDateText = isLastMonthPaid
+                    ? 'Final month rent pre-paid'
                     : `${actMonthName} ${actDay}, ${actYear}`;
                 } catch (err) {
                   console.error('Error formatting range on UI:', err);
@@ -1487,95 +1496,95 @@ function AppointmentsTab({ user, listings = [] }) {
 
       <div className="border rounded-2xl overflow-hidden bg-card shadow-sm">
         <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b bg-muted/50 text-xs uppercase tracking-wider">
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Agent / Owner</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Date & Time</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border text-sm">
-            {appointments.map(app => {
-              const listing = listingMap[app.listing_id];
-              const agent = profileMap[app.agent_id];
-              const owner = profileMap[app.owner_id];
-              const hostName = agent?.full_name || owner?.full_name || agent?.email || owner?.email || 'Host';
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b bg-muted/50 text-xs uppercase tracking-wider">
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Agent / Owner</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Date & Time</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border text-sm">
+              {appointments.map(app => {
+                const listing = listingMap[app.listing_id];
+                const agent = profileMap[app.agent_id];
+                const owner = profileMap[app.owner_id];
+                const hostName = agent?.full_name || owner?.full_name || agent?.email || owner?.email || 'Host';
 
-              return (
-                <tr key={app.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-4">
-                    <div className="font-semibold text-slate-800">
-                      {listing?.title ? (
-                        <Link to={`/listings/${app.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1">
-                          {listing.title} <ExternalLink className="w-3.5 h-3.5 opacity-60" />
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">Unknown Property</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="font-medium text-slate-700">{hostName}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{agent ? 'Agent' : 'Owner'}</div>
-                  </td>
-                  <td className="px-4 py-4 font-semibold text-slate-700">
-                    {app.appointment_date ? (
-                      format(new Date(app.appointment_date), 'MMMM d, yyyy · h:mm a')
-                    ) : (
-                      <span className="text-amber-600 font-medium">To be scheduled</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4">
-                    {app.owner_accepted ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                        Confirmed
-                      </span>
-                    ) : app.agent_scheduled_slots?.includes('approved_by_agent') ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse">
-                        Awaiting Owner
-                      </span>
-                    ) : app.agent_scheduled_slots?.length > 0 ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
-                        Alternative Proposed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-                        Pending
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-right">
-                    {app.agent_scheduled_slots?.length > 0 && !app.owner_accepted && (
-                      <div className="flex flex-col items-end gap-1.5">
-                        <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Choose a suggested slot:</span>
-                        <div className="flex flex-wrap gap-1 justify-end max-w-xs">
-                          {app.agent_scheduled_slots.map((slot, index) => (
-                            <Button
-                              key={index}
-                              size="xs"
-                              variant="outline"
-                              onClick={() => handleAcceptSlot(app.id, slot)}
-                              className="text-xs border-amber-200 bg-amber-50/50 hover:bg-amber-100 hover:text-amber-800 px-2 py-1 rounded"
-                            >
-                              {format(new Date(slot), 'MMM d, h:mm a')}
-                            </Button>
-                          ))}
-                        </div>
+                return (
+                  <tr key={app.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-slate-800">
+                        {listing?.title ? (
+                          <Link to={`/listings/${app.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1">
+                            {listing.title} <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">Unknown Property</span>
+                        )}
                       </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                      <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="font-medium text-slate-700">{hostName}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{agent ? 'Agent' : 'Owner'}</div>
+                    </td>
+                    <td className="px-4 py-4 font-semibold text-slate-700">
+                      {app.appointment_date ? (
+                        format(new Date(app.appointment_date), 'MMMM d, yyyy · h:mm a')
+                      ) : (
+                        <span className="text-amber-600 font-medium">To be scheduled</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      {app.owner_accepted ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          Confirmed
+                        </span>
+                      ) : app.agent_scheduled_slots?.includes('approved_by_agent') ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse">
+                          Awaiting Owner
+                        </span>
+                      ) : app.agent_scheduled_slots?.length > 0 ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                          Alternative Proposed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                          Pending
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      {app.agent_scheduled_slots?.length > 0 && !app.owner_accepted && (
+                        <div className="flex flex-col items-end gap-1.5">
+                          <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Choose a suggested slot:</span>
+                          <div className="flex flex-wrap gap-1 justify-end max-w-xs">
+                            {app.agent_scheduled_slots.map((slot, index) => (
+                              <Button
+                                key={index}
+                                size="xs"
+                                variant="outline"
+                                onClick={() => handleAcceptSlot(app.id, slot)}
+                                className="text-xs border-amber-200 bg-amber-50/50 hover:bg-amber-100 hover:text-amber-800 px-2 py-1 rounded"
+                              >
+                                {format(new Date(slot), 'MMM d, h:mm a')}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
-  </div>
   );
 }
 
@@ -1743,7 +1752,7 @@ export default function UserDashboard() {
     base44.auth.me().then(async (u) => {
       setUser(u);
       setAuthLoading(false);
-      
+
       if (u && (u.role === 'renter' || u.role === 'tenant')) {
         // Fetch verification state to check if they completed uploads
         const { data } = await supabase
@@ -1902,9 +1911,9 @@ export default function UserDashboard() {
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <StripeConnectBanner 
-        user={user} 
-        onboardingLoading={onboardingLoading} 
+      <StripeConnectBanner
+        user={user}
+        onboardingLoading={onboardingLoading}
         handleStripeOnboard={handleStripeOnboard}
         title="Set up Your Payments"
         description="To receive referral commission connect your bank account through Stripe."
@@ -1930,7 +1939,7 @@ export default function UserDashboard() {
         <StatCard icon={Calendar} label="Booking Requests" value={myBookings.length} color="bg-amber-100 text-amber-600" />
       </div>
 
-    
+
 
       {/* Tabs */}
       <Tabs className="text-sm" value={activeTab} onValueChange={(val) => {
