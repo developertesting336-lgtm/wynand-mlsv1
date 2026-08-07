@@ -662,14 +662,39 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
                   const advanceMonthsPayment = parseFloat(conditions.advanceMonthsPayment || 0);
                   const totalPaidByTenant = depositAmount + lastMonthRent + advanceMonthsPayment;
 
-                  if (hasAgentOrReferral) {
-                    ownerDisplayAmount = depositAmount + lastMonthRent + advanceMonthsPayment;
-                    description = 'Deposit + Last Month Rent + Advance Payment';
+                  // Read flags from payment's additional_data or fall back to DB checks
+                  const additionalData = p.additional_data || {};
+                  const isAgentPaid = additionalData.agentpaid === true || (!additionalData.nobodypaid && !additionalData.referral_paid && !!booking?.agent_id);
+                  const isReferralPaid = additionalData.referral_paid === true || (!additionalData.nobodypaid && !additionalData.agentpaid && !booking?.agent_id && hasAgentOrReferral);
+
+                  if (isAgentPaid) {
+                    // Agent takes 1 month rent as commission
+                    // 10% platform fee on agent commission, 16% IVA on platform fee
+                    const commission = rentAmount;
+                    const platformFee = commission * 0.10;
+                    const iva = platformFee * 0.16;
+                    
+                    // Owner gets: totalPaidByTenant - agentCommission (which is net of its platform fees and tax)
+                    // The actual agent net payout was: commission - platformFee - iva.
+                    // The rest (owner payout + platform earnings) sums back to totalPaidByTenant.
+                    // Owner gets: totalPaidByTenant - commission
+                    ownerDisplayAmount = totalPaidByTenant - commission;
+                    description = `Deposit + Last Month Rent + Advance Payment - Agent Commission (1 Month Rent)`;
+                  } else if (isReferralPaid) {
+                    // Referral gets 15% of 1 month rent as commission
+                    // 10% platform fee on referral commission, 16% IVA on platform fee
+                    const commission = rentAmount * 0.15;
+                    const platformFee = commission * 0.10;
+                    const iva = platformFee * 0.16;
+
+                    ownerDisplayAmount = totalPaidByTenant - commission;
+                    description = `Deposit + Last Month Rent + Advance Payment - Referral Commission (15% of 1 Month Rent)`;
                   } else {
-                    const platformFee = (lastMonthRent + advanceMonthsPayment) * 0.10;
+                    // Nobody paid (10% platform fee on totalPaidByTenant + 16% IVA on that platform fee)
+                    const platformFee = totalPaidByTenant * 0.10;
                     const iva = platformFee * 0.16;
                     ownerDisplayAmount = totalPaidByTenant - platformFee - iva;
-                    description = 'Deposit + Last Month Rent + Advance Payment (Net payout after 10% platform fee and 16% IVA on rent)';
+                    description = `Deposit + Last Month Rent + Advance Payment (Net payout after 10% platform fee and 16% IVA on total)`;
                   }
                 }
 

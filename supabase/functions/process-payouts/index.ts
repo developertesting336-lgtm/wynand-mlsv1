@@ -676,6 +676,16 @@ serve(async (req) => {
                     }
                 }
 
+                // Determine additional_data payload
+                let additionalDataJson = {};
+                if (isAgentSelfReferral || isAgentReferral) {
+                    additionalDataJson = { agentpaid: true };
+                } else if (saleReferral) {
+                    additionalDataJson = { referral_paid: true };
+                } else {
+                    additionalDataJson = { nobodypaid: true };
+                }
+
                 // Update the main payment record
                 const { error: updateError } = await supabase
                     .from('payments')
@@ -683,6 +693,7 @@ serve(async (req) => {
                         payout_status: 'paid',
                         payout_transfer_id: transferId,
                         payout_error: commissionTransferFailed ? `Owner paid, commission failed: ${transferId}` : null,
+                        additional_data: additionalDataJson,
                     })
                     .eq('id', payment.id);
 
