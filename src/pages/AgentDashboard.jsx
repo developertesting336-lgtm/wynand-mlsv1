@@ -23,6 +23,7 @@ import InquiryKanban from '@/components/inquiries/InquiryKanban';
 import StaleLeadsAlert from '@/components/inquiries/StaleLeadsAlert';
 import StripeConnectBanner from '@/components/StripeConnectBanner';
 import { useStripeOnboarding } from '@/hooks/useStripeOnboarding';
+import { sendPushNotification } from '@/utils/pushNotification';
 import TenantVerification from '@/components/profile/TenantVerification';
 import EditPropertyModal from '@/components/owner/EditPropertyModal';
 import LeaseDetailsForm from '@/components/owner/LeaseDetailsForm';
@@ -258,6 +259,22 @@ export default function AgentDashboard() {
 
       const { error } = await supabase.from('bookings').update(updatePayload).eq('id', agentSigningBooking.id);
       if (error) throw error;
+
+      // Send push notification to tenant to pay
+      try {
+        if (agentSigningBooking.renter_id) {
+          const listingTitle = listingMap[agentSigningBooking.listing_id]?.title || agentSigningBooking.listing_title || 'Property';
+          await sendPushNotification(
+            agentSigningBooking.renter_id,
+            'Lease Fully Approved',
+            `The lease agreement for "${listingTitle}" has been signed by all parties. Please proceed to payment.`,
+            '/dashboard',
+            'lease_approved'
+          );
+        }
+      } catch (notiErr) {
+        console.warn('Failed to send lease fully approved notification to tenant', notiErr);
+      }
 
       const anvilResponse = await supabase.functions.invoke('anvil-send-lease', {
         body: {
@@ -810,7 +827,7 @@ export default function AgentDashboard() {
                               {NEIGHBORHOOD_LABELS[listing.neighborhood] || listing.neighborhood}
                             </td>
                             <td className="px-4 py-3 font-semibold whitespace-nowrap">
-                              ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString() || '—'}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
+                              {listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString() || '—'}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
                             </td>
                             <td className="px-4 py-3 text-center font-bold">{listing.views || 0}</td>
                             <td className="px-4 py-3">
@@ -1134,7 +1151,7 @@ export default function AgentDashboard() {
                                 !b.agreement_conditions?.tenantSignature &&
                                 listing?.owner_email?.trim().toLowerCase() === listing?.agent_email?.trim().toLowerCase() &&
                                 listing?.owner_email?.trim().toLowerCase() === user?.email?.trim().toLowerCase();
-                              const needsAgentSignature = b.agent_id && b.agreement_conditions && !b.agreement_conditions?.agentSignature;
+                              const needsAgentSignature = b.agent_id && b.agreement_conditions?.tenantSignature && b.agreement_conditions?.landlordSignature && !b.agreement_conditions?.agentSignature;
                               return (
                                 <tr key={b.id} className="hover:bg-muted/30 transition-colors">
                                   <td className="px-4 py-3 font-medium">

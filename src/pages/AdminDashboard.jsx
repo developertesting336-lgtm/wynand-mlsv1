@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Home, Users, ShieldCheck, Eye, Star, FileText, CreditCard, Calendar, Search,
-  ExternalLink, MapPin, BarChart3, Building2, Loader2
+  ExternalLink, MapPin, BarChart3, Building2, Loader2, Handshake, CheckCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -156,6 +156,40 @@ export default function AdminDashboard() {
     },
   });
 
+  const { data: allReferrals = [], isLoading: referralsLoading } = useQuery({
+    queryKey: ['admin-referrals'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sale_referrals')
+        .select('*')
+        .order('created_date', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Assign agent mutation for referrals
+  const assignAgentToReferral = useMutation({
+    mutationFn: async ({ referralId, agentId }) => {
+      const { error } = await supabase
+        .from('sale_referrals')
+        .update({
+          agent_id: agentId || null,
+          updated_date: new Date().toISOString()
+        })
+        .eq('id', referralId);
+      if (error) throw error;
+      return { referralId, agentId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-referrals'] });
+      toast.success('Agent assigned successfully');
+    },
+    onError: (err) => {
+      toast.error(`Failed to assign agent: ${err.message}`);
+    }
+  });
+
   const { data: auditProfiles = [] } = useQuery({
     queryKey: ['admin-audit-profiles', auditLogs.map(log => log.user_id).filter(Boolean)],
     queryFn: async () => {
@@ -171,11 +205,27 @@ export default function AdminDashboard() {
     enabled: auditLogs.length > 0,
   });
 
+  // Query all profiles to have a complete fallback map for referrals and other tables
+  const { data: allProfilesList = [] } = useQuery({
+    queryKey: ['admin-all-profiles-fallback'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, role');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const fallbackProfileMap = Object.fromEntries(allProfilesList.map(p => [p.id, p]));
   const auditProfileMap = Object.fromEntries(auditProfiles.map(p => [p.id, p]));
 
   const profileMap = Object.fromEntries(bookingProfiles.map(p => [p.id, p]));
   const paymentPayerMap = Object.fromEntries(paymentProfiles.map(p => [p.id, p]));
-  const userMap = Object.fromEntries(users.map(u => [u.id, u]));
+  const userMap = {
+    ...Object.fromEntries(users.map(u => [u.id, u])),
+    ...fallbackProfileMap
+  };
   const tenantVerificationMap = Object.fromEntries(verifications.map(v => [v.user_id, v]));
   const listingMap = Object.fromEntries(allListings.map(l => [l.id, l]));
   const bookingMap = Object.fromEntries(allBookings.map(b => [b.id, b]));
@@ -300,6 +350,9 @@ export default function AdminDashboard() {
   const [confirmAction, setConfirmAction] = useState(null); // { listing, action: 'approve' | 'reject' }
   const [confirmUserAction, setConfirmUserAction] = useState(null); // { user, verified: boolean }
   const [selectedUserDocs, setSelectedUserDocs] = useState(null); // { userName, identityDocs, bankDocs }
+  const [activeReferralAssign, setActiveReferralAssign] = useState(null); // { referralId, currentAgentId }
+  const [agentSelectorSearch, setAgentSelectorSearch] = useState('');
+  const [agentSelectorPage, setAgentSelectorPage] = useState(1);
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('admin_dashboard_active_tab') || 'users';
   });
@@ -308,6 +361,9 @@ export default function AdminDashboard() {
   const [bookingsSearch, setBookingsSearch] = useState('');
   const [maintenanceViewBooking, setMaintenanceViewBooking] = useState(null);
   const [paymentsSearch, setPaymentsSearch] = useState('');
+  const [referralsSearch, setReferralsSearch] = useState('');
+  const [referralsPage, setReferralsPage] = useState(1);
+  const [referralsPageSize, setReferralsPageSize] = useState(15);
   const [auditLogsSearch, setAuditLogsSearch] = useState('');
   const [auditLogsPage, setAuditLogsPage] = useState(1);
   const [auditLogsPageSize, setAuditLogsPageSize] = useState(15);
@@ -316,6 +372,7 @@ export default function AdminDashboard() {
   const debouncedPropertiesSearch = useDebouncedValue(propertiesSearch, 500);
   const debouncedBookingsSearch = useDebouncedValue(bookingsSearch, 500);
   const debouncedPaymentsSearch = useDebouncedValue(paymentsSearch, 500);
+  const debouncedReferralsSearch = useDebouncedValue(referralsSearch, 500);
   const debouncedAuditLogsSearch = useDebouncedValue(auditLogsSearch, 500);
 
   const updateUserVerification = useMutation({
@@ -453,6 +510,28 @@ export default function AdminDashboard() {
   const paginatedSubscriptions = filteredSubscriptions.slice((subscriptionsPage - 1) * subscriptionsPageSize, subscriptionsPage * subscriptionsPageSize);
   const subscriptionsTotalPages = Math.max(1, Math.ceil(filteredSubscriptions.length / subscriptionsPageSize));
 
+  const filteredReferrals = allReferrals.filter(ref => {
+    const query = debouncedReferralsSearch.trim().toLowerCase();
+    if (!query) return true;
+    const referrer = userMap[ref.referrer_id];
+    const agent = userMap[ref.agent_id];
+    return [
+      ref.client_name,
+      ref.client_email,
+      ref.client_phone,
+      ref.referral_type,
+      ref.status,
+      referrer?.full_name,
+      referrer?.email,
+      agent?.full_name,
+      agent?.email
+    ]
+      .filter(Boolean)
+      .some(value => value.toLowerCase().includes(query));
+  });
+  const paginatedReferrals = filteredReferrals.slice((referralsPage - 1) * referralsPageSize, referralsPage * referralsPageSize);
+  const referralsTotalPages = Math.max(1, Math.ceil(filteredReferrals.length / referralsPageSize));
+
   const filteredAuditLogs = auditLogs.filter(log => {
     const query = debouncedAuditLogsSearch.trim().toLowerCase();
     if (!query) return true;
@@ -476,7 +555,7 @@ export default function AdminDashboard() {
 
   const formatCurrency = (value) => (
     <>
-      ${(value / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      {(value / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       <span className="text-xs font-normal text-muted-foreground ml-1">MXN</span>
     </>
   );
@@ -547,6 +626,7 @@ export default function AdminDashboard() {
           <TabsTrigger value="bookings" className="gap-1"><Calendar className="w-4 h-4" /> Bookings ({allBookings.length})</TabsTrigger>
           <TabsTrigger value="earnings" className="gap-1"><BarChart3 className="w-4 h-4" /> Earnings</TabsTrigger>
           <TabsTrigger value="payments" className="gap-1"><CreditCard className="w-4 h-4" /> Payments ({allPayments.length})</TabsTrigger>
+          <TabsTrigger value="referrals" className="gap-1"><Handshake className="w-4 h-4" /> Referrals ({allReferrals.length})</TabsTrigger>
           <TabsTrigger value="audit_logs" className="gap-1"><FileText className="w-4 h-4" /> Audit Logs</TabsTrigger>
         </TabsList>
 
@@ -730,13 +810,12 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-center align-middle">
                           <div className="flex items-center justify-center">
                             <select
-                              className={`text-xs p-1.5 rounded-lg border font-semibold cursor-pointer shadow-sm focus:outline-none focus:ring-1 focus:ring-primary ${
-                                verification.id_verification === 'approved'
-                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                                  : verification.id_verification === 'declined'
-                                    ? 'bg-rose-50 border-rose-300 text-rose-700'
-                                    : 'bg-slate-50 border-slate-300 text-slate-700'
-                              }`}
+                              className={`text-xs p-1.5 rounded-lg border font-semibold cursor-pointer shadow-sm focus:outline-none focus:ring-1 focus:ring-primary ${verification.id_verification === 'approved'
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                : verification.id_verification === 'declined'
+                                  ? 'bg-rose-50 border-rose-300 text-rose-700'
+                                  : 'bg-slate-50 border-slate-300 text-slate-700'
+                                }`}
                               value={verification.id_verification || 'pending'}
                               onChange={(e) => updateVerificationStatus.mutate({
                                 userId: u.id,
@@ -754,13 +833,12 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-center align-middle">
                           <div className="flex items-center justify-center">
                             <select
-                              className={`text-xs p-1.5 rounded-lg border font-semibold cursor-pointer shadow-sm focus:outline-none focus:ring-1 focus:ring-primary ${
-                                verification.employment_verification === 'approved'
-                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                                  : verification.employment_verification === 'declined'
-                                    ? 'bg-rose-50 border-rose-300 text-rose-700'
-                                    : 'bg-slate-50 border-slate-300 text-slate-700'
-                              }`}
+                              className={`text-xs p-1.5 rounded-lg border font-semibold cursor-pointer shadow-sm focus:outline-none focus:ring-1 focus:ring-primary ${verification.employment_verification === 'approved'
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                : verification.employment_verification === 'declined'
+                                  ? 'bg-rose-50 border-rose-300 text-rose-700'
+                                  : 'bg-slate-50 border-slate-300 text-slate-700'
+                                }`}
                               value={verification.employment_verification || 'pending'}
                               onChange={(e) => updateVerificationStatus.mutate({
                                 userId: u.id,
@@ -778,13 +856,12 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-center align-middle">
                           <div className="flex items-center justify-center">
                             <select
-                              className={`text-xs p-1.5 rounded-lg border font-semibold cursor-pointer shadow-sm focus:outline-none focus:ring-1 focus:ring-primary ${
-                                verification.bank_statement_verification === 'approved'
-                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                                  : verification.bank_statement_verification === 'declined'
-                                    ? 'bg-rose-50 border-rose-300 text-rose-700'
-                                    : 'bg-slate-50 border-slate-300 text-slate-700'
-                              }`}
+                              className={`text-xs p-1.5 rounded-lg border font-semibold cursor-pointer shadow-sm focus:outline-none focus:ring-1 focus:ring-primary ${verification.bank_statement_verification === 'approved'
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                : verification.bank_statement_verification === 'declined'
+                                  ? 'bg-rose-50 border-rose-300 text-rose-700'
+                                  : 'bg-slate-50 border-slate-300 text-slate-700'
+                                }`}
                               value={verification.bank_statement_verification || 'pending'}
                               onChange={(e) => updateVerificationStatus.mutate({
                                 userId: u.id,
@@ -816,10 +893,10 @@ export default function AdminDashboard() {
                                   propertyDocs: verification.property_documents || []
                                 })}
                               >
-                                <Eye className="w-3.5 h-3.5" /> View ({ 
-                                  (verification.identity_documents?.length || 0) + 
-                                  (verification.bank_documents?.length || 0) + 
-                                  (verification.property_documents?.length || 0) 
+                                <Eye className="w-3.5 h-3.5" /> View ({
+                                  (verification.identity_documents?.length || 0) +
+                                  (verification.bank_documents?.length || 0) +
+                                  (verification.property_documents?.length || 0)
                                 })
                               </Button>
                             ) : (
@@ -929,7 +1006,7 @@ export default function AdminDashboard() {
                         <div className="text-xs text-muted-foreground">{listing.owner_email || ''}</div>
                       </td>
                       <td className="px-4 py-3 font-semibold">
-                        ${listing.price_mxn || listing.price_usd}
+                        {listing.price_mxn || listing.price_usd}
                         <span className="text-xs font-normal text-muted-foreground ml-1">MXN</span>/mo
                       </td>
                       <td className="px-4 py-3">
@@ -1388,7 +1465,7 @@ export default function AdminDashboard() {
                           <div className="text-xs text-muted-foreground">{payee?.email || ''}</div>
                         </td>
                         <td className="px-4 py-3 font-semibold text-emerald-600">
-                          ${amountFormatted}
+                          {amountFormatted}
                           <span className="text-xs font-normal text-muted-foreground ml-1">MXN</span>
                         </td>
                         <td className="px-4 py-3"><Badge variant="outline">{p.status || 'succeeded'}</Badge></td>
@@ -1537,10 +1614,291 @@ export default function AdminDashboard() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="referrals" className="mt-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                value={referralsSearch}
+                onChange={(e) => { setReferralsSearch(e.target.value); setReferralsPage(1); }}
+                placeholder="Search referrals..."
+                className="pl-10 pr-3 h-11 rounded-2xl border border-slate-200 bg-slate-50 shadow-sm focus:border-slate-300 focus:ring-2 focus:ring-primary/10"
+              />
+            </div>
+          </div>
+          {referralsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />)}
+            </div>
+          ) : filteredReferrals.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">No referrals found</p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50 text-left">
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Client</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Referrer</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Assigned Agent</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Type</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Est. Value (MXN)</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Commission</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedReferrals.map(ref => {
+                    const referrer = userMap[ref.referrer_id];
+                    const agent = userMap[ref.agent_id];
+                    const agentsList = users.filter(u => u.role === 'agent');
+
+                    return (
+                      <tr key={ref.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-800">{ref.client_name}</div>
+                          <div className="text-xs text-muted-foreground">{ref.client_email || 'No email'}</div>
+                          {ref.client_phone && <div className="text-xs text-slate-500">{ref.client_phone}</div>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium">{referrer?.full_name || 'Unknown'}</div>
+                          <div className="text-xs text-muted-foreground">{referrer?.email || ''}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1 items-start">
+                            {agent ? (
+                              <div className="text-xs">
+                                <span className="font-semibold text-slate-800">{agent.full_name || 'Agent'}</span>
+                                <span className="block text-slate-500">{agent.email}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">Unassigned</span>
+                            )}
+                            {(() => {
+                              // If unassigned, they can always assign
+                              if (!ref.agent_id) {
+                                return (
+                                  <Button
+                                    size="xs"
+                                    variant="outline"
+                                    className="mt-1 text-[10px] h-6 px-2"
+                                    onClick={() => {
+                                      setActiveReferralAssign({ referralId: ref.id, currentAgentId: ref.agent_id });
+                                      setAgentSelectorSearch('');
+                                      setAgentSelectorPage(1);
+                                    }}
+                                  >
+                                    Assign Agent
+                                  </Button>
+                                );
+                              }
+
+                              // If assigned, only allow changing within 30 minutes of updated_date
+                              const updatedDateVal = ref.updated_date || ref.created_date;
+                              const isEditable = (() => {
+                                if (!updatedDateVal) return true;
+                                const diffMs = new Date() - new Date(updatedDateVal);
+                                const diffMins = diffMs / (1000 * 60);
+                                return diffMins <= 30;
+                              })();
+
+                              if (isEditable) {
+                                return (
+                                  <Button
+                                    size="xs"
+                                    variant="outline"
+                                    className="mt-1 text-[10px] h-6 px-2"
+                                    onClick={() => {
+                                      setActiveReferralAssign({ referralId: ref.id, currentAgentId: ref.agent_id });
+                                      setAgentSelectorSearch('');
+                                      setAgentSelectorPage(1);
+                                    }}
+                                  >
+                                    Change Agent
+                                  </Button>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 capitalize">{ref.referral_type}</td>
+                        <td className="px-4 py-3 font-medium">
+                          {ref.estimated_value_usd ? (
+                            `${parseFloat(ref.estimated_value_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 font-medium">
+                          {ref.commission_amount ? (
+                            `${parseFloat(ref.commission_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`
+                          ) : (
+                            <span className="text-muted-foreground">{ref.commission_pct || 15}%</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant={ref.status === 'paid' ? 'default' : 'secondary'} className="capitalize">
+                            {ref.status || 'pending'}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {ref.created_date ? format(new Date(ref.created_date), 'MMM d, yyyy') : 'N/A'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Show</span>
+                  <select
+                    className="text-sm p-1 rounded border"
+                    value={referralsPageSize}
+                    onChange={(e) => { setReferralsPageSize(Number(e.target.value)); setReferralsPage(1); }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={15}>15</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                  <span className="text-sm text-muted-foreground">per page</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" disabled={referralsPage <= 1} onClick={() => setReferralsPage(p => Math.max(1, p - 1))}>Prev</Button>
+                  <div className="text-sm text-muted-foreground">Page {referralsPage} of {referralsTotalPages}</div>
+                  <Button size="sm" variant="outline" disabled={referralsPage >= referralsTotalPages} onClick={() => setReferralsPage(p => Math.min(referralsTotalPages, p + 1))}>Next</Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
       {maintenanceViewBooking && (
         <AdminMaintenanceModal booking={maintenanceViewBooking} onClose={() => setMaintenanceViewBooking(null)} />
       )}
+
+      {/* Searchable Paginated Agent Assignment Dialog */}
+      <Dialog open={!!activeReferralAssign} onOpenChange={(open) => !open && setActiveReferralAssign(null)}>
+        <DialogContent className="max-w-md bg-white p-6 rounded-2xl shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Assign Agent to Referral</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground mt-1">
+              Select an agent to assign to this client request.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="my-4 space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                value={agentSelectorSearch}
+                onChange={(e) => {
+                  setAgentSelectorSearch(e.target.value);
+                  setAgentSelectorPage(1);
+                }}
+                placeholder="Search agent name or email..."
+                className="pl-9 h-10 rounded-xl border border-slate-200"
+              />
+            </div>
+
+            {(() => {
+              const allAgents = allProfilesList.filter(u => u.role === 'agent');
+              const filteredAgents = allAgents.filter(a => {
+                const term = agentSelectorSearch.trim().toLowerCase();
+                if (!term) return true;
+                return [a.full_name, a.email].filter(Boolean).some(val => val.toLowerCase().includes(term));
+              });
+
+              const limit = 10;
+              const pagesCount = Math.max(1, Math.ceil(filteredAgents.length / limit));
+              const displayedAgents = filteredAgents.slice((agentSelectorPage - 1) * limit, agentSelectorPage * limit);
+
+              return (
+                <div className="space-y-3">
+                  <div className="max-h-[300px] overflow-y-auto divide-y divide-border border rounded-xl bg-slate-50/50">
+                    <div
+                      onClick={() => {
+                        assignAgentToReferral.mutate({ referralId: activeReferralAssign.referralId, agentId: null });
+                        setActiveReferralAssign(null);
+                      }}
+                      className="p-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer flex items-center justify-between transition-colors"
+                    >
+                      <span>Unassign Agent / Clear</span>
+                      {!activeReferralAssign?.currentAgentId && <CheckCircle className="w-4 h-4 text-rose-600" />}
+                    </div>
+
+                    {displayedAgents.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-6">No matching agents found</p>
+                    ) : (
+                      displayedAgents.map(a => {
+                        const isCurrent = activeReferralAssign?.currentAgentId === a.id;
+                        return (
+                          <div
+                            key={a.id}
+                            onClick={() => {
+                              assignAgentToReferral.mutate({ referralId: activeReferralAssign.referralId, agentId: a.id });
+                              setActiveReferralAssign(null);
+                            }}
+                            className={`p-3 text-xs hover:bg-muted/50 cursor-pointer flex items-center justify-between transition-colors ${
+                              isCurrent ? 'bg-primary/5 font-semibold text-primary' : ''
+                            }`}
+                          >
+                            <div>
+                              <p className="font-medium text-slate-800">{a.full_name || 'Agent'}</p>
+                              <p className="text-slate-500 text-[10px]">{a.email}</p>
+                            </div>
+                            {isCurrent && <CheckCircle className="w-4 h-4 text-primary" />}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {pagesCount > 1 && (
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 px-1">
+                      <span>Page {agentSelectorPage} of {pagesCount}</span>
+                      <div className="flex gap-2">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={agentSelectorPage <= 1}
+                          onClick={() => setAgentSelectorPage(p => p - 1)}
+                        >
+                          Prev
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={agentSelectorPage >= pagesCount}
+                          onClick={() => setAgentSelectorPage(p => p + 1)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          <DialogFooter className="sm:justify-start">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setActiveReferralAssign(null)}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

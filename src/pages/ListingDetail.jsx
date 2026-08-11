@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogD
 import {
   ShieldCheck, Bed, Bath, MapPin,
   ArrowLeft, ChevronLeft, ChevronRight, Dog, Sofa, Clock,
-  Phone, Video, ExternalLink, Eye, Calendar, DollarSign, Star, Users, CheckCircle, AlertCircle
+  Phone, Video, ExternalLink, Eye, Calendar, Star, Users, CheckCircle, AlertCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
@@ -39,7 +39,7 @@ export default function ListingDetail() {
   const refCode = new URLSearchParams(window.location.search).get('ref') || '';
   const [currentPhoto, setCurrentPhoto] = useState(0);
   const touchStartX = useRef(null);
-  
+
   // Use global auth context
   const { user, login, authChecked } = useAuth();
 
@@ -99,7 +99,7 @@ export default function ListingDetail() {
     queryFn: () =>
       user?.id
         ? base44.entities.TenantVerification.filter({ user_id: user.id })
-            .then(v => v[0] || {})
+          .then(v => v[0] || {})
         : Promise.resolve({}),
     enabled: !!user?.id,
   });
@@ -113,7 +113,7 @@ export default function ListingDetail() {
 
   useEffect(() => {
     if (listing) {
-      base44.entities.Listing.update(listing.id, { views: (listing.views || 0) + 1 }).catch(() => {});
+      base44.entities.Listing.update(listing.id, { views: (listing.views || 0) + 1 }).catch(() => { });
     }
   }, [listing?.id]);
 
@@ -279,11 +279,11 @@ export default function ListingDetail() {
             </div>
             <div className="shrink-0">
               <div className="text-2xl md:text-3xl font-bold text-foreground">
-                MXN ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}
+                MXN {listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}
                 <span className="text-base font-normal text-muted-foreground">/mo</span>
               </div>
               {/* {listing.price_mxn && listing.price_usd && (
-                <p className="text-xs text-muted-foreground text-right">USD ${listing.price_usd?.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground text-right">USD {listing.price_usd?.toLocaleString()}</p>
               )} */}
             </div>
           </div>
@@ -300,36 +300,32 @@ export default function ListingDetail() {
 
           {/* Booking status banner */}
           {hasBookingRequest && bookingStatus !== 'declined' && (
-            <div className={`flex items-center gap-3 rounded-xl px-4 py-3 border ${
-              bookingStatus === 'approved' 
-                ? 'bg-green-50 border-green-200' 
-                : bookingStatus === 'pending'
+            <div className={`flex items-center gap-3 rounded-xl px-4 py-3 border ${bookingStatus === 'approved'
+              ? 'bg-green-50 border-green-200'
+              : bookingStatus === 'pending'
                 ? 'bg-amber-50 border-amber-200'
                 : bookingStatus === 'declined'
-                ? 'bg-red-50 border-red-200'
-                : 'bg-blue-50 border-blue-200'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${
-                bookingStatus === 'approved' ? 'bg-green-600' 
-                : bookingStatus === 'pending' ? 'bg-amber-600'
-                : bookingStatus === 'declined' ? 'bg-red-600'
-                : 'bg-blue-600'
-              }`} />
-              <div className={`text-sm ${
-                bookingStatus === 'approved' ? 'text-green-800' 
-                : bookingStatus === 'pending' ? 'text-amber-800'
-                : bookingStatus === 'declined' ? 'text-red-800'
-                : 'text-blue-800'
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-blue-50 border-blue-200'
               }`}>
+              <div className={`w-2 h-2 rounded-full ${bookingStatus === 'approved' ? 'bg-green-600'
+                : bookingStatus === 'pending' ? 'bg-amber-600'
+                  : bookingStatus === 'declined' ? 'bg-red-600'
+                    : 'bg-blue-600'
+                }`} />
+              <div className={`text-sm ${bookingStatus === 'approved' ? 'text-green-800'
+                : bookingStatus === 'pending' ? 'text-amber-800'
+                  : bookingStatus === 'declined' ? 'text-red-800'
+                    : 'text-blue-800'
+                }`}>
                 <p className="font-semibold">
                   {bookingStatus === 'approved' && '✓ Your booking has been approved!'}
                   {bookingStatus === 'pending' && '⏳ Booking request pending approval'}
                   {bookingStatus === 'confirmed' && '✓ Your booking is confirmed & paid'}
-                  {bookingStatus === 'declined' && `✗ Your booking request was declined on ${
-                    userBookings[0]?.updated_date 
-                      ? format(new Date(userBookings[0].updated_date), 'MMMM d, yyyy') 
-                      : 'a recent date'
-                  }`}
+                  {bookingStatus === 'declined' && `✗ Your booking request was declined on ${userBookings[0]?.updated_date
+                    ? format(new Date(userBookings[0].updated_date), 'MMMM d, yyyy')
+                    : 'a recent date'
+                    }`}
                 </p>
                 {bookingStatus === 'approved' && <p className="text-xs mt-0.5">Head to your dashboard to complete payment.</p>}
                 {bookingStatus === 'pending' && <p className="text-xs mt-0.5">The owner will review your request soon.</p>}
@@ -342,10 +338,10 @@ export default function ListingDetail() {
             </div>
           )}
 
-          
 
-            {/* Booking component when allowed */}
-            {/* {canBook && (
+
+          {/* Booking component when allowed */}
+          {/* {canBook && (
               <div className="mt-4">
                 <BookingForm listing={listing} user={user} refCode={refCode} />
               </div>
@@ -402,8 +398,8 @@ export default function ListingDetail() {
               )}
               {listing.deposit_amount && (
                 <div className="rounded-xl border bg-card p-4">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1"><DollarSign className="w-3 h-3" /> Deposit (one-time)</p>
-                  <p className="font-semibold mt-1 text-sm">MXN ${listing.deposit_amount?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">Deposit (one-time)</p>
+                  <p className="font-semibold mt-1 text-sm">MXN {listing.deposit_amount?.toLocaleString()}</p>
                 </div>
               )}
               {listing.lease_terms && (
@@ -496,17 +492,17 @@ export default function ListingDetail() {
           {/* Price summary */}
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="text-3xl font-bold">
-              MXN ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}
+              MXN {listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}
               <span className="text-base font-normal text-muted-foreground">/mo</span>
             </div>
             {/* {listing.price_mxn && listing.price_usd && (
-              <p className="text-sm text-muted-foreground">≈ USD ${listing.price_usd?.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground">≈ USD {listing.price_usd?.toLocaleString()}</p>
             )} */}
             {listing.deposit_amount && (
               <div>
-                <p className="text-sm text-muted-foreground mt-1">Deposit (one-time): MXN ${listing.deposit_amount?.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground mt-1">Deposit (one-time): MXN {listing.deposit_amount?.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1 p-2 bg-blue-50 rounded border border-blue-200">
-                  ℹ️ On first booking, you'll pay: Deposit (one-time) + First Month Rent + Last Month Rent (Total: MXN ${(Number(listing.deposit_amount || 0) + (Number(listing.price_mxn || listing.price_usd || 0) * 2))?.toLocaleString()})
+                  ℹ️ On first booking, you'll pay: Deposit (one-time) + First Month Rent + Last Month Rent (Total: MXN {(Number(listing.deposit_amount || 0) + (Number(listing.price_mxn || listing.price_usd || 0) * 2))?.toLocaleString()})
                 </p>
               </div>
             )}

@@ -129,14 +129,17 @@ export default function Pricing() {
             <p className="text-sm uppercase tracking-[0.24em] text-primary font-semibold">Pricing</p>
             <h1 className="text-4xl font-bold mt-3">Premium membership</h1>
             <p className="max-w-2xl text-muted-foreground mt-4 leading-7">
-              Unlock access to prioritized customer support, subscription benefits, and a smoother renting experience for just ${PRICE_USD.toFixed(2)}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span> per month.
+              Unlock access to prioritized customer support, subscription benefits, and a smoother renting experience for just 342 MXN / $19.99 USD per month.
             </p>
           </div>
 
           <div className="grid gap-4">
             <Card className="border border-border/80">
               <CardHeader>
-                <CardTitle className="text-2xl">${PRICE_USD.toFixed(2)}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span> / month</CardTitle>
+                <CardTitle className="text-2xl flex flex-col gap-0.5">
+                  <span>342 MXN / month</span>
+                  <span className="text-sm font-normal text-muted-foreground">$19.99 USD / month</span>
+                </CardTitle>
                 {/* <CardDescription>Recurring subscription for renters and property owners.</CardDescription> */}
               </CardHeader>
               <CardContent className="space-y-4">
@@ -188,7 +191,7 @@ export default function Pricing() {
                     onClick={handleSubscribe}
                     disabled={subscribing || loadingUser}
                   >
-                    {loadingUser ? 'Checking account…' : subscribing ? 'Starting checkout…' : `Subscribe for $${PRICE_USD.toFixed(2)} MXN`}
+                    {loadingUser ? 'Checking account…' : subscribing ? 'Starting checkout…' : `Subscribe for 342 MXN / $19.99`}
                   </Button>
                   {!user && !loadingUser && (
                     <p className="text-sm text-muted-foreground">Please sign in to subscribe.</p>
@@ -216,9 +219,9 @@ export default function Pricing() {
               <CardDescription>Get premium access today.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <div className="rounded-2xl bg-muted p-4">
-                <p className="font-semibold">${PRICE_USD.toFixed(2)} / month</p>
-                {/* <p>Recurring subscription billed to your payment method.</p> */}
+              <div className="rounded-2xl bg-muted p-4 space-y-1">
+                <p className="font-semibold text-slate-800">342 MXN / month</p>
+                <p className="text-xs text-muted-foreground">$19.99 USD / month</p>
               </div>
               <ul className="space-y-2">
                 <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-accent" /> Secure Stripe checkout</li>

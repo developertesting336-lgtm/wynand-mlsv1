@@ -240,8 +240,8 @@ export default function Profile() {
                 {bookings.map(b => {
                   const conditions = b.agreement_conditions || {};
                   const property = b.listings || {};
-                  const monthlyRent = conditions.monthlyRent || `$${property.price_usd?.toLocaleString() || 'N/A'}`;
-                  const securityDeposit = conditions.securityDepositAmount ? `$${Number(conditions.securityDepositAmount).toLocaleString()}` : 'N/A';
+                  const monthlyRent = conditions.monthlyRent ? conditions.monthlyRent.toString().replace('$', '') : `${property.price_usd?.toLocaleString() || 'N/A'}`;
+                  const securityDeposit = conditions.securityDepositAmount ? `${Number(conditions.securityDepositAmount).toLocaleString()}` : 'N/A';
                   const agreementDate = conditions.landlordSignatureDate || b.created_date ? new Date(b.created_date).toLocaleDateString() : 'N/A';
                   
                   return (
@@ -304,7 +304,7 @@ export default function Profile() {
                   <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <div>
                       <p className="text-sm font-medium">{p.title || 'Untitled Property'}</p>
-                      <p className="text-xs text-muted-foreground">{p.neighborhood || 'No location'} · ${p.price_usd?.toLocaleString()}/mo</p>
+                      <p className="text-xs text-muted-foreground">{p.neighborhood || 'No location'} · {p.price_usd?.toLocaleString()}/mo</p>
                     </div>
                     <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
                       p.status === 'approved' ? 'bg-green-100 text-green-700' :

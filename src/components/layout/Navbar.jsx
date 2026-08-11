@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, ShieldCheck, Search, PlusCircle, LayoutDashboard, DollarSign, Users, Heart, UserCircle, KeyRound, Handshake, Building2, UserCog, Bell, CheckCheck } from 'lucide-react';
+import { Menu, X, ShieldCheck, Search, PlusCircle, LayoutDashboard, CreditCard, Users, Heart, UserCircle, KeyRound, Handshake, Building2, UserCog, Bell, CheckCheck } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { registerPushNotifications, checkPushSubscription, unsubscribePushNotifications } from '@/utils/pushNotification';
@@ -218,8 +218,8 @@ export default function Navbar() {
 
 
   const navLinks = [
-    { to: '/pricing', icon: DollarSign, label: 'Pricing', roles: ['renter'], requiresAuth: false },
-    { to: '/listings', icon: Search, label: 'Browse', roles: ['renter', 'agent', 'owner', 'admin'], requiresAuth: false },
+    { to: '/pricing', icon: CreditCard, label: 'Pricing', roles: ['renter'], requiresAuth: false },
+    { to: '/listings', icon: Search, label: 'Browse', roles: ['renter', 'admin'], requiresAuth: false },
     { to: '/agents', icon: Users, label: 'Agents', roles: ['renter', 'owner', 'admin'], requiresAuth: false },
     { to: '/admin', icon: UserCog, label: 'Admin Panel', roles: ['admin'], requiresAuth: true },
     { to: '/refer', icon: Handshake, label: 'Refer & Earn', roles: ['renter', 'agent', 'owner'], requiresAuth: false },

@@ -60,7 +60,7 @@ serve(async (req) => {
       .eq('id', bookingId)
       .single();
 
-    console.log(booking, '0000000000000000000000000000000000000')
+
 
     if (bookingError || !booking) {
       return new Response(JSON.stringify({ error: 'Booking not found' }), {
@@ -99,7 +99,6 @@ serve(async (req) => {
       .eq('id', booking.listing_id)
       .single();
 
-    console.log(listing, '000000000000044444444444444400')
 
     if (listingError || !listing) {
       return new Response(JSON.stringify({ error: 'Listing not found' }), {
@@ -115,7 +114,6 @@ serve(async (req) => {
       .eq('id', booking.owner_id)
       .single();
 
-    console.log(profile, '00000000005555555548765454');
 
 
     if (profileError || !profile || !profile.stripe_connect_id) {
@@ -132,7 +130,7 @@ serve(async (req) => {
     const depositAmount = parseFloat(agreement.securityDepositAmount) || 0;
     const rentAmount = parseFloat((agreement.monthlyRent || '').toString().replace(/[^0-9.]/g, '')) || 0;
     let platformFeeAmount = Math.round(rentAmount * 0.10 * 100) / 100;
-    
+
     let amountToCharge = 0;
     const lineItems = [];
 
@@ -143,7 +141,7 @@ serve(async (req) => {
         .select('id', { count: 'exact', head: true })
         .eq('booking_id', bookingId)
         .eq('payment_type', 'monthly_rent');
-      
+
       const monthsPaid = (countError || existingCount === null) ? 0 : existingCount;
       let finalRentAmount = rentAmount;
 

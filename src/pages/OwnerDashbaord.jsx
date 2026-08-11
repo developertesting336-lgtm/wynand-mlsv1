@@ -127,7 +127,7 @@ function PropertiesTable({ listings, pendingBookingsCount, bookingStatusMap, onE
                   {NEIGHBORHOOD_LABELS[l.neighborhood] || l.neighborhood}
                 </td>
                 <td className="px-4 py-3 font-semibold whitespace-nowrap">
-                  ${l.price_mxn?.toLocaleString() || l.price_usd?.toLocaleString()}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span><span className="text-muted-foreground font-normal">/mo</span>
+                  {l.price_mxn?.toLocaleString() || l.price_usd?.toLocaleString()}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span><span className="text-muted-foreground font-normal">/mo</span>
                 </td>
                 <td className="px-4 py-3 text-center font-bold">{l.views || 0}</td>
                 <td className="px-4 py-3">
@@ -363,146 +363,146 @@ function OwnerAppointmentsTab({ user, listings = [] }) {
 
       <div className="border rounded-2xl overflow-hidden bg-card shadow-sm">
         <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50 text-xs uppercase tracking-wider">
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Tenant</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Requested Date & Time</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {appointments.map(app => {
-              const listing = listingMap[app.listing_id];
-              const tenant = profileMap[app.renter_id];
-              const tenantName = tenant?.full_name || tenant?.email || 'Tenant';
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50 text-xs uppercase tracking-wider">
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Tenant</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Requested Date & Time</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
+                <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {appointments.map(app => {
+                const listing = listingMap[app.listing_id];
+                const tenant = profileMap[app.renter_id];
+                const tenantName = tenant?.full_name || tenant?.email || 'Tenant';
 
-              return (
-                <tr key={app.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-4">
-                    <div className="font-semibold text-slate-800">
-                      {listing?.title ? (
-                        <Link to={`/listings/${app.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1">
-                          {listing.title} <ExternalLink className="w-3.5 h-3.5 opacity-60" />
-                        </Link>
+                return (
+                  <tr key={app.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-slate-800">
+                        {listing?.title ? (
+                          <Link to={`/listings/${app.listing_id}`} className="hover:text-primary transition-colors inline-flex items-center gap-1">
+                            {listing.title} <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">Unknown Property</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="font-medium text-slate-700">{tenantName}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{tenant?.email}</div>
+                    </td>
+                    <td className="px-4 py-4 font-semibold text-slate-700">
+                      {app.appointment_date ? (
+                        format(new Date(app.appointment_date), 'MMMM d, yyyy · h:mm a')
                       ) : (
-                        <span className="text-muted-foreground">Unknown Property</span>
+                        <span className="text-amber-600 font-medium">To be scheduled</span>
                       )}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="font-medium text-slate-700">{tenantName}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{tenant?.email}</div>
-                  </td>
-                  <td className="px-4 py-4 font-semibold text-slate-700">
-                    {app.appointment_date ? (
-                      format(new Date(app.appointment_date), 'MMMM d, yyyy · h:mm a')
-                    ) : (
-                      <span className="text-amber-600 font-medium">To be scheduled</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4">
-                    {app.owner_accepted ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                        Confirmed
-                      </span>
-                    ) : app.agent_scheduled_slots?.includes('approved_by_agent') ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse">
-                        Approved by Agent
-                      </span>
-                    ) : app.agent_scheduled_slots?.length > 0 ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
-                        Alternative Proposed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-                        Pending Approval
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-right">
-                    <div className="flex flex-col items-end gap-2">
-                      {!app.owner_accepted && suggestingId !== app.id && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleAccept(app.id)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs animate-transform active:scale-95"
-                          >
-                            Accept Request
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSuggestingId(app.id);
-                              setSlotsInputs(prev => ({
-                                ...prev,
-                                [app.id]: ['', '', '']
-                              }));
-                            }}
-                            className="text-xs"
-                          >
-                            Suggest Slots
-                          </Button>
-                        </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      {app.owner_accepted ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          Confirmed
+                        </span>
+                      ) : app.agent_scheduled_slots?.includes('approved_by_agent') ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse">
+                          Approved by Agent
+                        </span>
+                      ) : app.agent_scheduled_slots?.length > 0 ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                          Alternative Proposed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                          Pending Approval
+                        </span>
                       )}
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <div className="flex flex-col items-end gap-2">
+                        {!app.owner_accepted && suggestingId !== app.id && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleAccept(app.id)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs animate-transform active:scale-95"
+                            >
+                              Accept Request
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSuggestingId(app.id);
+                                setSlotsInputs(prev => ({
+                                  ...prev,
+                                  [app.id]: ['', '', '']
+                                }));
+                              }}
+                              className="text-xs"
+                            >
+                              Suggest Slots
+                            </Button>
+                          </div>
+                        )}
 
-                      {suggestingId === app.id && (
-                        <div className="bg-white p-4 rounded-xl border border-slate-200 text-left space-y-3 w-80 shadow-md mt-2">
-                          <div>
-                            <span className="text-xs font-semibold text-slate-600 block mb-1">Propose Alternative Slots (Up to 3):</span>
-                            <div className="space-y-2">
-                              {[0, 1, 2].map(idx => (
-                                <input
-                                  key={idx}
-                                  type="datetime-local"
-                                  value={slotsInputs[app.id]?.[idx] || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setSlotsInputs(prev => {
-                                      const arr = [...(prev[app.id] || ['', '', ''])];
-                                      arr[idx] = val;
-                                      return { ...prev, [app.id]: arr };
-                                    });
-                                  }}
-                                  className="w-full text-xs h-9 px-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
-                                />
-                              ))}
+                        {suggestingId === app.id && (
+                          <div className="bg-white p-4 rounded-xl border border-slate-200 text-left space-y-3 w-80 shadow-md mt-2">
+                            <div>
+                              <span className="text-xs font-semibold text-slate-600 block mb-1">Propose Alternative Slots (Up to 3):</span>
+                              <div className="space-y-2">
+                                {[0, 1, 2].map(idx => (
+                                  <input
+                                    key={idx}
+                                    type="datetime-local"
+                                    value={slotsInputs[app.id]?.[idx] || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setSlotsInputs(prev => {
+                                        const arr = [...(prev[app.id] || ['', '', ''])];
+                                        arr[idx] = val;
+                                        return { ...prev, [app.id]: arr };
+                                      });
+                                    }}
+                                    className="w-full text-xs h-9 px-2.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setSuggestingId(null)}
+                                className="h-8 text-xs"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleSuggestSlots(app.id)}
+                                className="bg-primary text-primary-foreground font-semibold h-8 text-xs px-3"
+                              >
+                                Submit Slots
+                              </Button>
                             </div>
                           </div>
-                          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setSuggestingId(null)}
-                              className="h-8 text-xs"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleSuggestSlots(app.id)}
-                              className="bg-primary text-primary-foreground font-semibold h-8 text-xs px-3"
-                            >
-                              Submit Slots
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
-  </div>
   );
 }
 
@@ -646,57 +646,57 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
               const depositAmount = parseFloat(conditions.securityDepositAmount || 0);
               const rentAmount = parseFloat(conditions.monthlyRent?.toString().replace(/[^0-9.]/g, '') || 0);
 
-               const isMonthlyPayment = p.payment_type === 'monthly_rent';
-               let ownerDisplayAmount = 0;
-               let description = '';
+              const isMonthlyPayment = p.payment_type === 'monthly_rent';
+              let ownerDisplayAmount = 0;
+              let description = '';
 
-               if (isMonthlyPayment) {
-                 const tenantPaid = p.amount_centavos ? (p.amount_centavos / 100) : p.amount_mxn;
-                 const platformFee = rentAmount * 0.10;
-                 const iva = platformFee * 0.16;
-                 ownerDisplayAmount = rentAmount; // Net rent to owner (platform fee was added on top)
-                 description = 'Monthly Rent (Platform fee added to renter payment)';
-               } else {
-                  // Booking payment (deposit + last month rent + advance payment)
-                  const lastMonthRent = parseFloat(conditions.lastMonthRent || 0);
-                  const advanceMonthsPayment = parseFloat(conditions.advanceMonthsPayment || 0);
-                  const totalPaidByTenant = depositAmount + lastMonthRent + advanceMonthsPayment;
+              if (isMonthlyPayment) {
+                const tenantPaid = p.amount_centavos ? (p.amount_centavos / 100) : p.amount_mxn;
+                const platformFee = rentAmount * 0.10;
+                const iva = platformFee * 0.16;
+                ownerDisplayAmount = rentAmount; // Net rent to owner (platform fee was added on top)
+                description = 'Monthly Rent (Platform fee added to renter payment)';
+              } else {
+                // Booking payment (deposit + last month rent + advance payment)
+                const lastMonthRent = parseFloat(conditions.lastMonthRent || 0);
+                const advanceMonthsPayment = parseFloat(conditions.advanceMonthsPayment || 0);
+                const totalPaidByTenant = depositAmount + lastMonthRent + advanceMonthsPayment;
 
-                  // Read flags from payment's additional_data or fall back to DB checks
-                  const additionalData = p.additional_data || {};
-                  const isAgentPaid = additionalData.agentpaid === true || (!additionalData.nobodypaid && !additionalData.referral_paid && !!booking?.agent_id);
-                  const isReferralPaid = additionalData.referral_paid === true || (!additionalData.nobodypaid && !additionalData.agentpaid && !booking?.agent_id && hasAgentOrReferral);
+                // Read flags from payment's additional_data or fall back to DB checks
+                const additionalData = p.additional_data || {};
+                const isAgentPaid = additionalData.agentpaid === true || (!additionalData.nobodypaid && !additionalData.referral_paid && !!booking?.agent_id);
+                const isReferralPaid = additionalData.referral_paid === true || (!additionalData.nobodypaid && !additionalData.agentpaid && !booking?.agent_id && hasAgentOrReferral);
 
-                  if (isAgentPaid) {
-                    // Agent takes 1 month rent as commission
-                    // 10% platform fee on agent commission, 16% IVA on platform fee
-                    const commission = rentAmount;
-                    const platformFee = commission * 0.10;
-                    const iva = platformFee * 0.16;
-                    
-                    // Owner gets: totalPaidByTenant - agentCommission (which is net of its platform fees and tax)
-                    // The actual agent net payout was: commission - platformFee - iva.
-                    // The rest (owner payout + platform earnings) sums back to totalPaidByTenant.
-                    // Owner gets: totalPaidByTenant - commission
-                    ownerDisplayAmount = totalPaidByTenant - commission;
-                    description = `Deposit + Last Month Rent + Advance Payment - Agent Commission (1 Month Rent)`;
-                  } else if (isReferralPaid) {
-                    // Referral gets 15% of 1 month rent as commission
-                    // 10% platform fee on referral commission, 16% IVA on platform fee
-                    const commission = rentAmount * 0.15;
-                    const platformFee = commission * 0.10;
-                    const iva = platformFee * 0.16;
+                if (isAgentPaid) {
+                  // Agent takes 1 month rent as commission
+                  // 10% platform fee on agent commission, 16% IVA on platform fee
+                  const commission = rentAmount;
+                  const platformFee = commission * 0.10;
+                  const iva = platformFee * 0.16;
 
-                    ownerDisplayAmount = totalPaidByTenant - commission;
-                    description = `Deposit + Last Month Rent + Advance Payment - Referral Commission (15% of 1 Month Rent)`;
-                  } else {
-                    // Nobody paid (10% platform fee on totalPaidByTenant + 16% IVA on that platform fee)
-                    const platformFee = totalPaidByTenant * 0.10;
-                    const iva = platformFee * 0.16;
-                    ownerDisplayAmount = totalPaidByTenant - platformFee - iva;
-                    description = `Deposit + Last Month Rent + Advance Payment (Net payout after 10% platform fee and 16% IVA on total)`;
-                  }
+                  // Owner gets: totalPaidByTenant - agentCommission (which is net of its platform fees and tax)
+                  // The actual agent net payout was: commission - platformFee - iva.
+                  // The rest (owner payout + platform earnings) sums back to totalPaidByTenant.
+                  // Owner gets: totalPaidByTenant - commission
+                  ownerDisplayAmount = totalPaidByTenant - commission;
+                  description = `Deposit + Last Month Rent + Advance Payment - Agent Commission (1 Month Rent)`;
+                } else if (isReferralPaid) {
+                  // Referral gets 15% of 1 month rent as commission
+                  // 10% platform fee on referral commission, 16% IVA on platform fee
+                  const commission = rentAmount * 0.15;
+                  const platformFee = commission * 0.10;
+                  const iva = platformFee * 0.16;
+
+                  ownerDisplayAmount = totalPaidByTenant - commission;
+                  description = `Deposit + Last Month Rent + Advance Payment - Referral Commission (15% of 1 Month Rent)`;
+                } else {
+                  // Nobody paid (10% platform fee on totalPaidByTenant + 16% IVA on that platform fee)
+                  const platformFee = totalPaidByTenant * 0.10;
+                  const iva = platformFee * 0.16;
+                  ownerDisplayAmount = totalPaidByTenant - platformFee - iva;
+                  description = `Deposit + Last Month Rent + Advance Payment (Net payout after 10% platform fee and 16% IVA on total)`;
                 }
+              }
 
               return (
                 <tr key={p.id} className="hover:bg-muted/30 transition-colors">
@@ -719,7 +719,7 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
                   </td>
                   <td className="px-4 py-3">
                     <div className="font-semibold text-emerald-600">
-                      ${ownerDisplayAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
+                      {ownerDisplayAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
                       {description}
@@ -934,6 +934,8 @@ export default function OwnerDashboard() {
 
   // Maintenance view modal state
   const [maintenanceViewBooking, setMaintenanceViewBooking] = useState(null);
+  const [ownerSigningBooking, setOwnerSigningBooking] = useState(null);
+  const [ownerSigning, setOwnerSigning] = useState(false);
 
   const [bookingsSearch, setBookingsSearch] = useState('');
   const [bookingsPage, setBookingsPage] = useState(1);
@@ -1008,7 +1010,7 @@ export default function OwnerDashboard() {
     mutationFn: async ({ bookingId, agreementConditions }) => {
       setUpdatingState({ id: bookingId, action: 'approve' });
       await saveAgreementConditions.mutateAsync({ bookingId, conditions: agreementConditions });
-      
+
       const { data: bookingData } = await supabase
         .from('bookings')
         .select('*')
@@ -1017,25 +1019,17 @@ export default function OwnerDashboard() {
 
       const { error } = await supabase
         .from('bookings')
-        .update({ status: 'lease_pending', lease_status: 'pending_renter', updated_date: new Date().toISOString() })
+        .update({
+          status: 'lease_pending',
+          lease_status: 'pending_renter',
+          updated_date: new Date().toISOString()
+        })
         .eq('id', bookingId);
       if (error) throw new Error(error.message);
       const res = await supabase.functions.invoke('anvil-send-lease', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
 
-      // Send push notification to agent if associated
-      if (bookingData && bookingData.agent_id) {
-        const listingTitle = myListings.find((listing) => listing.id === bookingData.listing_id)?.title || 'Property';
-        sendPushNotification(
-          bookingData.agent_id,
-          'Lease Agreement Created',
-          `The owner has created a lease agreement for "${listingTitle}". Please review and sign.`,
-          '/agent-dashboard',
-          'lease_pending'
-        ).catch((notificationError) => {
-          console.error('Agent lease created push notification error:', notificationError);
-        });
-      }
+      // Only tenant gets notified at this stage (tenant signs first). Agent will be notified after owner signs.
 
       // Send push notification to tenant/renter
       if (bookingData && bookingData.renter_id) {
@@ -1081,19 +1075,7 @@ export default function OwnerDashboard() {
       const res = await supabase.functions.invoke('anvil-send-lease', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
 
-      // Send push notification to agent if associated
-      if (bookingData && bookingData.agent_id) {
-        const listingTitle = myListings.find((listing) => listing.id === bookingData.listing_id)?.title || 'Property';
-        sendPushNotification(
-          bookingData.agent_id,
-          'Lease Agreement Updated',
-          `The owner has updated the lease agreement for "${listingTitle}". Please review and sign.`,
-          '/agent-dashboard',
-          'lease_pending'
-        ).catch((notificationError) => {
-          console.error('Agent lease updated push notification error:', notificationError);
-        });
-      }
+      // Agent is not notified on owner edits before tenant signature.
 
       // Send push notification to tenant/renter
       if (bookingData && bookingData.renter_id) {
@@ -1124,6 +1106,114 @@ export default function OwnerDashboard() {
       setUpdatingState({ id: null, action: null });
     },
   });
+
+  const handleOwnerSignatureSave = async (signature) => {
+    if (!ownerSigningBooking) return;
+    setOwnerSigning(true);
+    try {
+      let signatureUrl = signature;
+      if (!signatureUrl.startsWith('http')) {
+        const arr = signature.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const file = new File([u8arr], `signs/signature_owner_${ownerSigningBooking.id}.png`, { type: mime });
+        const uploadResult = await base44.integrations.Core.UploadFile({ file });
+        signatureUrl = uploadResult?.file_url;
+        if (!signatureUrl) {
+          throw new Error('Failed to obtain signature public URL from storage.');
+        }
+      }
+
+      if (user?.id) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('signatures')
+            .eq('id', user.id)
+            .single();
+          if (!profileError) {
+            const currentSigs = profile?.signatures || [];
+            if (!currentSigs.includes(signatureUrl)) {
+              const updatedSigs = [...currentSigs, signatureUrl].slice(-3);
+              await supabase.from('profiles').update({ signatures: updatedSigs }).eq('id', user.id);
+              setUser(prev => ({ ...prev, signatures: updatedSigs }));
+            }
+          }
+        } catch (profileErr) {
+          console.error('Failed to update owner signatures:', profileErr);
+        }
+      }
+
+      const existingConditions = ownerSigningBooking.agreement_conditions || {};
+      const mergedConditions = {
+        ...existingConditions,
+        landlordSignature: signatureUrl,
+        landlordSignatureDate: new Date().toISOString(),
+      };
+
+      // Determine next status: if agent exists, transition to 'pending_agent', else 'approved' (fully signed lease)
+      const nextLeaseStatus = ownerSigningBooking.agent_id ? 'pending_agent' : 'approved';
+
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          lease_status: nextLeaseStatus,
+          agreement_conditions: mergedConditions,
+          updated_date: new Date().toISOString()
+        })
+        .eq('id', ownerSigningBooking.id);
+      if (error) throw error;
+
+      const anvilResponse = await supabase.functions.invoke('anvil-send-lease', {
+        body: {
+          bookingId: ownerSigningBooking.id,
+          agreementConditions: mergedConditions,
+          tenantSignature: existingConditions.tenantSignature,
+          tenantSignatureDate: existingConditions.tenantSignatureDate,
+          landlordSignature: signatureUrl,
+          landlordSignatureDate: mergedConditions.landlordSignatureDate,
+        },
+      });
+      if (anvilResponse.error) {
+        throw new Error(anvilResponse.error.message || 'Failed to regenerate lease agreement through Anvil');
+      }
+
+      // Send push notification to agent if associated, otherwise to tenant (ready to pay)
+      if (ownerSigningBooking.agent_id) {
+        const listingTitle = myListings.find((listing) => listing.id === ownerSigningBooking.listing_id)?.title || 'Property';
+        sendPushNotification(
+          ownerSigningBooking.agent_id,
+          'Lease Agreement Signed by Owner',
+          `The owner has signed the lease agreement for "${listingTitle}". Please review and sign.`,
+          '/agent-dashboard',
+          'lease_pending'
+        ).catch(() => {});
+      } else {
+        const listingTitle = myListings.find((listing) => listing.id === ownerSigningBooking.listing_id)?.title || 'Property';
+        sendPushNotification(
+          ownerSigningBooking.renter_id,
+          'Lease Fully Approved',
+          `The lease agreement for "${listingTitle}" has been signed by all parties. Please proceed to payment.`,
+          '/dashboard',
+          'lease_approved'
+        ).catch(() => {});
+      }
+
+      toast.success('Lease signed successfully!');
+      queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
+      setOwnerSigningBooking(null);
+    } catch (err) {
+      console.error('Failed to save owner signature:', err);
+      toast.error(`Failed to save signature: ${err.message}`);
+    } finally {
+      setOwnerSigning(false);
+    }
+  };
 
   const endLeaseMutation = useMutation({
     mutationFn: async (bookingId) => {
@@ -1605,8 +1695,7 @@ export default function OwnerDashboard() {
                                       )}
                                     </td>
                                   </tr>
-
-                                  {isEditing && !agreementData && (
+                                  {isEditing && (
                                     <tr className="bg-muted/10">
                                       <td colSpan={8} className="px-4 py-4">
                                         <LeaseDetailsForm
@@ -1614,87 +1703,24 @@ export default function OwnerDashboard() {
                                           listing={listing}
                                           ownerProfile={{ full_name: user?.full_name || user?.email || 'Owner' }}
                                           renterProfile={renter}
-                                          onSubmit={(formData) => setAgreementData(formData)}
-                                          onCancel={() => {
-                                            setEditingBookingId(null);
-                                            setAgreementData(null);
-                                          }}
-                                          isSubmitting={updatingState?.id === b.id}
-                                        />
-                                      </td>
-                                    </tr>
-                                  )}
-
-                                  {agreementData && editingBookingId === b.id && (
-                                    <tr className="bg-muted/10">
-                                      <td colSpan={8} className="px-4 py-4">
-                                        <SignaturePad
-                                          title="Owner Signature"
-                                          savedSignatures={user?.signatures || []}
-                                          onSave={async (signature) => {
+                                          onSubmit={async (formData) => {
                                             try {
-                                              setUpdatingState({ id: b.id, action: 'approve' });
-
-                                              let signatureUrl = signature;
-                                              if (!signature.startsWith('http')) {
-                                                const arr = signature.split(',');
-                                                const mime = arr[0].match(/:(.*?);/)[1];
-                                                const bstr = atob(arr[1]);
-                                                let n = bstr.length;
-                                                const u8arr = new Uint8Array(n);
-                                                while (n--) {
-                                                  u8arr[n] = bstr.charCodeAt(n);
-                                                }
-                                                const file = new File([u8arr], `signs/signature_owner_${b.id}.png`, { type: mime });
-
-                                                const uploadResult = await base44.integrations.Core.UploadFile({ file });
-                                                signatureUrl = uploadResult?.file_url;
-
-                                                if (!signatureUrl) {
-                                                  throw new Error('Failed to obtain signature public URL from storage.');
-                                                }
-
-                                                try {
-                                                  const { data: profile } = await supabase
-                                                    .from('profiles')
-                                                    .select('signatures')
-                                                    .eq('id', user.id)
-                                                    .single();
-                                                  const currentSigs = profile?.signatures || [];
-                                                  if (!currentSigs.includes(signatureUrl)) {
-                                                    const updatedSigs = [...currentSigs, signatureUrl].slice(-3);
-                                                    await supabase
-                                                      .from('profiles')
-                                                      .update({ signatures: updatedSigs })
-                                                      .eq('id', user.id);
-                                                    setUser(prev => ({ ...prev, signatures: updatedSigs }));
-                                                  }
-                                                } catch (profileErr) {
-                                                  console.error('Failed to append signature to profile:', profileErr);
-                                                }
-                                              }
-
-                                              const finalAgreementData = {
-                                                ...agreementData,
-                                                landlordSignature: signatureUrl,
-                                                landlordSignatureDate: new Date().toISOString().split('T')[0],
-                                              };
                                               await approveAndSendLease.mutateAsync({
                                                 bookingId: b.id,
-                                                agreementConditions: finalAgreementData,
+                                                agreementConditions: {
+                                                  ...formData,
+                                                  landlordSignature: null,
+                                                  landlordSignatureDate: null,
+                                                },
                                               });
-
                                             } catch (err) {
-                                              toast.error(`Signature upload or approval failed: ${err.message}`);
-                                              setUpdatingState({ id: null, action: null });
+                                              toast.error(`Approval failed: ${err.message}`);
                                             }
                                           }}
                                           onCancel={() => {
-                                            setAgreementData(null);
                                             setEditingBookingId(null);
                                           }}
                                           isSubmitting={updatingState?.id === b.id}
-                                          disableSubmit={!agreementData?.landlordName}
                                         />
                                       </td>
                                     </tr>
@@ -1958,6 +1984,20 @@ export default function OwnerDashboard() {
                                   <td className="px-4 py-3 text-right">
                                     {(() => {
                                       const canEditAgreement = b.agreement_conditions && !b.agreement_conditions?.tenantSignature;
+                                      const needsOwnerSignature = b.agreement_conditions?.tenantSignature && !b.agreement_conditions?.landlordSignature;
+
+                                      if (needsOwnerSignature) {
+                                        return (
+                                          <Button
+                                            size="sm"
+                                            className="text-xs font-semibold py-1 px-2.5 h-auto whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white"
+                                            onClick={() => setOwnerSigningBooking(b)}
+                                            disabled={updatingState?.id === b.id}
+                                          >
+                                            Sign Agreement
+                                          </Button>
+                                        );
+                                      }
 
                                       if (canEditAgreement) {
                                         return (
@@ -1980,7 +2020,7 @@ export default function OwnerDashboard() {
                                       }
                                       const leaseEndDate = getLeaseEndDate(b.move_in_date, b.agreement_conditions?.leaseDuration || b.lease_duration_months);
                                       let isLeaseOver = leaseEndDate ? leaseEndDate <= new Date() : false;
-                                      
+
                                       if (b.move_out_date) {
                                         const now = new Date();
                                         now.setHours(0, 0, 0, 0);
@@ -2177,84 +2217,79 @@ export default function OwnerDashboard() {
                 />
 
                 {editingAgreementData && (
-                  <div className="space-y-4">
-                    {editingAgreementData.landlordSignature ? (
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Saved Owner Signature</p>
-                          <img
-                            src={editingAgreementData.landlordSignature}
-                            alt="Owner signature"
-                            className="mt-2 h-24 rounded-md border border-slate-200 object-contain"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            className="gap-1"
-                            onClick={async () => {
-                              const finalAgreementData = {
-                                ...editingAgreementData,
-                                landlordSignatureDate: editingAgreementData.landlordSignatureDate || new Date().toISOString().split('T')[0],
-                              };
-                              await updateAndResendLease.mutateAsync({
-                                bookingId: editingAgreementId,
-                                agreementConditions: finalAgreementData,
-                              });
-                            }}
-                            disabled={updatingState?.id === editingAgreementId || !editingAgreementData.landlordName}
-                          >
-                            {updatingState?.id === editingAgreementId ? 'Submitting...' : 'Submit Changes'}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <SignaturePad
-                        title="Owner Signature (required to update)"
-                        savedSignatures={user?.signatures || []}
-                        submitLabel="Submit Changes"
-                        onSave={async (signature) => {
-                          try {
-                            let signatureUrl = signature;
-                            if (!signature.startsWith('http')) {
-                              const arr = signature.split(',');
-                              const mime = arr[0].match(/:(.*?);/)[1];
-                              const bstr = atob(arr[1]);
-                              let n = bstr.length;
-                              const u8arr = new Uint8Array(n);
-                              while (n--) {
-                                u8arr[n] = bstr.charCodeAt(n);
-                              }
-                              const file = new File([u8arr], `signs/signature_owner_${editingAgreementId}.png`, { type: mime });
-                              const uploadResult = await base44.integrations.Core.UploadFile({ file });
-                              signatureUrl = uploadResult?.file_url;
-                              if (!signatureUrl) {
-                                throw new Error('Failed to obtain signature public URL from storage.');
-                              }
-                            }
-                            const finalAgreementData = {
-                              ...editingAgreementData,
-                              landlordSignature: signatureUrl,
-                              landlordSignatureDate: new Date().toISOString().split('T')[0],
-                            };
-                            await updateAndResendLease.mutateAsync({
-                              bookingId: editingAgreementId,
-                              agreementConditions: finalAgreementData,
-                            });
-                          } catch (err) {
-                            toast.error(`Update failed: ${err.message}`);
-                            setUpdatingState({ id: null, action: null });
-                          }
+                  <div className="space-y-4 pt-2">
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          const finalAgreementData = {
+                            ...editingAgreementData,
+                            landlordSignature: null,
+                            landlordSignatureDate: null,
+                          };
+                          await updateAndResendLease.mutateAsync({
+                            bookingId: editingAgreementId,
+                            agreementConditions: finalAgreementData,
+                          });
                         }}
-                        onCancel={() => { setEditingAgreementId(null); setEditingAgreementData(null); }}
-                        isSubmitting={updatingState?.id === editingAgreementId}
-                        disableSubmit={!editingAgreementData.landlordName}
-                      />
-                    )}
+                        disabled={updatingState?.id === editingAgreementId || !editingAgreementData.landlordName}
+                      >
+                        {updatingState?.id === editingAgreementId ? 'Submitting...' : 'Submit Changes'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingAgreementId(null);
+                          setEditingAgreementData(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Owner Lease Signature Modal */}
+      {ownerSigningBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
+            <div className="flex items-center justify-between mb-4 border-b pb-3">
+              <h2 className="text-lg font-bold text-slate-800">Sign Lease Agreement</h2>
+              <button onClick={() => setOwnerSigningBooking(null)} className="text-muted-foreground hover:text-foreground">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                By signing, you agree to the conditions defined in the lease.
+              </p>
+              {ownerSigningBooking.lease_pdf_url && (
+                <div className="bg-slate-50 p-3 rounded-lg border flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-700">Generated PDF Agreement</span>
+                  <a
+                    href={ownerSigningBooking.lease_pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline font-semibold flex items-center gap-1"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> View Agreement
+                  </a>
+                </div>
+              )}
+              <SignaturePad
+                title="Owner Signature"
+                savedSignatures={user?.signatures || []}
+                onSave={handleOwnerSignatureSave}
+                onCancel={() => setOwnerSigningBooking(null)}
+                isSubmitting={ownerSigning}
+              />
+            </div>
           </div>
         </div>
       )}

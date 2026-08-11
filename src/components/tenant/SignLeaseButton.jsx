@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import SignaturePad from '@/components/owner/SignaturePad';
 import { base44 } from '@/api/base44Client';
+import { sendPushNotification } from '@/utils/pushNotification';
 
 export default function SignLeaseButton({ booking, listing, onSigned }) {
   const queryClient = useQueryClient();
@@ -83,7 +84,8 @@ export default function SignLeaseButton({ booking, listing, onSigned }) {
       const { error } = await supabase
         .from('bookings')
         .update({
-          lease_status: 'approved',
+          status: 'lease_pending',
+          lease_status: 'pending_owner',
           agreement_conditions: mergedConditions,
           updated_date: new Date().toISOString()
         })
@@ -103,7 +105,35 @@ export default function SignLeaseButton({ booking, listing, onSigned }) {
 
       if (res.error) throw new Error(res.error.message || 'Failed to update lease');
 
-      toast.success('Lease signed successfully! You can now proceed with payment.');
+      // Send push notification to owner
+      try {
+        const { data: bookingData } = await supabase
+          .from('bookings')
+          .select('owner_id, listing_id')
+          .eq('id', booking.id)
+          .single();
+        if (bookingData && bookingData.owner_id) {
+          const { data: listingData } = await supabase
+            .from('listings')
+            .select('title')
+            .eq('id', bookingData.listing_id)
+            .single();
+          const listingTitle = listingData?.title || 'Property';
+
+          // Helper call for notification
+          await sendPushNotification(
+            bookingData.owner_id,
+            'Lease signed by Tenant',
+            `The tenant has signed the lease agreement for "${listingTitle}". It is now ready for your signature.`,
+            '/owner-dashboard',
+            'lease_signed_tenant'
+          );
+        }
+      } catch (notiErr) {
+        console.warn('Failed to send lease signature notification to owner', notiErr);
+      }
+
+      toast.success('Lease signed successfully! Awaiting owner signature.');
       setIsOpen(false);
       setShowSignaturePad(false);
       // Invalidate queries to refresh the bookings list

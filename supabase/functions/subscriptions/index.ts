@@ -82,11 +82,11 @@ serve(async (req: any) => {
 
       const planPrices: Record<string, { amount: number; name: string }> = normalizedRole === 'agent'
         ? {
-          basic: { amount: 2900, name: 'Basic Agent Plan' },
-          pro: { amount: 7900, name: 'Pro Agent Plan' },
+          basic: { amount: 49900, name: 'Basic Agent Plan' }, // 499 MXN
+          pro: { amount: 129900, name: 'Pro Agent Plan' },   // 1299 MXN
         }
         : {
-          basic: { amount: 1999, name: 'Premium Membership' },
+          basic: { amount: 34200, name: 'Premium Membership' }, // 342 MXN
         };
 
       const planInfo = planPrices[plan] || planPrices[normalizedRole === 'agent' ? 'basic' : 'basic'];

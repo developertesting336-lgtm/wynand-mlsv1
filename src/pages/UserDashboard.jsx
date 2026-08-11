@@ -982,30 +982,26 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                         </Button>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {(b.status === 'lease_pending' || (b.status === 'approved' && b.lease_status !== 'signed')) ? (
+                        {!(b.agreement_conditions?.tenantSignature) ? (
                           <SignLeaseButton booking={b} listing={listing} onSigned={() => { }} />
-                        ) : b.status === 'approved' && totalAmount > 0 ? (
+                        ) : (b.status !== 'confirmed' && b.agreement_conditions?.tenantSignature && b.agreement_conditions?.landlordSignature && agentSigned && totalAmount > 0) ? (
                           <Button
                             size="sm"
                             onClick={() => handlePayment(b.id)}
-                            disabled={payingId === b.id || !agentSigned}
-                            title={agentSigned ? 'Proceed to payment' : 'Payment is available after the agent signs the agreement'}
+                            disabled={payingId === b.id}
+                            title="Proceed to payment"
                             className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-transform active:scale-[0.98] py-1 px-2.5 h-auto whitespace-nowrap disabled:opacity-70 disabled:cursor-not-allowed"
                           >
                             {payingId === b.id ? (
                               <span className="flex items-center gap-1.5">
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                {agentSigned ? `Pay $${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Awaiting agent signature'}
+                                Pay {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
                               </span>
                             ) : (
                               <>
-                                {agentSigned ? (
-                                  <>
-                                    Pay ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
-                                  </>
-                                ) : 'Awaiting agent signature'}
+                                Pay {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <span className="text-[10px] font-normal opacity-90 ml-0.5"> mxn</span>
                               </>
                             )}
                           </Button>
@@ -1163,7 +1159,7 @@ function PaymentsTab({ payments = [], bookings = [], listings = [], isLoading })
                       <div className="text-sm font-medium">{ownerName}</div>
                     </td>
                     <td className="px-4 py-3 font-semibold text-emerald-600">
-                      ${amountUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
+                      {amountUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       <div>{datePart}</div>
@@ -1369,7 +1365,7 @@ function MonthlyRentPaymentsTab({ bookings = [], listings = [], payments = [] })
                     <div className="text-xs text-slate-500 mt-0.5">{listing?.address || '—'}</div>
                   </td>
                   <td className="px-4 py-4 font-semibold text-slate-700 text-sm">
-                    ${displayRentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
+                    {displayRentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>
                   </td>
 
                   <td className="px-4 py-4 text-slate-600 text-sm font-semibold">

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/lib/supabase';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -30,7 +30,28 @@ export default function Listings() {
   }, [urlRefCode]);
   const refCode = urlRefCode || sessionStorage.getItem('referral_code') || '';
 
-  useEffect(() => { base44.auth.me().then(setUser).catch(() => { }); }, []);
+  const [authChecking, setAuthChecking] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    base44.auth.me()
+      .then((currUser) => {
+        setUser(currUser);
+        if (currUser) {
+          if (currUser.role === 'owner') {
+            navigate('/owner-dashboard', { replace: true });
+            return;
+          } else if (currUser.role === 'agent') {
+            navigate('/agent-dashboard', { replace: true });
+            return;
+          }
+        }
+        setAuthChecking(false);
+      })
+      .catch(() => {
+        setAuthChecking(false);
+      });
+  }, [navigate]);
 
   const { favoriteIds, toggle } = useFavorites(user?.id);
   const [filters, setFilters] = useState({
@@ -193,6 +214,14 @@ export default function Listings() {
   const paginatedListings = useMemo(() => {
     return filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   }, [filtered, currentPage]);
+
+  if (authChecking) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

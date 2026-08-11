@@ -73,7 +73,7 @@ export default function Refer() {
   <tr><td style="padding:6px 0;color:#666">Referrer</td><td style="font-weight:600">${currentUser?.full_name || 'N/A'} (${currentUser?.email || 'N/A'})</td></tr>
   <tr><td style="padding:6px 0;color:#666">Client</td><td>${form.client_name} · ${form.client_email || 'N/A'}</td></tr>
   <tr><td style="padding:6px 0;color:#666">Type</td><td>${form.referral_type === 'buyer' ? 'Buyer' : 'Seller'}</td></tr>
-  ${form.estimated_value_usd ? `<tr><td style="padding:6px 0;color:#666">Est. Value</td><td>$${Number(form.estimated_value_usd).toLocaleString()}</td></tr>` : ''}
+  ${form.estimated_value_usd ? `<tr><td style="padding:6px 0;color:#666">Est. Value</td><td>${Number(form.estimated_value_usd).toLocaleString()}</td></tr>` : ''}
   ${form.property_description ? `<tr><td style="padding:6px 0;color:#666">Property</td><td>${form.property_description}</td></tr>` : ''}
 </table>
 <p>Please review in the Admin Dashboard.</p>
@@ -168,9 +168,9 @@ export default function Refer() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               {[
-                { price: '$300,000', commission: '$18,000', fee: '$3,600' },
-                { price: '$500,000', commission: '$30,000', fee: '$6,000' },
-                { price: '$1,000,000', commission: '$60,000', fee: '$12,000' },
+                { price: '300,000', commission: '18,000', fee: '3,600' },
+                { price: '500,000', commission: '30,000', fee: '6,000' },
+                { price: '1,000,000', commission: '60,000', fee: '12,000' },
               ].map(({ price, commission, fee }) => (
                 <div key={price} className="bg-white rounded-lg p-4 text-center shadow-sm">
                   <p className="text-muted-foreground text-xs mb-1">Sale Price</p>

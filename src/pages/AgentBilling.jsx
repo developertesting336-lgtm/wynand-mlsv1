@@ -289,7 +289,7 @@ export default function AgentBilling() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm line-clamp-1">{listing.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}<span className="text-[10px] font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
+                        {listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}<span className="text-[10px] font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
                       </p>
                     </div>
                     {isFeatured ? (
@@ -329,7 +329,7 @@ export default function AgentBilling() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm line-clamp-1">{listing.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      ${listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}<span className="text-[10px] font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
+                      {listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}<span className="text-[10px] font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
                     </p>
                   </div>
                   {listing.is_featured ? (
