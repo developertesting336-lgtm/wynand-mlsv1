@@ -159,30 +159,36 @@ export default function Refer() {
           ))}
         </div>
 
-        {/* Example earnings */}
-        {/* <Card className="mb-10 border-primary/20 bg-primary/5">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold">Example Earnings</h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-              {[
-                { price: '300,000', commission: '18,000', fee: '3,600' },
-                { price: '500,000', commission: '30,000', fee: '6,000' },
-                { price: '1,000,000', commission: '60,000', fee: '12,000' },
-              ].map(({ price, commission, fee }) => (
-                <div key={price} className="bg-white rounded-lg p-4 text-center shadow-sm">
-                  <p className="text-muted-foreground text-xs mb-1">Sale Price</p>
-                  <p className="font-bold text-lg">{price}</p>
-                  <p className="text-xs text-muted-foreground mt-2">Our commission: {commission}</p>
-                  <p className="text-primary font-semibold mt-1">Your 15%: {fee}</p>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-3">* Based on a 6% sales commission. Actual amounts may vary.</p>
-          </CardContent>
-        </Card> */}
+        {/* Unique referral links */}
+        {currentUser && (
+          <Card className="mb-10 border-primary/20 bg-primary/5">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                <h3 className="font-semibold">Your Unique Referral Link</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Share your unique referral link. When users sign up or submit viewing requests through your link, they are automatically tracked as your referrals.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={`${window.location.origin}/?ref=${currentUser.id}`}
+                  readOnly
+                  className="bg-white"
+                />
+                <Button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/?ref=${currentUser.id}`);
+                    toast.success('Referral link copied to clipboard!');
+                  }}
+                  variant="default"
+                >
+                  Copy Link
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Form */}
         <Card>
@@ -284,16 +290,16 @@ export default function Refer() {
       )}
       {authChecked && !user && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-8 text-center">
-            <h2 className="text-2xl font-bold mb-4">Sign In Required</h2>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-8 text-center border border-slate-100">
+            <h2 className="text-2xl font-bold mb-2">Want to Refer Someone?</h2>
             <p className="text-muted-foreground mb-6">
-              You need to sign in to submit a referral and earn 15% commission.
+              Create an account or sign in to get your unique referral links and start earning 15% commission.
             </p>
             <button
               onClick={login}
-              className="bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              className="w-full bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors shadow-sm"
             >
-              Sign In / Sign Up
+              Create an account / Sign In
             </button>
           </div>
         </div>

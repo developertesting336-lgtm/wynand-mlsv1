@@ -391,13 +391,26 @@ function OtpInput({ value, onChange }) {
 // ─── Main AuthModal ─────────────────────────────────────────────────────────
 export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   const [mode, setMode] = useState('login') // 'login' | 'signup' | 'otp' | 'reset-password' | 'reset-otp' | 'reset-success'
-  const [form, setForm] = useState({ email: '', password: '', full_name: '', phone_number: '', role: 'renter' })
+  const [form, setForm] = useState(() => {
+    const isReferPage = typeof window !== 'undefined' && window.location.pathname === '/refer';
+    return { email: '', password: '', full_name: '', phone_number: '', role: isReferPage ? 'agent' : 'renter' };
+  })
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [error, setError] = useState('')
+
+  // Watch for path changes or custom events to reset role to agent if on /refer
+  useEffect(() => {
+    if (isOpen) {
+      const isReferPage = typeof window !== 'undefined' && window.location.pathname === '/refer';
+      if (isReferPage) {
+        setForm(prev => ({ ...prev, role: 'agent' }));
+      }
+    }
+  }, [isOpen]);
 
   // countdown timer for resend
   useEffect(() => {
