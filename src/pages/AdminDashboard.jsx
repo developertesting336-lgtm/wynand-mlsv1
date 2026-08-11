@@ -656,19 +656,17 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Owner</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Tenant</th>
-                    <th className="px-4 py-3 font-semibold text-muted-foreground">Move-in</th>
-                    <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Agent</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Paid Amount</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Lease Status</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Agreement</th>
-                    <th className="px-4 py-3 font-semibold text-muted-foreground">Inspection Report</th>
-                    <th className="px-4 py-3 font-semibold text-muted-foreground">Maintenance</th>
-                    <th className="px-4 py-3 font-semibold text-muted-foreground">Move-out Report</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {paginatedBookings.map(booking => {
                     const owner = profileMap[booking.owner_id];
                     const tenant = profileMap[booking.renter_id];
+                    const agent = profileMap[booking.agent_id];
                     const listing = listingMap[booking.listing_id];
                     const maintenanceCount = (booking.maintenance_requests || []).length;
                     return (
@@ -682,13 +680,43 @@ export default function AdminDashboard() {
                           <div className="font-medium">{tenant?.full_name || 'Unknown'}</div>
                           <div className="text-xs text-muted-foreground">{tenant?.email || ''}</div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {booking.move_in_date ? format(new Date(booking.move_in_date + 'T00:00:00'), 'MMM d, yyyy') : 'N/A'}
-                        </td>
                         <td className="px-4 py-3">
-                          <Badge variant={booking.status === 'approved' || booking.status === 'confirmed' ? 'success' : booking.status === 'declined' ? 'destructive' : 'secondary'}>
-                            {booking.status || 'pending'}
-                          </Badge>
+                          {agent ? (
+                            <>
+                              <div className="font-medium">{agent.full_name || 'Unknown'}</div>
+                              <div className="text-xs text-muted-foreground">{agent.email || ''}</div>
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">None</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {(() => {
+                            const p = allPayments.find(pay => pay.booking_id === booking.id);
+                            const payDate = p?.created_date || p?.created_at;
+                            const dateStr = payDate ? format(new Date(payDate), 'MMM d, yyyy') : '';
+                            
+                            let amountStr = '—';
+                            if (p && p.amount_mxn) {
+                              amountStr = `${parseFloat(p.amount_mxn).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`;
+                            } else {
+                              const conditions = booking.agreement_conditions || {};
+                              const deposit = parseFloat(conditions.securityDepositAmount) || 0;
+                              const lastMonth = parseFloat(conditions.lastMonthRent) || 0;
+                              const advance = parseFloat(conditions.advanceMonthsPayment) || 0;
+                              const total = deposit + lastMonth + advance;
+                              if (booking.status === 'confirmed' && total > 0) {
+                                amountStr = `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`;
+                              }
+                            }
+                            
+                            return (
+                              <div className="flex flex-col">
+                                <span className="font-medium">{amountStr}</span>
+                                {dateStr && <span className="text-xs text-muted-foreground">{dateStr}</span>}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant="outline">{booking.lease_status || 'pending'}</Badge>
@@ -700,38 +728,6 @@ export default function AdminDashboard() {
                             </a>
                           ) : (
                             <span className="text-xs text-muted-foreground italic">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {booking.inspection_report?.pdfUrl ? (
-                            <a href={booking.inspection_report.pdfUrl} target="_blank" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                              <FileText className="w-3 h-3" /> View
-                            </a>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Pending</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {maintenanceCount > 0 ? (
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              className="text-xs whitespace-nowrap px-3 py-2"
-                              onClick={() => setMaintenanceViewBooking(booking)}
-                            >
-                              View ({maintenanceCount})
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">None</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {booking.move_out_report?.pdfUrl ? (
-                            <a href={booking.move_out_report.pdfUrl} target="_blank" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                              <FileText className="w-3 h-3" /> View
-                            </a>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">N/A</span>
                           )}
                         </td>
                       </tr>
