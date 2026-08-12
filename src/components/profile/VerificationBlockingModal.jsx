@@ -43,6 +43,7 @@ export default function VerificationBlockingModal({ user, onComplete }) {
   const profilePhotoUrl = verification?.profile_photo || user?.photo_url || null;
   const identityDocs = verification?.identity_documents || [];
   const idDocUrl = verification?.id_document_url || user?.id_document_url;
+  const targetIdDocUrl = identityDocs.length > 0 ? identityDocs[0] : idDocUrl;
   const hasUploadedId = identityDocs.length > 0 || !!idDocUrl;
   const bankDocs = verification?.bank_documents || [];
 
@@ -184,22 +185,29 @@ export default function VerificationBlockingModal({ user, onComplete }) {
 
   if (loading) return null;
 
-  // Render modal if user lacks photo or identity card upload
-  if (profilePhotoUrl && hasUploadedId) {
-    return null;
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto p-6 md:p-8 animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2.5 rounded-xl bg-primary/10">
-            <ShieldCheck className="w-6 h-6 text-primary" />
+        <div className="relative flex items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-primary/10">
+              <ShieldCheck className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Complete Account Verification</h2>
+              <p className="text-sm text-slate-500 mt-0.5">Please upload required documents to access your account</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-bold tracking-tight">Complete Account Verification</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Please upload required documents to access your account</p>
-          </div>
+          {profilePhotoUrl && hasUploadedId && (
+            <button
+              type="button"
+              onClick={onComplete}
+              className="absolute right-0 top-0 text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-full hover:bg-slate-100"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         <div className="space-y-6">

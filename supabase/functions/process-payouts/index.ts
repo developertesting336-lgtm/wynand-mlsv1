@@ -252,12 +252,36 @@ serve(async (req) => {
                 console.log(`[MONTHLY_RENT] Owner receives 100% = ${ownerPayoutAmount}¢`);
 
             } else if (!hasAgent) {
-                // ── Case 1: No agent ─────────────────────────────────────────────────
-                const platformFeeCents = Math.round(payment.amount_centavos * 0.10);
-                const ivaCents = Math.round(platformFeeCents * 0.16);
-                platformPayoutAmount = platformFeeCents + ivaCents;
-                ownerPayoutAmount = payment.amount_centavos - platformPayoutAmount;
-                console.log(`[Case 1] No agent: owner=${ownerPayoutAmount}¢, platform=${platformPayoutAmount}¢ (fee=${platformFeeCents}¢ + iva=${ivaCents}¢)`);
+                if (hasReferralCode) {
+                    // ── Case 1.5: No agent, but has referral_code ───────────────────
+                    // Owner gets: 80% of total payment
+                    // Platform gets: 5% platform fee + 16% IVA on that 5% fee (which is 0.8% of total payment)
+                    // Referrer gets: 15% of total payment minus the platform's 16% IVA tax (which is deducted from referrer)
+                    ownerPayoutAmount = Math.round(payment.amount_centavos * 0.80);
+                    
+                    const platformBaseCents = Math.round(payment.amount_centavos * 0.05);
+                    const platformIva = Math.round(platformBaseCents * 0.16); // 16% on the platform's 5%
+                    platformPayoutAmount = platformBaseCents + platformIva;
+
+                    const referrerBaseCents = Math.round(payment.amount_centavos * 0.15);
+                    referrerPayoutAmount = referrerBaseCents - platformIva; // Deduct the platform's IVA from referrer's share
+
+                    // Adjust any rounding differences so sum equals total payment
+                    const sum = ownerPayoutAmount + referrerPayoutAmount + platformPayoutAmount;
+                    if (sum !== payment.amount_centavos) {
+                        const diff = payment.amount_centavos - sum;
+                        ownerPayoutAmount += diff;
+                    }
+
+                    console.log(`[Case 1.5] No agent + referral (Refined IVA): owner=${ownerPayoutAmount}¢, referrer=${referrerPayoutAmount}¢ (base=${referrerBaseCents}¢ - iva=${platformIva}¢), platform=${platformPayoutAmount}¢ (base=${platformBaseCents}¢ + iva=${platformIva}¢)`);
+                } else {
+                    // ── Case 1: No agent, no referral ────────────────────────────────
+                    const platformFeeCents = Math.round(payment.amount_centavos * 0.10);
+                    const ivaCents = Math.round(platformFeeCents * 0.16);
+                    platformPayoutAmount = platformFeeCents + ivaCents;
+                    ownerPayoutAmount = payment.amount_centavos - platformPayoutAmount;
+                    console.log(`[Case 1] No agent, no referral: owner=${ownerPayoutAmount}¢, platform=${platformPayoutAmount}¢ (fee=${platformFeeCents}¢ + iva=${ivaCents}¢)`);
+                }
 
             } else {
                 // ── Cases 2/3/4: Agent present ───────────────────────────────────────
