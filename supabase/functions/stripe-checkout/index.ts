@@ -146,6 +146,7 @@ serve(async (req) => {
       let finalRentAmount = rentAmount;
 
       if (booking.move_in_date) {
+        const moveIn = new Date(booking.move_in_date);
         const agreement = booking.agreement_conditions || {};
         const advMonths = parseInt(agreement.advancePaymentMonths) || 0;
         const offset = advMonths > 0 ? (advMonths + 1) : 1;

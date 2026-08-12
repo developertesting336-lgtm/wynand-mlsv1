@@ -31,14 +31,25 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
     queryFn: async () => {
       if (!userId) return [];
       
-      // Fetch referral payments where this user is the referrer
-      const { data: payments } = await supabase
+      // Fetch referral payments and join bookings and listings in a single query to bypass bookings RLS
+      const { data: payments, error: paymentsError } = await supabase
         .from('referral_payments')
-        .select('*')
+        .select(`
+          *,
+          bookings!referral_payments_booking_id_fkey (
+            id,
+            listing_id,
+            listings (
+              id,
+              title
+            )
+          )
+        `)
         .eq('referrer_id', userId)
         .order('created_date', { ascending: false });
       
-      // Fetch the sale_referrals to get commission_pct and client info
+      console.log('ReferralPaymentsTab: payments fetched with join', payments, paymentsError);
+      
       if (payments && payments.length > 0) {
         const referralIds = payments.map(p => p.referral_id).filter(Boolean);
         const { data: referrals } = await supabase
@@ -56,20 +67,18 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
           .in('id', payerIds);
         const payerMap = Object.fromEntries((payerProfiles || []).map(p => [p.id, p]));
         
-        // Fetch bookings to get listing_id
-        const bookingIds = payments.map(p => p.booking_id).filter(Boolean);
-        const { data: bookings } = await supabase
-          .from('bookings')
-          .select('id, listing_id')
-          .in('id', bookingIds);
-        const bookingMap = Object.fromEntries((bookings || []).map(b => [b.id, b]));
-        
-        return payments.map(p => ({
-          ...p,
-          referral: referralMap[p.referral_id] || null,
-          payer: payerMap[p.payer_id] || null,
-          listingId: bookingMap[p.booking_id]?.listing_id || null,
-        }));
+        return payments.map(p => {
+          const bookingObj = p.bookings;
+          const listingId = bookingObj?.listing_id || null;
+          const dbListing = bookingObj?.listings || null;
+          return {
+            ...p,
+            referral: referralMap[p.referral_id] || null,
+            payer: payerMap[p.payer_id] || null,
+            listingId,
+            dbListing,
+          };
+        });
       }
       
       return payments || [];
@@ -81,7 +90,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
   const filteredReferralPayments = referralPayments.filter(p => {
     const query = debouncedSearch.trim().toLowerCase();
     if (!query) return true;
-    const listing = listingMap[p.listingId];
+    const listing = listingMap[p.listingId] || p.dbListing;
     return [
       listing?.title,
       p.referral?.client_name,
@@ -164,7 +173,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
             <div>
               <p className="text-sm text-muted-foreground">Total Earnings</p>
               <p className="text-3xl font-bold text-emerald-600">
-                ${(totalEarnings / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-1"> MXN</span>
+                MXN {(totalEarnings / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
             <div className="text-right">
@@ -181,7 +190,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
           <thead>
             <tr className="bg-muted/50 text-left">
               <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
-              <th className="px-4 py-3 font-semibold text-muted-foreground">Client</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Tenant</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Referral Type</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Amount Earned</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
@@ -190,7 +199,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
           </thead>
           <tbody className="divide-y divide-border">
             {paginatedReferralPayments.map(p => {
-              const listing = listingMap[p.listingId];
+              const listing = listingMap[p.listingId] || p.dbListing;
               const amountUsd = p.amount_centavos ? (p.amount_centavos / 100) : 0;
               const commissionPct = p.referral?.commission_pct || 15;
               const clientName = p.payer?.full_name || p.referral?.client_name || 'Unknown';
@@ -218,7 +227,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
                     </span>
                   </td>
                   <td className="px-4 py-3 font-semibold text-emerald-600">
-                    ${amountUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-muted-foreground ml-1"> MXN</span>
+                    MXN {amountUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-4 py-3">
                     {p.payout_status === 'paid' ? (

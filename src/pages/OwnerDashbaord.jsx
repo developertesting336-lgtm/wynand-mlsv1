@@ -626,6 +626,7 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
             <tr className="bg-muted/50 text-left">
               <th className="px-4 py-3 font-semibold text-muted-foreground">Property</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Tenant</th>
+              <th className="px-4 py-3 font-semibold text-muted-foreground">Payment Type</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Amount</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Tenant Payment</th>
               <th className="px-4 py-3 font-semibold text-muted-foreground">Date</th>
@@ -716,6 +717,11 @@ function PaymentsReceivedTab({ payments = [], bookings = [], listings = [], isLo
                   </td>
                   <td className="px-4 py-3">
                     <div className="text-xs text-muted-foreground">{payerProfileMap[p.payer_id]?.full_name || ''}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${isMonthlyPayment ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' : 'bg-teal-100 text-teal-800 border border-teal-200'}`}>
+                      {isMonthlyPayment ? 'Monthly' : 'Booking'}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="font-semibold text-emerald-600">

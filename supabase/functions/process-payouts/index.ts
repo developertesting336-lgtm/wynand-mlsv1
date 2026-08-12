@@ -74,7 +74,7 @@ serve(async (req) => {
 
             const { data: booking, error: bookingError } = await supabase
                 .from('bookings')
-                .select('id, status, move_in_date, owner_id, agent_id, referral_code, listing_id, agreement_conditions, lease_duration_months')
+                .select('id, status, move_in_date, owner_id, agent_id, referral_code, agent_referral, listing_id, agreement_conditions, lease_duration_months')
                 .eq('id', payment.booking_id)
                 .maybeSingle();
 
@@ -164,211 +164,45 @@ serve(async (req) => {
                 continue;
             }
 
+            // ── COMMISSION DISTRIBUTION ───────────────────────────────────────────────
+            //
+            // booking.agent_id       = the assigned agent for this property/booking
+            // booking.agent_referral = UUID of another agent who referred this booking
+            // booking.referral_code  = UUID of a normal user (owner/renter) who referred
+            //
+            // Case 1: No agent_id, no agent_referral, no referral_code
+            //   Platform fee = payment × 10%
+            //   IVA           = platform_fee × 16%
+            //   Platform gets = platform_fee + IVA
+            //   Owner gets    = payment − platform_fee − IVA
+            //
+            // Case 2: agent_id only (no agent_referral, no referral_code)
+            //   Commission    = lease-duration tier × monthly_rent
+            //   Platform fee  = commission × 10%
+            //   IVA           = platform_fee × 16%
+            //   Platform gets = platform_fee + IVA
+            //   Agent gets    = commission − platform_fee − IVA   (net commission)
+            //   Owner gets    = payment − commission
+            //
+            // Case 3: agent_id + referral_code
+            //   Same deductions as Case 2 on commission
+            //   net_commission = commission − platform_fee − IVA
+            //   Referrer gets  = net_commission × 10%
+            //   Agent gets     = net_commission × 90%
+            //   Owner gets     = payment − commission
+            //
+            // Case 4: agent_id + agent_referral
+            //   Same deductions as Case 2 on commission
+            //   net_commission       = commission − platform_fee − IVA
+            //   Referring agent gets = net_commission × 10%
+            //   Agent gets           = net_commission × 90%
+            //   Owner gets           = payment − commission
 
-            // ── REFERRAL DETECTION ──────────────────────────────────────────────────
-            // Priority:
-            //   1) booking.agent_id + referral_code present → Booking agent referral
-            //      → Owner 80%, Agent 15%
-            //   2) No booking.agent_id → Check agent_referrals table (renter/owner)
-            //   3) No agent referral → Check sale_referrals (buyer → seller)
-            //   4) No referral → Owner gets 90%
+            const hasAgent = !!booking.agent_id;
+            const hasAgentReferral = !!booking.agent_referral;
+            const hasReferralCode = !!booking.referral_code;
 
-            let isAgentReferral = false;
-            let isAgentSelfReferral = false;
-            let saleReferral = null;
-            let referralPayoutAmount = 0;
-            let platformPayoutAmount = 0;
-            let referralPaymentId = null;
-
-            // Get payer (renter) email from profiles
-            const { data: payerProfile } = await supabase
-                .from('profiles')
-                .select('email')
-                .eq('id', payment.payer_id)
-                .single();
-
-            // Get owner (seller) email from profiles
-            const { data: ownerProfile } = await supabase
-                .from('profiles')
-                .select('email')
-                .eq('id', booking.owner_id)
-                .single();
-
-
-            // console.log(booking, '0000000000000000000')
-
-            // ── 1) AGENT REFERRAL CHECK (Booking-Level) ─────────────────────────────
-            if (booking.agent_id || booking.referral_code) {
-                isAgentSelfReferral = true;
-                isAgentReferral = true;
-                console.log(`Booking agent referral: agent_id=${booking.agent_id}, referral_code=${booking.referral_code} → owner 80%, agent 15%`);
-            }
-
-            // ── 2) AGENT REFERRALS CHECK (agent_referrals table) ──────────────────
-            if (!isAgentReferral && !saleReferral) {
-                if (payerProfile?.email) {
-                    const { data: existingPaidAgentRenter } = await supabase
-                        .from('agent_referrals')
-                        .select('id')
-                        .eq('client_email', payerProfile.email)
-                        .eq('status', 'paid')
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (!existingPaidAgentRenter) {
-                        const { data: foundAgentRenterRef } = await supabase
-                            .from('agent_referrals')
-                            .select('id, agent_id, referrer_id, commission_pct, status, client_email, client_phone')
-                            .eq('client_email', payerProfile.email)
-                            .eq('status', 'pending')
-                            .limit(1)
-                            .maybeSingle();
-
-                        if (foundAgentRenterRef) {
-                            const { data: renterProfile } = await supabase
-                                .from('profiles')
-                                .select('phone_number')
-                                .eq('id', payment.payer_id)
-                                .single();
-
-                            const storedPhone = foundAgentRenterRef.client_phone?.replace(/\D/g, '');
-                            const actualPhone = renterProfile?.phone_number?.replace(/\D/g, '');
-
-                            if (storedPhone && actualPhone && storedPhone === actualPhone) {
-                                saleReferral = {
-                                    id: foundAgentRenterRef.id,
-                                    referrer_id: foundAgentRenterRef.referrer_id,
-                                    commission_pct: foundAgentRenterRef.commission_pct || 15,
-                                    referral_type: 'agent',
-                                    client_email: foundAgentRenterRef.client_email,
-                                };
-                                isAgentReferral = true;
-                                console.log(`Found agent referral for renter ${payerProfile.email} (phone matched)`);
-                            }
-                        }
-                    }
-                }
-
-                if (!isAgentReferral && !saleReferral && ownerProfile?.email) {
-                    const { data: existingPaidAgentOwner } = await supabase
-                        .from('agent_referrals')
-                        .select('id')
-                        .eq('client_email', ownerProfile.email)
-                        .eq('status', 'paid')
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (!existingPaidAgentOwner) {
-                        const { data: foundAgentOwnerRef } = await supabase
-                            .from('agent_referrals')
-                            .select('id, agent_id, referrer_id, commission_pct, status, client_email, client_phone')
-                            .eq('client_email', ownerProfile.email)
-                            .eq('status', 'pending')
-                            .limit(1)
-                            .maybeSingle();
-
-                        if (foundAgentOwnerRef) {
-                            const { data: ownerProfilePhone } = await supabase
-                                .from('profiles')
-                                .select('phone_number')
-                                .eq('id', booking.owner_id)
-                                .single();
-
-                            const storedPhone = foundAgentOwnerRef.client_phone?.replace(/\D/g, '');
-                            const actualPhone = ownerProfilePhone?.phone_number?.replace(/\D/g, '');
-
-                            if (storedPhone && actualPhone && storedPhone === actualPhone) {
-                                saleReferral = {
-                                    id: foundAgentOwnerRef.id,
-                                    referrer_id: foundAgentOwnerRef.referrer_id,
-                                    commission_pct: foundAgentOwnerRef.commission_pct || 15,
-                                    referral_type: 'agent',
-                                    client_email: foundAgentOwnerRef.client_email,
-                                };
-                                isAgentReferral = true;
-                                console.log(`Found agent referral for owner ${ownerProfile.email} (phone matched)`);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── 3) SALE REFERRAL CHECK ─────────────────────────────────────────────
-            if (!isAgentReferral && !saleReferral) {
-                if (payerProfile?.email) {
-                    const { data: existingPaidRef } = await supabase
-                        .from('sale_referrals')
-                        .select('id')
-                        .eq('client_email', payerProfile.email)
-                        .eq('status', 'paid')
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (!existingPaidRef) {
-                        const { data: foundRef } = await supabase
-                            .from('sale_referrals')
-                            .select('id, referrer_id, commission_pct, status, referral_type, client_phone')
-                            .eq('client_email', payerProfile.email)
-                            .eq('status', 'pending')
-                            .limit(1)
-                            .maybeSingle();
-
-                        if (foundRef && foundRef.referral_type === 'buyer') {
-                            const { data: payerWithPhone } = await supabase
-                                .from('profiles')
-                                .select('phone_number')
-                                .eq('id', payment.payer_id)
-                                .single();
-
-                            const storedPhone = foundRef.client_phone?.replace(/\D/g, '');
-                            const actualPhone = payerWithPhone?.phone_number?.replace(/\D/g, '');
-
-                            if (storedPhone && actualPhone && storedPhone === actualPhone) {
-                                saleReferral = foundRef;
-                                console.log(`Found valid buyer referral for ${payerProfile.email} (phone matched)`);
-                            }
-                        }
-                    }
-                }
-
-                if (!saleReferral && ownerProfile?.email) {
-                    const { data: existingPaidSeller } = await supabase
-                        .from('sale_referrals')
-                        .select('id')
-                        .eq('client_email', ownerProfile.email)
-                        .eq('status', 'paid')
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (!existingPaidSeller) {
-                        const { data: foundSeller } = await supabase
-                            .from('sale_referrals')
-                            .select('id, referrer_id, commission_pct, status, referral_type, client_phone')
-                            .eq('client_email', ownerProfile.email)
-                            .eq('status', 'pending')
-                            .limit(1)
-                            .maybeSingle();
-
-                        if (foundSeller && foundSeller.referral_type === 'seller') {
-                            const { data: ownerWithPhone } = await supabase
-                                .from('profiles')
-                                .select('phone_number')
-                                .eq('id', booking.owner_id)
-                                .single();
-
-                            const storedPhone = foundSeller.client_phone?.replace(/\D/g, '');
-                            const actualPhone = ownerWithPhone?.phone_number?.replace(/\D/g, '');
-
-                            if (storedPhone && actualPhone && storedPhone === actualPhone) {
-                                saleReferral = foundSeller;
-                                console.log(`Found valid seller referral for ${ownerProfile.email} (phone matched)`);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── CALCULATIONS ──────────────────────────────────────────────────────────
+            // ── LEASE DURATION & MONTHLY RENT ────────────────────────────────────────
             const conditions = booking.agreement_conditions || {};
             let leaseDuration = 12;
             if (conditions.leaseDuration) {
@@ -400,162 +234,88 @@ serve(async (req) => {
             } else if (leaseDuration >= 6) {
                 commissionPct = 0.5;
             }
-            const baseCommissionCents = Math.round(monthlyRentCents * commissionPct);
+            let baseCommissionCents = Math.round(monthlyRentCents * commissionPct);
+            if (baseCommissionCents > payment.amount_centavos) {
+                console.warn(`[WARNING] Commission ${baseCommissionCents}¢ exceeds payment ${payment.amount_centavos}¢. Capping.`);
+                baseCommissionCents = payment.amount_centavos;
+            }
 
+            // ── PAYOUT AMOUNTS ────────────────────────────────────────────────────────
             let ownerPayoutAmount = 0;
-            referralPayoutAmount = 0;
-            platformPayoutAmount = 0;
+            let agentPayoutAmount = 0;
+            let referrerPayoutAmount = 0;
+            let platformPayoutAmount = 0;
 
             if (payment.payment_type === 'monthly_rent') {
+                // Monthly rent: owner always receives 100%
                 ownerPayoutAmount = payment.amount_centavos;
-                console.log(`[INFO] Monthly rent payment: owner receives 100% = ${ownerPayoutAmount} cents, no platform fee or commission`);
+                console.log(`[MONTHLY_RENT] Owner receives 100% = ${ownerPayoutAmount}¢`);
+
+            } else if (!hasAgent) {
+                // ── Case 1: No agent ─────────────────────────────────────────────────
+                const platformFeeCents = Math.round(payment.amount_centavos * 0.10);
+                const ivaCents = Math.round(platformFeeCents * 0.16);
+                platformPayoutAmount = platformFeeCents + ivaCents;
+                ownerPayoutAmount = payment.amount_centavos - platformPayoutAmount;
+                console.log(`[Case 1] No agent: owner=${ownerPayoutAmount}¢, platform=${platformPayoutAmount}¢ (fee=${platformFeeCents}¢ + iva=${ivaCents}¢)`);
+
             } else {
-                const hasAgentAssociated = isAgentSelfReferral || isAgentReferral;
+                // ── Cases 2/3/4: Agent present ───────────────────────────────────────
+                const commissionCents = baseCommissionCents;
+                const platformFeeCents = Math.round(commissionCents * 0.10);
+                const ivaCents = Math.round(platformFeeCents * 0.16);
+                platformPayoutAmount = platformFeeCents + ivaCents;
+                const netCommissionCents = commissionCents - platformFeeCents - ivaCents;
+                ownerPayoutAmount = payment.amount_centavos - commissionCents;
 
-                if (hasAgentAssociated) {
-                    // Case A: Agent Present
-                    let commissionCents = baseCommissionCents;
-                    if (commissionCents > payment.amount_centavos) {
-                        console.warn(`[WARNING] Commission ${commissionCents} cents exceeds payment total ${payment.amount_centavos} cents. Capping commission at payment total.`);
-                        commissionCents = payment.amount_centavos;
-                    }
-                    const platformFeeCents = Math.round(commissionCents * 0.10);
-                    const remainingCommissionCents = commissionCents - platformFeeCents;
-                    const ivaCents = Math.round(remainingCommissionCents * 0.16);
+                if (hasAgentReferral) {
+                    // ── Case 4: Agent + agent_referral ───────────────────────────────
+                    referrerPayoutAmount = Math.round(netCommissionCents * 0.10);
+                    agentPayoutAmount = netCommissionCents - referrerPayoutAmount;
+                    console.log(`[Case 4] Agent + agent_referral: agent=${agentPayoutAmount}¢, referring_agent=${referrerPayoutAmount}¢, owner=${ownerPayoutAmount}¢, platform=${platformPayoutAmount}¢`);
 
-                    referralPayoutAmount = remainingCommissionCents - ivaCents;
-                    ownerPayoutAmount = payment.amount_centavos - commissionCents;
-                    platformPayoutAmount = platformFeeCents + ivaCents;
+                } else if (hasReferralCode) {
+                    // ── Case 3: Agent + referral_code ────────────────────────────────
+                    referrerPayoutAmount = Math.round(netCommissionCents * 0.10);
+                    agentPayoutAmount = netCommissionCents - referrerPayoutAmount;
+                    console.log(`[Case 3] Agent + referral_code: agent=${agentPayoutAmount}¢, referrer=${referrerPayoutAmount}¢, owner=${ownerPayoutAmount}¢, platform=${platformPayoutAmount}¢`);
 
-                    if (isAgentSelfReferral) {
-                        const { data: createdRefPayment, error: refPayError } = await supabase
-                            .from('referral_payments')
-                            .insert({
-                                id: crypto.randomUUID(),
-                                referral_id: payment.payer_id,
-                                booking_id: payment.booking_id,
-                                payer_id: payment.payer_id,
-                                referrer_id: booking.agent_id,
-                                amount_centavos: referralPayoutAmount,
-                                amount_mxn: referralPayoutAmount / 100,
-                                currency: payment.currency || 'mxn',
-                                payout_status: 'pending',
-                            })
-                            .select()
-                            .single();
-
-                        if (refPayError) {
-                            console.error('Failed to create referral_payments entry:', refPayError);
-                        } else if (createdRefPayment?.id) {
-                            referralPaymentId = createdRefPayment.id;
-                        }
-                        console.log(`Agent self-referral: owner receives = ${ownerPayoutAmount}, agent receives = ${referralPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
-                    } else {
-                        // Agent Referral from agent_referrals table
-                        const referredClientId = (saleReferral.referral_type === 'seller')
-                            ? booking.owner_id
-                            : payment.payer_id;
-
-                        const { data: createdReferralPayment, error: referralError } = await supabase
-                            .from('referral_payments')
-                            .insert({
-                                id: crypto.randomUUID(),
-                                referral_id: referredClientId,
-                                booking_id: payment.booking_id,
-                                payer_id: payment.payer_id,
-                                referrer_id: saleReferral.referrer_id,
-                                amount_centavos: referralPayoutAmount,
-                                amount_mxn: referralPayoutAmount / 100,
-                                currency: payment.currency || 'mxn',
-                                payout_status: 'pending',
-                            })
-                            .select()
-                            .single();
-
-                        if (referralError) {
-                            console.error('Failed to create referral payment:', referralError);
-                        } else if (createdReferralPayment?.id) {
-                            referralPaymentId = createdReferralPayment.id;
-                        }
-                        console.log(`Agent referral table match: owner receives = ${ownerPayoutAmount}, agent receives = ${referralPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
-                    }
-                } else if (saleReferral) {
-                    // Case B: Referral Present (No Agent)
-                    let commissionCents = baseCommissionCents;
-                    if (commissionCents > payment.amount_centavos) {
-                        console.warn(`[WARNING] Commission ${commissionCents} cents exceeds payment total ${payment.amount_centavos} cents. Capping commission at payment total.`);
-                        commissionCents = payment.amount_centavos;
-                    }
-                    const platformFeeCents = Math.round(commissionCents * 0.10);
-                    const remainingCommissionCents = commissionCents - platformFeeCents;
-                    const ivaCents = Math.round(remainingCommissionCents * 0.16);
-
-                    referralPayoutAmount = remainingCommissionCents - ivaCents;
-                    ownerPayoutAmount = payment.amount_centavos - commissionCents;
-                    platformPayoutAmount = platformFeeCents + ivaCents;
-
-                    const referredClientId = (saleReferral.referral_type === 'seller')
-                        ? booking.owner_id
-                        : payment.payer_id;
-
-                    const { data: createdReferralPayment, error: referralError } = await supabase
-                        .from('referral_payments')
-                        .insert({
-                            id: crypto.randomUUID(),
-                            referral_id: referredClientId,
-                            booking_id: payment.booking_id,
-                            payer_id: payment.payer_id,
-                            referrer_id: saleReferral.referrer_id,
-                            amount_centavos: referralPayoutAmount,
-                            amount_mxn: referralPayoutAmount / 100,
-                            currency: payment.currency || 'mxn',
-                            payout_status: 'pending',
-                        })
-                        .select()
-                        .single();
-
-                    if (referralError) {
-                        console.error('Failed to create referral payment:', referralError);
-                    } else if (createdReferralPayment?.id) {
-                        referralPaymentId = createdReferralPayment.id;
-                        console.log('Created referral payment:', referralPaymentId);
-                    }
-                    console.log(`Referral match: owner receives = ${ownerPayoutAmount}, referrer receives = ${referralPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
                 } else {
-                    // Case C: Neither Agent nor Referral Present
-                    const platformFeeCents = Math.round(payment.amount_centavos * 0.10);
-                    const ivaCents = Math.round(platformFeeCents * 0.16);
-
-                    platformPayoutAmount = platformFeeCents + ivaCents;
-                    ownerPayoutAmount = payment.amount_centavos - platformPayoutAmount;
-                    referralPayoutAmount = 0;
-                    console.log(`No agent/referral: owner receives = ${ownerPayoutAmount}, platform keeps = ${platformPayoutAmount}`);
+                    // ── Case 2: Agent only ───────────────────────────────────────────
+                    agentPayoutAmount = netCommissionCents;
+                    console.log(`[Case 2] Agent only: agent=${agentPayoutAmount}¢, owner=${ownerPayoutAmount}¢, platform=${platformPayoutAmount}¢`);
                 }
             }
 
             ownerPayoutAmount = Math.max(0, ownerPayoutAmount);
-            referralPayoutAmount = Math.max(0, referralPayoutAmount);
+            agentPayoutAmount = Math.max(0, agentPayoutAmount);
+            referrerPayoutAmount = Math.max(0, referrerPayoutAmount);
             platformPayoutAmount = Math.max(0, platformPayoutAmount);
 
+            // ── STRIPE TRANSFERS & DB RECORDS ─────────────────────────────────────────
             try {
                 const transferCurrency = 'mxn';
-                let transferId = null;
+                let ownerTransferId: string | null = null;
+                let agentTransferId: string | null = null;
+                let referrerTransferId: string | null = null;
+                let agentTransferFailed = false;
+                let referrerTransferFailed = false;
 
-                // Transfer to owner (only if amount > 0)
+                // 1. Transfer to owner
                 if (ownerPayoutAmount > 0) {
-                    const transfer = await stripe.transfers.create({
+                    const ownerTransfer = await stripe.transfers.create({
                         amount: ownerPayoutAmount,
                         currency: transferCurrency,
                         destination: payeeStripeConnectId,
-                        description: referralPaymentId
-                            ? `Payout for Booking #${booking.id} after referral commission deduction`
-                            : `Payout for Booking #${booking.id} after platform fee and IVA deduction`,
+                        description: `Owner payout for Booking #${booking.id}`,
                     });
-                    transferId = transfer.id;
+                    ownerTransferId = ownerTransfer.id;
+                    console.log(`Owner transfer done: ${ownerPayoutAmount}¢ → ${ownerTransferId}`);
                 } else {
-                    console.log(`[INFO] Skipping owner payout transfer (amount is 0)`);
+                    console.log(`[INFO] Skipping owner transfer (amount is 0)`);
                 }
 
+                // 2. Log platform earnings
                 if (platformPayoutAmount > 0) {
                     const { error: platformInsertError } = await supabase.from('platform_earnings').insert({
                         id: crypto.randomUUID(),
@@ -573,126 +333,119 @@ serve(async (req) => {
                     }
                 }
 
-                // Pay referrer/agent commission via Stripe
-                let commissionTransferFailed = false;
-                let commissionTransferId = null;
+                // 3. Transfer to agent (Cases 2, 3, 4)
+                if (agentPayoutAmount > 0 && booking.agent_id) {
+                    try {
+                        const { data: agentInfo } = await supabase
+                            .from('profiles')
+                            .select('stripe_connect_id')
+                            .eq('id', booking.agent_id)
+                            .single();
 
-                if (referralPaymentId && isAgentSelfReferral && booking.agent_id) {
-                    if (referralPayoutAmount > 0) {
-                        try {
-                            const { data: agentInfo } = await supabase
-                                .from('profiles')
-                                .select('stripe_connect_id')
-                                .eq('id', booking.agent_id)
-                                .single();
-
-                            if (agentInfo?.stripe_connect_id) {
-                                const agentTransfer = await stripe.transfers.create({
-                                    amount: referralPayoutAmount,
-                                    currency: transferCurrency,
-                                    destination: agentInfo.stripe_connect_id,
-                                    description: `Agent Commission for Booking #${booking.id} (after platform fee and IVA)`,
-                                });
-                                commissionTransferId = agentTransfer.id;
-                                console.log(`Agent self-referral commission paid: ${referralPayoutAmount} to agent ${booking.agent_id}, transfer=${agentTransfer.id}`);
-                            } else {
-                                console.error(`Agent ${booking.agent_id} has no Stripe Connect ID — commission not paid`);
-                                commissionTransferFailed = true;
-                            }
-                        } catch (agentPayoutErr: any) {
-                            console.error(`Failed to pay agent commission for ${booking.agent_id}:`, agentPayoutErr?.message);
-                            commissionTransferFailed = true;
+                        if (agentInfo?.stripe_connect_id) {
+                            const agentTransfer = await stripe.transfers.create({
+                                amount: agentPayoutAmount,
+                                currency: transferCurrency,
+                                destination: agentInfo.stripe_connect_id,
+                                description: `Agent commission for Booking #${booking.id}`,
+                            });
+                            agentTransferId = agentTransfer.id;
+                            console.log(`Agent transfer done: ${agentPayoutAmount}¢ → ${agentTransferId}`);
+                        } else {
+                            console.error(`Agent ${booking.agent_id} has no Stripe Connect ID — agent commission not paid`);
+                            agentTransferFailed = true;
                         }
-                    } else {
-                        console.log(`[INFO] Skipping agent commission transfer (amount is 0)`);
+                    } catch (agentErr: any) {
+                        console.error(`Failed to pay agent ${booking.agent_id}:`, agentErr?.message);
+                        agentTransferFailed = true;
                     }
-                } else if (referralPaymentId && saleReferral) {
-                    if (referralPayoutAmount > 0) {
-                        try {
-                            const { data: referrerProfile } = await supabase
-                                .from('profiles')
-                                .select('stripe_connect_id')
-                                .eq('id', saleReferral.referrer_id)
-                                .single();
+                }
 
-                            if (referrerProfile?.stripe_connect_id) {
-                                const refTransfer = await stripe.transfers.create({
-                                    amount: referralPayoutAmount,
-                                    currency: transferCurrency,
-                                    destination: referrerProfile.stripe_connect_id,
-                                    description: isAgentReferral
-                                        ? `Agent Referral Commission for Booking #${booking.id} (after platform fee and IVA)`
-                                        : `${saleReferral.referral_type === 'seller' ? 'Seller' : 'Buyer'} Referral Commission for Booking #${booking.id} (after platform fee and IVA)`,
-                                });
-                                commissionTransferId = refTransfer.id;
-                                console.log(`Referral commission paid: ${referralPayoutAmount} to referrer ${saleReferral.referrer_id}, transfer=${refTransfer.id}`);
-                            } else {
-                                console.error(`Referrer ${saleReferral.referrer_id} has no Stripe Connect ID — commission not paid`);
-                                commissionTransferFailed = true;
-                            }
-                        } catch (refPayoutErr: any) {
-                            console.error(`Failed to pay referrer commission ${saleReferral.referrer_id}:`, refPayoutErr?.message);
-                            commissionTransferFailed = true;
+                // 4. Transfer to referrer
+                //    Case 3: booking.referral_code = normal user UUID
+                //    Case 4: booking.agent_referral = referring agent UUID
+                const referrerUUID = booking.agent_referral || booking.referral_code || null;
+                if (referrerPayoutAmount > 0 && referrerUUID) {
+                    try {
+                        const { data: referrerInfo } = await supabase
+                            .from('profiles')
+                            .select('stripe_connect_id')
+                            .eq('id', referrerUUID)
+                            .single();
+
+                        if (referrerInfo?.stripe_connect_id) {
+                            const refTransfer = await stripe.transfers.create({
+                                amount: referrerPayoutAmount,
+                                currency: transferCurrency,
+                                destination: referrerInfo.stripe_connect_id,
+                                description: hasAgentReferral
+                                    ? `Referring agent commission for Booking #${booking.id}`
+                                    : `Referral commission for Booking #${booking.id}`,
+                            });
+                            referrerTransferId = refTransfer.id;
+                            console.log(`Referrer transfer done: ${referrerPayoutAmount}¢ → ${referrerTransferId}`);
+                        } else {
+                            console.error(`Referrer ${referrerUUID} has no Stripe Connect ID — referral commission not paid`);
+                            referrerTransferFailed = true;
                         }
-                    } else {
-                        console.log(`[INFO] Skipping referral commission transfer (amount is 0)`);
+                    } catch (refErr: any) {
+                        console.error(`Failed to pay referrer ${referrerUUID}:`, refErr?.message);
+                        referrerTransferFailed = true;
                     }
                 }
 
-                // Update referral_payments status based on commission transfer result
-                if (referralPaymentId) {
-                    if (commissionTransferId) {
-                        await supabase
-                            .from('referral_payments')
-                            .update({
-                                payout_status: 'paid',
-                                payout_transfer_id: commissionTransferId,
-                                paid_date: new Date().toISOString(),
-                            })
-                            .eq('id', referralPaymentId);
-                    } else if (commissionTransferFailed) {
-                        await supabase
-                            .from('referral_payments')
-                            .update({
-                                payout_status: 'failed',
-                                payout_error: 'Stripe transfer failed — referrer not paid',
-                            })
-                            .eq('id', referralPaymentId);
-                    }
+                // 5. Record referral_payments entries
+                if (agentPayoutAmount > 0 && booking.agent_id) {
+                    await supabase.from('referral_payments').insert({
+                        id: crypto.randomUUID(),
+                        referral_id: booking.agent_id,
+                        booking_id: payment.booking_id,
+                        payer_id: payment.payer_id,
+                        referrer_id: booking.agent_id,
+                        amount_centavos: agentPayoutAmount,
+                        amount_mxn: agentPayoutAmount / 100,
+                        currency: payment.currency || 'mxn',
+                        payout_status: agentTransferId ? 'paid' : (agentTransferFailed ? 'failed' : 'pending'),
+                        payout_transfer_id: agentTransferId || null,
+                        paid_date: agentTransferId ? new Date().toISOString() : null,
+                    });
                 }
 
-                // Mark agent_referrals or sale_referrals as paid
-                if (saleReferral && commissionTransferId) {
-                    if (isAgentReferral) {
-                        await supabase
-                            .from('agent_referrals')
-                            .update({ status: 'paid', paid_date: new Date().toISOString() })
-                            .eq('id', saleReferral.id);
-                    } else {
-                        await supabase
-                            .from('sale_referrals')
-                            .update({ status: 'paid', paid_date: new Date().toISOString() })
-                            .eq('id', saleReferral.id);
-                    }
+                if (referrerPayoutAmount > 0 && referrerUUID) {
+                    await supabase.from('referral_payments').insert({
+                        id: crypto.randomUUID(),
+                        referral_id: referrerUUID,
+                        booking_id: payment.booking_id,
+                        payer_id: payment.payer_id,
+                        referrer_id: referrerUUID,
+                        amount_centavos: referrerPayoutAmount,
+                        amount_mxn: referrerPayoutAmount / 100,
+                        currency: payment.currency || 'mxn',
+                        payout_status: referrerTransferId ? 'paid' : (referrerTransferFailed ? 'failed' : 'pending'),
+                        payout_transfer_id: referrerTransferId || null,
+                        paid_date: referrerTransferId ? new Date().toISOString() : null,
+                    });
                 }
 
-                // Determine additional_data payload
-                let additionalDataJson = {};
-                if (isAgentSelfReferral || isAgentReferral) {
-                    additionalDataJson = { agentpaid: true };
-                } else if (saleReferral) {
-                    additionalDataJson = { referral_paid: true };
+                // 6. Determine additional_data payload for audit
+                let additionalDataJson: Record<string, boolean> = {};
+                if (hasAgent && (hasAgentReferral || hasReferralCode)) {
+                    additionalDataJson = { agent_and_referral_paid: true };
+                } else if (hasAgent) {
+                    additionalDataJson = { agent_paid: true };
                 } else {
-                    additionalDataJson = { nobodypaid: true };
+                    additionalDataJson = { no_agent: true };
                 }
 
-                // Update the main payment record
+                // 7. Update the main payment record
                 const { error: updateError } = await supabase
                     .from('payments')
                     .update({
                         payout_status: 'paid',
-                        payout_transfer_id: transferId,
-                        payout_error: commissionTransferFailed ? `Owner paid, commission failed: ${transferId}` : null,
+                        payout_transfer_id: ownerTransferId,
+                        payout_error: (agentTransferFailed || referrerTransferFailed)
+                            ? `Owner paid (${ownerTransferId}), some commission transfers failed`
+                            : null,
                         additional_data: additionalDataJson,
                     })
                     .eq('id', payment.id);
@@ -703,9 +456,10 @@ serve(async (req) => {
 
                 processed.push({
                     id: payment.id,
-                    transferId: transferId,
+                    transferId: ownerTransferId,
                     amount: ownerPayoutAmount,
                 });
+
             } catch (stripeErr: any) {
                 console.error(`[FAILED] Stripe Transfer failed for payment ${payment.id}`);
                 console.error('Error message:', stripeErr?.message);
@@ -724,6 +478,7 @@ serve(async (req) => {
                     reason: `Stripe error: ${stripeErr?.message}`,
                 });
             }
+
         }
 
 
