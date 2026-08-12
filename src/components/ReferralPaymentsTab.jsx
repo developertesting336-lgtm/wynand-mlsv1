@@ -30,7 +30,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
     queryKey: ['referral-payments', userId, userEmail],
     queryFn: async () => {
       if (!userId) return [];
-      
+
       // Fetch referral payments and join bookings and listings in a single query to bypass bookings RLS
       const { data: payments, error: paymentsError } = await supabase
         .from('referral_payments')
@@ -47,18 +47,18 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
         `)
         .eq('referrer_id', userId)
         .order('created_date', { ascending: false });
-      
-      console.log('ReferralPaymentsTab: payments fetched with join', payments, paymentsError);
-      
+
+
+
       if (payments && payments.length > 0) {
         const referralIds = payments.map(p => p.referral_id).filter(Boolean);
         const { data: referrals } = await supabase
           .from('sale_referrals')
           .select('id, client_name, client_email, client_phone, referral_type, commission_pct')
           .in('id', referralIds);
-        
+
         const referralMap = Object.fromEntries((referrals || []).map(r => [r.id, r]));
-        
+
         // Fetch payer profiles for the client names
         const payerIds = payments.map(p => p.payer_id).filter(Boolean);
         const { data: payerProfiles } = await supabase
@@ -66,7 +66,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
           .select('id, email, full_name')
           .in('id', payerIds);
         const payerMap = Object.fromEntries((payerProfiles || []).map(p => [p.id, p]));
-        
+
         return payments.map(p => {
           const bookingObj = p.bookings;
           const listingId = bookingObj?.listing_id || null;
@@ -80,7 +80,7 @@ export default function ReferralPaymentsTab({ userId, userEmail, listings = [] }
           };
         });
       }
-      
+
       return payments || [];
     },
     enabled: !!userId,

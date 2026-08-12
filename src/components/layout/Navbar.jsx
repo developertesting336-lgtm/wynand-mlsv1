@@ -144,10 +144,8 @@ export default function Navbar() {
     const res = await registerPushNotifications(user.id);
     if (res.success) {
       setPushStatus('subscribed');
-      setShowPrompt(false);
     } else if (res.error === 'permission_denied') {
       setPushStatus('denied');
-      setShowPrompt(false);
       alert('Notification permission was denied. Please allow notifications in your browser settings.');
     } else {
       alert('Could not enable push notifications: ' + res.error);

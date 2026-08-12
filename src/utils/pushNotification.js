@@ -82,48 +82,38 @@ export async function checkPushSubscription(userId) {
     return 'unsupported';
   }
 
-  // If userId is provided, check database first to prevent redundant prompt popups.
-  // If the user already has a registered fcm/web-push subscription token in the DB, consider them subscribed.
-  if (userId) {
-    try {
-      const { data, error } = await supabase
-        .from('user_push_subscriptions')
-        .select('id')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle();
-      if (data && !error) {
-        return 'subscribed';
-      }
-    } catch (err) {
-      console.warn('Error querying DB push subscription:', err);
-    }
-  }
-
-  // 1. If browser permission is default (never asked / reset), user is unsubscribed on this browser
-  if (Notification.permission === 'default') {
-    return 'unsubscribed';
-  }
-
-  // 2. If browser permission is denied, user denied notifications
+  // 1. If browser permission is denied, user denied notifications
   if (Notification.permission === 'denied') {
     return 'denied';
   }
 
+  // 2. If browser permission is default (never asked / reset), user is unsubscribed on this browser
+  if (Notification.permission === 'default') {
+    // Clean up DB if they reset it
+    if (userId) {
+      supabase.from('user_push_subscriptions').delete().eq('user_id', userId).then(() => {}).catch(() => {});
+    }
+    return 'unsubscribed';
+  }
+
+  // 3. Browser has 'granted' permission. Check if an active browser push subscription exists.
+  let subscription = null;
   try {
     const registration = await navigator.serviceWorker.getRegistration('/');
-    if (!registration) {
-      return 'unsubscribed';
+    if (registration) {
+      subscription = await registration.pushManager.getSubscription();
     }
+  } catch (err) {
+    console.warn('Error fetching browser registration/subscription:', err);
+  }
 
-    const subscription = await registration.pushManager.getSubscription();
-    // 3. If browser has no active push subscription (e.g. cookies/site data cleared)
-    if (!subscription) {
-      return 'unsubscribed';
-    }
+  // 4. If no active browser subscription exists (e.g. cookies/site data cleared, sw unregistered)
+  if (!subscription) {
+    return 'unsubscribed';
+  }
 
-    // 4. Browser HAS active subscription & permission. Check/sync with Supabase DB for this user
-    if (userId) {
+  // 5. Browser has active subscription. Check/sync with Supabase DB for this user
+  if (userId) {
       const rawSubscription = JSON.parse(JSON.stringify(subscription));
       const endpoint = rawSubscription.endpoint;
 
@@ -149,14 +139,11 @@ export async function checkPushSubscription(userId) {
             p256dh: rawSubscription.keys?.p256dh,
             auth: rawSubscription.keys?.auth
           });
-      }
+        return 'subscribed';
     }
-
-    return 'subscribed';
-  } catch (err) {
-    console.error('Error checking push subscription:', err);
-    return 'unsubscribed';
   }
+
+  return 'subscribed';
 }
 
 
