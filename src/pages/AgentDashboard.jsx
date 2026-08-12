@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -86,6 +87,54 @@ export default function AgentDashboard() {
   const [agentSigning, setAgentSigning] = useState(false);
   const [agentSignatures, setAgentSignatures] = useState([]);
 
+  // Agent to Agent referral states
+  const [referralModalListing, setReferralModalListing] = useState(null);
+  const [agentSearchQuery, setAgentSearchQuery] = useState('');
+  const [foundAgents, setFoundAgents] = useState([]);
+  const [searchingAgents, setSearchingAgents] = useState(false);
+  const [sendingReferralAgentId, setSendingReferralAgentId] = useState(null);
+  const [removingReferralId, setRemovingReferralId] = useState(null);
+
+  // Debounced agent search trigger
+  useEffect(() => {
+    if (!referralModalListing) {
+      setFoundAgents([]);
+      return;
+    }
+
+    const triggerSearch = async () => {
+      setSearchingAgents(true);
+      try {
+        let queryBuilder = supabase
+          .from('profiles')
+          .select('id, full_name, email, role')
+          .eq('role', 'agent')
+          .neq('id', user?.id);
+
+        if (agentSearchQuery.trim()) {
+          queryBuilder = queryBuilder.or(`full_name.ilike.%${agentSearchQuery}%,email.ilike.%${agentSearchQuery}%`);
+        }
+
+        const { data, error } = await queryBuilder.limit(10);
+        if (!error && data) {
+          setFoundAgents(data);
+        }
+      } catch (err) {
+        console.error('Agent lookup failed:', err);
+      } finally {
+        setSearchingAgents(false);
+      }
+    };
+
+    if (!agentSearchQuery.trim()) {
+      triggerSearch();
+      return;
+    }
+
+    const delay = setTimeout(triggerSearch, 600);
+    return () => clearTimeout(delay);
+  }, [agentSearchQuery, user?.id, referralModalListing]);
+
   // Inspection states
   const [inspectionBooking, setInspectionBooking] = useState(null);
   const [inspectionSelectedSignature, setInspectionSelectedSignature] = useState('');
@@ -106,17 +155,7 @@ export default function AgentDashboard() {
   };
 
   const canEditListing = (listing) => {
-    const ownerEmail = listing.owner_email?.trim().toLowerCase();
-    const agentEmail = listing.agent_email?.trim().toLowerCase();
-    const userEmail = user?.email?.trim().toLowerCase();
-
-    return (
-      ownerEmail &&
-      agentEmail &&
-      userEmail &&
-      ownerEmail === agentEmail &&
-      agentEmail === userEmail
-    );
+    return true;
   };
 
   const closeDocumentsModal = () => {
@@ -336,9 +375,65 @@ export default function AgentDashboard() {
   }, []);
 
   const { data: myListings = [] } = useQuery({
-    queryKey: ['agent-listings', user?.email],
-    queryFn: () => base44.entities.Listing.filter({ agent_email: user.email }, '-created_date', 100),
-    enabled: !!user?.email,
+    queryKey: ['agent-listings', user?.email, user?.id],
+    queryFn: async () => {
+      // 1. Fetch listings owned or directly assigned to the agent via agent_email
+      const directListings = await base44.entities.Listing.filter({ agent_email: user.email }, '-created_date', 100);
+
+      // 2. Fetch accepted referrals for this agent (where agent_referral_id = user.id and status = 'accepted')
+      if (user?.id) {
+        try {
+          const { data: referrals, error: refError } = await supabase
+            .from('property_referrals')
+            .select('listing_id')
+            .eq('agent_referral_id', user.id)
+            .eq('status', 'accepted');
+
+          if (!refError && referrals && referrals.length > 0) {
+            const referredListingIds = referrals.map(r => r.listing_id).filter(Boolean);
+            if (referredListingIds.length > 0) {
+              // Retrieve referred listing entities
+              const referredListings = [];
+              for (const lid of referredListingIds) {
+                const results = await base44.entities.Listing.filter({ id: lid });
+                if (results && results[0]) {
+                  referredListings.push(results[0]);
+                }
+              }
+              // Merge lists without duplicates
+              const allListings = [...directListings];
+              referredListings.forEach(rl => {
+                if (!allListings.some(dl => dl.id === rl.id)) {
+                  allListings.push(rl);
+                }
+              });
+              return allListings;
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load referred listings:', err);
+        }
+      }
+
+      return directListings;
+    },
+    enabled: !!user?.email && !!user?.id,
+  });
+
+  // Query property referrals records related to listings
+  const { data: listingsReferrals = [], refetch: refetchListingsReferrals } = useQuery({
+    queryKey: ['listings-property-referrals', myListings.map(l => l.id)],
+    queryFn: async () => {
+      const listingIds = myListings.map(l => l.id);
+      if (listingIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('property_referrals')
+        .select('*')
+        .in('listing_id', listingIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: myListings.length > 0
   });
 
   const { data: myListingsForInquiries = [] } = useQuery({
@@ -365,9 +460,6 @@ export default function AgentDashboard() {
   const { data: myBookings = [], isLoading: bookingsLoading } = useQuery({
     queryKey: ['agent-bookings', user?.id, myListings.map(l => l.id)],
     queryFn: async () => {
-      console.log('=== AGENT DASHBOARD BOOKINGS QUERY ===');
-      console.log('Logged in user ID:', user?.id);
-      console.log('Logged in user email:', user?.email);
 
       const listingIds = myListings.map(l => l.id);
       let query = supabase.from('bookings').select('*').order('created_date', { ascending: false });
@@ -379,8 +471,6 @@ export default function AgentDashboard() {
       }
 
       const { data, error } = await query;
-
-      console.log('Bookings query result:', { data, error, count: data?.length });
 
       if (error) {
         console.error('Bookings query error:', error);
@@ -755,6 +845,7 @@ export default function AgentDashboard() {
           <TabsTrigger value="bookings" className="gap-1"><Calendar className="w-4 h-4" /> Bookings ({myBookings.length})</TabsTrigger>
           <TabsTrigger value="appointments" className="gap-1"><Calendar className="w-4 h-4" /> Appointments</TabsTrigger>
           <TabsTrigger value="leads" className="gap-1"><MessageSquare className="w-4 h-4" /> Inquiries ({myInquiries.length})</TabsTrigger>
+          <TabsTrigger value="agent-referrals" className="gap-1"><Users className="w-4 h-4" /> Agent Referrals</TabsTrigger>
           <TabsTrigger value="referrals" className="gap-1"><Users className="w-4 h-4" /> Referrals</TabsTrigger>
           <TabsTrigger value="payouts" className="gap-1"><Banknote className="w-4 h-4" /> Payouts</TabsTrigger>
           <TabsTrigger value="verification" className="gap-1"><ShieldCheck className="w-4 h-4" /> Verification</TabsTrigger>
@@ -809,44 +900,124 @@ export default function AgentDashboard() {
                           <th className="px-4 py-3 font-semibold text-muted-foreground">Price</th>
                           <th className="px-4 py-3 font-semibold text-muted-foreground text-center">Views</th>
                           <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
+                          <th className="px-4 py-3 font-semibold text-muted-foreground">Agent Referral</th>
                           <th className="px-4 py-3" />
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {paginatedListings.map(listing => (
-                          <tr key={listing.id} className="hover:bg-muted/30 transition-colors">
-                            <td className="px-4 py-3 font-medium">
-                              <Link to={`/listings/${listing.id}`} className="hover:text-primary transition-colors">
-                                {listing.title}
-                              </Link>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {listing.address || NEIGHBORHOOD_LABELS[listing.neighborhood] || 'No address'}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground">
-                              {NEIGHBORHOOD_LABELS[listing.neighborhood] || listing.neighborhood}
-                            </td>
-                            <td className="px-4 py-3 font-semibold whitespace-nowrap">
-                              {listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString() || '—'}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
-                            </td>
-                            <td className="px-4 py-3 text-center font-bold">{listing.views || 0}</td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusColors[listing.status] || 'bg-slate-100 text-slate-800'}`}>
-                                {listing.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex items-center justify-end gap-2">
-
-                                {canEditListing(listing) && (
-                                  <Button size="sm" variant="outline" onClick={() => openEditModal(listing)} className="gap-1">
-                                    <Pencil className="w-3.5 h-3.5" /> Edit
+                        {paginatedListings.map(listing => {
+                          const referralRecord = listingsReferrals.find(r => r.listing_id === listing.id);
+                          return (
+                            <tr key={listing.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="px-4 py-3 font-medium">
+                                <Link to={`/listings/${listing.id}`} className="hover:text-primary transition-colors">
+                                  {listing.title}
+                                </Link>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {listing.address || NEIGHBORHOOD_LABELS[listing.neighborhood] || 'No address'}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">
+                                {NEIGHBORHOOD_LABELS[listing.neighborhood] || listing.neighborhood}
+                              </td>
+                              <td className="px-4 py-3 font-semibold whitespace-nowrap">
+                                {listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString() || '—'}<span className="text-xs font-normal text-muted-foreground ml-0.5"> MXN</span>/mo
+                              </td>
+                              <td className="px-4 py-3 text-center font-bold">{listing.views || 0}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusColors[listing.status] || 'bg-slate-100 text-slate-800'}`}>
+                                  {listing.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {referralRecord ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(referralRecord.referral_link);
+                                      toast.success('Referral link copied!');
+                                    }}
+                                    className="text-xs px-3 py-1 font-semibold gap-1"
+                                  >
+                                    Copy Link
                                   </Button>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">N/A</span>
                                 )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <div className="flex items-center justify-end gap-2">
+
+                                  {canEditListing(listing) && (
+                                    <Button size="sm" variant="outline" onClick={() => openEditModal(listing)} className="gap-1">
+                                      <Pencil className="w-3.5 h-3.5" /> Edit
+                                    </Button>
+                                  )}
+                                  {listing.status === 'approved' && (
+                                    <>
+                                      {referralRecord ? (
+                                        (() => {
+                                          // Check if there are active bookings for this listing
+                                          // active booking status: pending, approved, confirmed, lease_pending (where end_lease is not true)
+                                          const hasActiveLease = myBookings.some(
+                                            b => b.listing_id === listing.id &&
+                                                 ['pending', 'approved', 'confirmed', 'lease_pending'].includes(b.status) &&
+                                                 b.end_lease !== true
+                                          );
+
+                                          // Allow both agent1 (referrer) and agent2 (referee) to remove referral, but only when there is no active lease
+                                          const isReferredAgent = referralRecord.agent_referral_id === user?.id;
+
+                                          return (
+                                            <Button
+                                              size="sm"
+                                              variant="destructive"
+                                              disabled={hasActiveLease || removingReferralId === referralRecord.id}
+                                              onClick={async () => {
+                                                setRemovingReferralId(referralRecord.id);
+                                                try {
+                                                  const { error } = await supabase
+                                                    .from('property_referrals')
+                                                    .delete()
+                                                    .eq('id', referralRecord.id);
+                                                  if (error) throw error;
+                                                  toast.success('Referral removed successfully!');
+                                                  queryClient.invalidateQueries({ queryKey: ['agent-listings'] });
+                                                  refetchListingsReferrals();
+                                                } catch (err) {
+                                                  toast.error(`Failed to remove referral: ${err.message}`);
+                                                } finally {
+                                                  setRemovingReferralId(null);
+                                                }
+                                              }}
+                                              className="text-xs font-semibold gap-1.5"
+                                            >
+                                              {removingReferralId === referralRecord.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                                              Remove Referral
+                                            </Button>
+                                          );
+                                        })()
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => {
+                                            setReferralModalListing(listing);
+                                            setAgentSearchQuery('');
+                                            setFoundAgents([]);
+                                          }}
+                                          className="text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white"
+                                        >
+                                          Create Referral
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -899,8 +1070,12 @@ export default function AgentDashboard() {
           </Tabs>
         </TabsContent>
 
+        <TabsContent value="agent-referrals" className="mt-4">
+          <AgentReferralsTab user={user} listings={myListings} />
+        </TabsContent>
+
         <TabsContent value="referrals" className="space-y-5 mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="max-w-xl mx-auto w-full">
             <ReferralLinkCard agent={user} listings={myListings} onCodeUpdated={async () => {
               try {
                 const [updated] = await base44.entities.User.filter({ id: user.id });
@@ -909,9 +1084,8 @@ export default function AgentDashboard() {
                 base44.auth.me().then(setUser).catch(() => { });
               }
             }} />
-            <AddReferralForm agent={user} listings={myListings} />
+            {/* <AddReferralForm agent={user} listings={myListings} /> */}
           </div>
-          <ReferralsList agentId={user?.id} />
         </TabsContent>
 
         <TabsContent value="payouts" className="mt-4">
@@ -2006,6 +2180,125 @@ export default function AgentDashboard() {
           }}
         />
       )}
+
+      {editingListing && (
+        <EditPropertyModal
+          listing={editingListing}
+          isOpen={!!editingListing}
+          onClose={closeEditModal}
+          onSave={async (updatedData) => {
+            try {
+              await base44.entities.Listing.update(editingListing.id, updatedData);
+              toast.success('Listing updated successfully!');
+              queryClient.invalidateQueries({ queryKey: ['agent-listings'] });
+              closeEditModal();
+            } catch (err) {
+              toast.error(`Failed to update listing: ${err.message}`);
+            }
+          }}
+        />
+      )}
+
+      {referralModalListing && (
+        <Dialog open={!!referralModalListing} onOpenChange={() => setReferralModalListing(null)}>
+          <DialogContent className="max-w-md bg-white p-6 rounded-2xl shadow-xl">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">Create Agent-to-Agent Referral</DialogTitle>
+              <DialogDescription>
+                Search and select another agent to send this property referral.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label className="text-xs font-semibold text-slate-500 mb-1 block">Referral Link</Label>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={`${window.location.origin}/listings/${referralModalListing.id}?ref=${user?.id}`}
+                    className="bg-slate-50 text-xs"
+                  />
+                  <Button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/listings/${referralModalListing.id}?ref=${user?.id}`);
+                      toast.success('Copied link to clipboard!');
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Copy
+                  </Button>
+                </div>
+              </div>
+              <Label htmlFor="agent-search" className="text-xs font-semibold text-slate-500 block mb-1">Search Agents (Name or Email)</Label>
+              <Input
+                id="agent-search"
+                placeholder="Type name or email to search agents..."
+                value={agentSearchQuery}
+                onChange={e => setAgentSearchQuery(e.target.value)}
+                className="h-10 text-sm w-full"
+              />
+
+              {foundAgents.length > 0 && (
+                <div className="border rounded-xl divide-y bg-slate-50 max-h-48 overflow-y-auto mt-2">
+                  {foundAgents.map(ag => (
+                    <div key={ag.id} className="p-3 flex items-center justify-between hover:bg-slate-100/50">
+                      <div>
+                        <p className="font-semibold text-sm text-slate-800">{ag.full_name || 'Agent'}</p>
+                        <p className="text-xs text-muted-foreground">{ag.email}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="px-4 py-1 text-xs font-semibold gap-1.5"
+                        disabled={sendingReferralAgentId !== null}
+                        onClick={async () => {
+                          setSendingReferralAgentId(ag.id);
+                          try {
+                            const referralLink = `${window.location.origin}/listings/${referralModalListing.id}?agent_ref=${ag.id}`;
+                            const { error } = await supabase
+                              .from('property_referrals')
+                              .insert({
+                                listing_id: referralModalListing.id,
+                                agent_referral_id: ag.id,
+                                agent_referrer_id: user.id,
+                                referral_link: referralLink,
+                                executed: false
+                              });
+                            if (error) throw error;
+                            
+                            // Send push notification to target agent
+                            try {
+                              await sendPushNotification(
+                                ag.id,
+                                'New Referral Received',
+                                `${user?.full_name || 'An agent'} sent you a property referral for "${referralModalListing.title}"`,
+                                '/dashboard',
+                                'referral_received'
+                              );
+                            } catch (notiErr) {
+                              console.warn('Failed to send referral push notification', notiErr);
+                            }
+
+                            toast.success(`Referral request sent successfully to ${ag.full_name}!`);
+                            queryClient.invalidateQueries({ queryKey: ['listings-property-referrals'] });
+                            setReferralModalListing(null);
+                          } catch (err) {
+                            toast.error(`Failed to submit referral: ${err.message}`);
+                          } finally {
+                            setSendingReferralAgentId(null);
+                          }
+                        }}
+                      >
+                        {sendingReferralAgentId === ag.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                        Select
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -2328,6 +2621,265 @@ function AgentMaintenanceModal({ booking, onClose }) {
           <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AgentReferralsTab({ user, listings = [] }) {
+  const queryClient = useQueryClient();
+  const [subTab, setSubTab] = useState('received');
+
+  // Load received agent referrals (where current agent is referee)
+  const { data: receivedReferrals = [], isLoading: receivedLoading, refetch: refetchReceived } = useQuery({
+    queryKey: ['received-property-referrals', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('property_referrals')
+        .select(`
+          id,
+          created_at,
+          listing_id,
+          agent_referral_id,
+          agent_referrer_id,
+          referral_link,
+          status,
+          executed
+        `)
+        .eq('agent_referral_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id
+  });
+
+  // Load sent agent referrals (where current agent is referrer)
+  const { data: sentReferrals = [], isLoading: sentLoading, refetch: refetchSent } = useQuery({
+    queryKey: ['sent-property-referrals', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('property_referrals')
+        .select(`
+          id,
+          created_at,
+          listing_id,
+          agent_referral_id,
+          agent_referrer_id,
+          referral_link,
+          status,
+          executed
+        `)
+        .eq('agent_referrer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id
+  });
+
+  // Query profiles to resolve agent names
+  const referrerIds = [...new Set(receivedReferrals.map(r => r.agent_referrer_id))];
+  const refereeIds = [...new Set(sentReferrals.map(r => r.agent_referral_id))];
+  const allRelatedAgentIds = [...new Set([...referrerIds, ...refereeIds].filter(Boolean))];
+
+  const { data: relatedProfiles = [] } = useQuery({
+    queryKey: ['property-referrals-agents', allRelatedAgentIds],
+    queryFn: async () => {
+      if (allRelatedAgentIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', allRelatedAgentIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: allRelatedAgentIds.length > 0
+  });
+
+  const agentMap = Object.fromEntries(relatedProfiles.map(p => [p.id, p]));
+
+  // Query listings to resolve property titles
+  const allListingIds = [...new Set([...receivedReferrals.map(r => r.listing_id), ...sentReferrals.map(r => r.listing_id)].filter(Boolean))];
+  const { data: relatedListings = [] } = useQuery({
+    queryKey: ['property-referrals-listings', allListingIds],
+    queryFn: async () => {
+      if (allListingIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('listings')
+        .select('id, title, neighborhood, price_mxn, price_usd')
+        .in('id', allListingIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: allListingIds.length > 0
+  });
+
+  const localListingMap = Object.fromEntries(relatedListings.map(l => [l.id, l]));
+  const [processingReferral, setProcessingReferral] = useState(null); // { id, action }
+
+  const handleUpdateStatus = async (referralId, newStatus) => {
+    setProcessingReferral({ id: referralId, action: newStatus });
+    try {
+      const { error } = await supabase
+        .from('property_referrals')
+        .update({ status: newStatus })
+        .eq('id', referralId);
+      if (error) throw error;
+
+      // Find the referral details to get referrer ID and listing ID
+      const targetRef = receivedReferrals.find(r => r.id === referralId);
+      if (targetRef) {
+        const listing = localListingMap[targetRef.listing_id];
+        try {
+          await sendPushNotification(
+            targetRef.agent_referrer_id,
+            `Referral Request ${newStatus === 'accepted' ? 'Accepted' : 'Rejected'}`,
+            `${user?.full_name || 'An agent'} has ${newStatus} your referral request for "${listing?.title || 'Property'}"`,
+            '/dashboard',
+            'referral_status_update'
+          );
+        } catch (notiErr) {
+          console.warn('Failed to send status update push notification', notiErr);
+        }
+      }
+
+      toast.success(`Referral status updated to ${newStatus}`);
+      refetchReceived();
+      refetchSent();
+    } catch (err) {
+      toast.error(`Failed to update referral status: ${err.message}`);
+    } finally {
+      setProcessingReferral(null);
+    }
+  };
+
+  const currentLoading = subTab === 'received' ? receivedLoading : sentLoading;
+  const currentReferrals = subTab === 'received' ? receivedReferrals : sentReferrals;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setSubTab('received')}
+          className={`py-2 px-4 font-semibold text-sm border-b-2 transition-colors ${subTab === 'received' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+        >
+          Received Requests ({receivedReferrals.length})
+        </button>
+        <button
+          onClick={() => setSubTab('sent')}
+          className={`py-2 px-4 font-semibold text-sm border-b-2 transition-colors ${subTab === 'sent' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+        >
+          Sent Requests ({sentReferrals.length})
+        </button>
+      </div>
+
+      {currentLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+        </div>
+      ) : currentReferrals.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl border border-slate-100 shadow-sm text-muted-foreground">
+          No {subTab} agent referrals found.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
+          <table className="w-full text-sm text-left">
+            <thead>
+              <tr className="bg-slate-50 text-slate-500 font-semibold border-b">
+                <th className="px-4 py-3">Property</th>
+                <th className="px-4 py-3">Price</th>
+                <th className="px-4 py-3">Agent</th>
+                <th className="px-4 py-3">Referral Link</th>
+                <th className="px-4 py-3">Status</th>
+                {subTab === 'received' && <th className="px-4 py-3 text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {currentReferrals.map(ref => {
+                const listing = localListingMap[ref.listing_id];
+                const relatedAgent = agentMap[subTab === 'received' ? ref.agent_referrer_id : ref.agent_referral_id];
+                const displayPrice = listing
+                  ? listing.price_mxn
+                    ? `$${Number(listing.price_mxn).toLocaleString()} MXN`
+                    : listing.price_usd
+                      ? `$${Number(listing.price_usd).toLocaleString()} USD`
+                      : 'N/A'
+                  : 'N/A';
+                return (
+                  <tr key={ref.id} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-800">{listing?.title || 'Unknown Property'}</p>
+                      <p className="text-xs text-muted-foreground">{listing?.neighborhood || ''}</p>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-slate-700 whitespace-nowrap">
+                      {displayPrice}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-700">{relatedAgent?.full_name || 'Agent'}</p>
+                      <p className="text-xs text-muted-foreground">{relatedAgent?.email || ''}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="px-3 py-1 text-xs"
+                        onClick={() => {
+                          navigator.clipboard.writeText(ref.referral_link);
+                          toast.success('Link copied!');
+                        }}
+                      >
+                        Copy link
+                      </Button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${ref.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                        ref.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                        {ref.status || 'pending'}
+                      </span>
+                    </td>
+                    {subTab === 'received' && (
+                      <td className="px-4 py-3 text-right">
+                        {ref.status === 'pending' ? (
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 text-xs gap-1.5"
+                              disabled={processingReferral !== null}
+                              onClick={() => handleUpdateStatus(ref.id, 'accepted')}
+                            >
+                              {processingReferral?.id === ref.id && processingReferral?.action === 'accepted' && (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              )}
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="px-3 py-1 text-xs gap-1.5"
+                              disabled={processingReferral !== null}
+                              onClick={() => handleUpdateStatus(ref.id, 'rejected')}
+                            >
+                              {processingReferral?.id === ref.id && processingReferral?.action === 'rejected' && (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              )}
+                              Reject
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Processed</span>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

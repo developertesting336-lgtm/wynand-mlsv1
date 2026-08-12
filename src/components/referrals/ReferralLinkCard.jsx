@@ -25,7 +25,7 @@ export default function ReferralLinkCard({ agent, listings, onCodeUpdated }) {
 
   const base = window.location.origin;
   const listingPath = selectedListing ? `/listings/${selectedListing}` : '/listings';
-  const referralUrl = `${base}${listingPath}?ref=${displayCode}`;
+  const referralUrl = `${base}${listingPath}?agent_ref=${agent?.id || ''}`;
 
   const copy = () => {
     navigator.clipboard.writeText(referralUrl);
@@ -113,49 +113,7 @@ export default function ReferralLinkCard({ agent, listings, onCodeUpdated }) {
           </select>
         </div>
 
-        <div>
-          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-            Your unique referral code
-          </label>
-          {editing ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Input
-                  value={codeInput}
-                  onChange={e => {
-                    setCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
-                    setCodeError('');
-                  }}
-                  placeholder="e.g. AGENT1234"
-                  maxLength={20}
-                  className="text-sm font-mono"
-                />
-                <Button size="sm" onClick={saveCode} disabled={saving || checking} className="shrink-0 gap-1">
-                  {(saving || checking) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Save className="w-3.5 h-3.5" /> Save</>}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={cancelEditing} className="shrink-0" disabled={saving || checking}>
-                  <X className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-              {codeError && <p className="text-xs text-red-600">{codeError}</p>}
-              <p className="text-xs text-muted-foreground">
-                At least 8 characters. Letters and numbers only. This will be your unique code.
-              </p>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Badge className="bg-primary/10 text-primary border-0 font-mono text-sm px-3 py-1">
-                {displayCode}
-              </Badge>
-              <Button size="sm" variant="ghost" onClick={startEditing} className="shrink-0 gap-1 text-xs">
-                <Pencil className="w-3.5 h-3.5" /> {storedCode ? 'Edit' : 'Set code'}
-              </Button>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground mt-1">
-            {storedCode ? 'Custom code active' : 'Default code based on your email — set a custom one above'}
-          </p>
-        </div>
+
 
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
@@ -169,12 +127,6 @@ export default function ReferralLinkCard({ agent, listings, onCodeUpdated }) {
             </Button>
           </div>
         </div>
-
-        <a href={referralUrl} target="_blank" rel="noopener noreferrer">
-          <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs">
-            <ExternalLink className="w-3.5 h-3.5" /> Preview link
-          </Button>
-        </a>
 
         <p className="text-xs text-muted-foreground">
           When a client clicks your link and fills in an inquiry or booking, their referral is automatically tracked to you.

@@ -87,7 +87,7 @@ ${newStatus === 'converted' ? '<p style="margin-top:16px;padding:12px;background
         <Users className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
         <p className="font-semibold text-lg">No referrals yet</p>
         <p className="text-muted-foreground text-sm mt-1">
-          Share your referral link or add a manual referral above to get started.
+          Share your referral link above to get started.
         </p>
       </div>
     );

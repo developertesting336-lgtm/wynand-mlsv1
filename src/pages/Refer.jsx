@@ -19,9 +19,20 @@ export default function Refer() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [agentListings, setAgentListings] = useState([]);
+  const [selectedListing, setSelectedListing] = useState('');
 
   // Get auth state
   const { user, login, authChecked } = useAuth();
+
+  // Load agent's listings if role is agent
+  useEffect(() => {
+    if (user?.role === 'agent' && user?.email) {
+      base44.entities.Listing.filter({ agent_email: user.email }, '-created_date', 100)
+        .then(setAgentListings)
+        .catch(console.error);
+    }
+  }, [user?.email, user?.role]);
 
   // Disable scroll when not authenticated
   useEffect(() => {
@@ -161,43 +172,75 @@ export default function Refer() {
 
         {/* Unique referral links */}
         {currentUser && (
-          <Card className="mb-10 border-primary/20 bg-primary/5">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold">Your Unique Referral Link</h3>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Share your unique referral link. When users sign up or submit viewing requests through your link, they are automatically tracked as your referrals.
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  value={`${window.location.origin}/?ref=${currentUser.id}`}
-                  readOnly
-                  className="bg-white"
-                />
-                <Button
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/?ref=${currentUser.id}`);
-                    toast.success('Referral link copied to clipboard!');
-                  }}
-                  variant="default"
-                >
-                  Copy Link
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          (() => {
+            const isAgent = currentUser.role === 'agent';
+            const listingPath = selectedListing ? `/listings/${selectedListing}` : '/listings';
+            const referralUrl = isAgent
+              ? `${window.location.origin}${listingPath}?agent_ref=${currentUser.id}`
+              : `${window.location.origin}${listingPath}?ref=${currentUser.id}`;
+
+            return (
+              <Card className="mb-10 border-primary/20 bg-primary/5">
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold">Your Referral Link</h3>
+                  </div>
+
+                  {isAgent && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                        Link to (optional — leave blank for all listings)
+                      </label>
+                      <select
+                        className="w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
+                        value={selectedListing}
+                        onChange={e => setSelectedListing(e.target.value)}
+                      >
+                        <option value="">All Listings</option>
+                        {agentListings.map(l => (
+                          <option key={l.id} value={l.id}>{l.title}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <p className="text-sm text-muted-foreground">
+                    {isAgent
+                      ? 'Share this link. When clients open your link and request bookings, their referral is automatically tracked.'
+                      : 'Share your unique referral link. When users sign up or submit viewing requests through your link, they are automatically tracked as your referrals.'}
+                  </p>
+
+                  <div className="flex gap-2">
+                    <Input
+                      value={referralUrl}
+                      readOnly
+                      className="bg-white"
+                    />
+                    <Button
+                      onClick={() => {
+                        navigator.clipboard.writeText(referralUrl);
+                        toast.success('Referral link copied to clipboard!');
+                      }}
+                      variant="default"
+                    >
+                      Copy Link
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()
         )}
 
-        {/* Form */}
+        {/* Form commented out
         <Card>
           <CardHeader>
             <CardTitle>Submit a Referral</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Your info */}
+              Your info
               <div>
                 <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3">Your Information</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -216,11 +259,11 @@ export default function Refer() {
                 </div>
               </div>
 
-              {/* Client info */}
+              Client info
               <div>
                 <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3">Client Information</h3>
 
-                {/* Buyer / Seller toggle */}
+                Buyer / Seller toggle
                 <div className="flex gap-2 mb-3">
                   {['buyer', 'seller'].map(t => (
                     <button
@@ -273,13 +316,11 @@ export default function Refer() {
                 <Button type="submit" disabled={loading} className="w-full h-12 text-base">
                   {loading ? 'Submitting...' : 'Submit Referral & Earn 15%'}
                 </Button>
-                {/* <p className="text-xs text-muted-foreground text-center mt-3">
-                  By submitting you agree to our referral terms. Commission is paid within 30 days of deal closing.
-                </p> */}
               </div>
             </form>
           </CardContent>
         </Card>
+        */}
       </div>
 
       {/* Show login prompt if not authenticated */}

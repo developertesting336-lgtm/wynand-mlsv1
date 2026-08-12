@@ -21,13 +21,30 @@ export default function Listings() {
   const [user, setUser] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'map'
 
-  // Referral code: URL takes priority, fallback to sessionStorage
+  // Referral code: URL takes priority, fallback to sessionStorage/localStorage
   const urlRefCode = urlParams.get('ref') || '';
+  const urlAgentRefCode = urlParams.get('agent_ref') || '';
+
   useEffect(() => {
     if (urlRefCode) {
       sessionStorage.setItem('referral_code', urlRefCode);
+      localStorage.setItem('referral_code', urlRefCode);
+      localStorage.setItem('referral_code_timestamp', new Date().toISOString());
+      
+      // Clear agent ref
+      localStorage.removeItem('agent_property_referral_code');
+      localStorage.removeItem('agent_property_referral_timestamp');
+    } else if (urlAgentRefCode) {
+      localStorage.setItem('agent_property_referral_code', urlAgentRefCode);
+      localStorage.setItem('agent_property_referral_timestamp', new Date().toISOString());
+      
+      // Clear normal ref
+      sessionStorage.removeItem('referral_code');
+      localStorage.removeItem('referral_code');
+      localStorage.removeItem('referral_code_timestamp');
     }
-  }, [urlRefCode]);
+  }, [urlRefCode, urlAgentRefCode]);
+
   const refCode = urlRefCode || sessionStorage.getItem('referral_code') || '';
 
   const [authChecking, setAuthChecking] = useState(true);
@@ -156,8 +173,8 @@ export default function Listings() {
     }
 
     if (filters.neighborhood) result = result.filter(l => l.neighborhood === filters.neighborhood);
-    if (filters.minPrice) result = result.filter(l => l.price_usd >= filters.minPrice);
-    if (filters.maxPrice) result = result.filter(l => l.price_usd <= filters.maxPrice);
+    if (filters.minPrice) result = result.filter(l => (l.price_mxn || l.price_usd) >= filters.minPrice);
+    if (filters.maxPrice) result = result.filter(l => (l.price_mxn || l.price_usd) <= filters.maxPrice);
     if (filters.bedrooms) result = result.filter(l => l.bedrooms >= filters.bedrooms);
     if (filters.bathrooms) result = result.filter(l => l.bathrooms >= filters.bathrooms);
     if (filters.furnished) result = result.filter(l => l.furnished === filters.furnished);

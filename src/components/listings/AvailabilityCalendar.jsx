@@ -27,7 +27,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
-export default function AvailabilityCalendar({ listing, currentUser, refCode = '' }) {
+export default function AvailabilityCalendar({ listing, currentUser, refCode = '', agentRefCode = '' }) {
   const queryClient = useQueryClient();
   const isOwner = currentUser?.email && currentUser.email === listing.owner_email;
 
@@ -226,6 +226,63 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
       }
 
       if (currentUser?.id && ownerId) {
+        // Get current values from URL query parameters first, then check localStorage
+        const queryAgentRef = agentRefCode;
+        const queryNormalRef = refCode;
+        
+        const storageAgentRef = localStorage.getItem('agent_property_referral_code');
+        const storageNormalRef = localStorage.getItem('referral_code');
+
+        let finalAgentRef = null;
+        let finalNormalRef = null;
+
+        // Determine priority based on timestamps if both references exist in localStorage
+        if (storageAgentRef && storageNormalRef) {
+          const agentTimeStr = localStorage.getItem('agent_property_referral_timestamp');
+          const normalTimeStr = localStorage.getItem('referral_code_timestamp');
+          const agentTime = agentTimeStr ? new Date(agentTimeStr).getTime() : 0;
+          const normalTime = normalTimeStr ? new Date(normalTimeStr).getTime() : 0;
+
+          if (agentTime >= normalTime) {
+            finalAgentRef = storageAgentRef;
+          } else {
+            finalNormalRef = storageNormalRef;
+          }
+        } else {
+          finalAgentRef = storageAgentRef;
+          finalNormalRef = storageNormalRef;
+        }
+
+        // Query parameters always take precedence over storage values
+        if (queryAgentRef) {
+          finalAgentRef = queryAgentRef;
+          finalNormalRef = null;
+        } else if (queryNormalRef) {
+          finalNormalRef = queryNormalRef;
+          finalAgentRef = null;
+        }
+
+        // Resolve agent_referral from property_referrals if an active agent referral exists
+        let resolvedAgentReferral = null;
+        if (finalAgentRef) {
+          try {
+            const { data: matchedReferral } = await supabase
+              .from('property_referrals')
+              .select('agent_referral_id')
+              .eq('listing_id', listing.id)
+              .eq('agent_referral_id', finalAgentRef)
+              .maybeSingle();
+            if (matchedReferral) {
+              resolvedAgentReferral = matchedReferral.agent_referral_id;
+            }
+          } catch (refErr) {
+            console.error('Failed to look up matching agent referral:', refErr);
+          }
+        }
+
+        // If the referral matches the property, clear standard normal referral code (exclusive)
+        const finalReferralCode = resolvedAgentReferral ? null : (finalNormalRef || null);
+
         const { error: bookingError } = await supabase
           .from('bookings')
           .insert({
@@ -233,7 +290,8 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
             renter_id: currentUser.id,
             owner_id: ownerId,
             agent_id: agentId,
-            referral_code: refCode || null,
+            referral_code: finalReferralCode,
+            agent_referral: resolvedAgentReferral,
             move_in_date: moveInDate,
             lease_duration_months: 12,
             monthly_budget_mxn: budget ? Number(budget) : null,

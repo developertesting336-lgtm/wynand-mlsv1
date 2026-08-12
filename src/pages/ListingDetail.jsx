@@ -36,12 +36,31 @@ import { toast } from 'sonner';
 
 export default function ListingDetail() {
   const listingId = window.location.pathname.split('/').pop();
-  const refCode = new URLSearchParams(window.location.search).get('ref') || '';
+  const searchParams = new URLSearchParams(window.location.search);
+  const refCode = searchParams.get('ref') || '';
+  const agentRefCode = searchParams.get('agent_ref') || '';
   const [currentPhoto, setCurrentPhoto] = useState(0);
   const touchStartX = useRef(null);
 
-  // Use global auth context
+  // Get auth state
   const { user, login, authChecked } = useAuth();
+
+  // Save referral codes to localStorage (exclusively storing the latest based on new navigation)
+  useEffect(() => {
+    if (refCode) {
+      localStorage.setItem('referral_code', refCode);
+      localStorage.setItem('referral_code_timestamp', new Date().toISOString());
+      // Remove other type to avoid overlaps
+      localStorage.removeItem('agent_property_referral_code');
+      localStorage.removeItem('agent_property_referral_timestamp');
+    } else if (agentRefCode) {
+      localStorage.setItem('agent_property_referral_code', agentRefCode);
+      localStorage.setItem('agent_property_referral_timestamp', new Date().toISOString());
+      // Remove other type to avoid overlaps
+      localStorage.removeItem('referral_code');
+      localStorage.removeItem('referral_code_timestamp');
+    }
+  }, [refCode, agentRefCode]);
 
   // Disable scroll when user is not authenticated
   useEffect(() => {
@@ -518,7 +537,7 @@ export default function ListingDetail() {
           {/* Hide inquiry form and calendar for owners */}
           {user?.role !== 'owner' && (
             <>
-              <AvailabilityCalendar listing={listing} currentUser={user} refCode={refCode} />
+              <AvailabilityCalendar listing={listing} currentUser={user} refCode={refCode} agentRefCode={agentRefCode} />
               {hasAssignedAgent ? (
                 <ContactAgentForm listing={listing} ownerRole={ownerRole} refCode={refCode} />
               ) : (

@@ -427,6 +427,16 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   }
 
   const redirectByRole = (role) => {
+    // If user is accessing a listing referral link, don't force redirect them to dashboard
+    const hasReferralParam = window.location.search.includes('ref=');
+    if (hasReferralParam) {
+      // Just reload the page to refresh auth state
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+      return;
+    }
+
     setTimeout(() => {
       if (role === 'admin') window.location.href = '/admin'
       else if (role === 'owner') window.location.href = '/owner-dashboard'

@@ -12,7 +12,7 @@ const BEDROOM_OPTIONS = [
   { label: '4+', val: 4 },
 ];
 
-const BUDGET_PRESETS = [1000, 1500, 2000, 3000];
+const BUDGET_PRESETS = [10000, 20000, 30000, 50000];
 
 export default function FilterSidebar({ filters, setFilters }) {
   const update = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
@@ -52,7 +52,7 @@ export default function FilterSidebar({ filters, setFilters }) {
 
         {/* Price Range */}
         <div className="space-y-2">
-          <Label className="text-sm font-semibold">Monthly Budget (USD)</Label>
+          <Label className="text-sm font-semibold">Monthly Budget (MXN)</Label>
           <div className="flex gap-2">
             <Input
               type="number"
@@ -76,7 +76,7 @@ export default function FilterSidebar({ filters, setFilters }) {
                 onClick={() => update('maxPrice', filters.maxPrice === p ? undefined : p)}
                 className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${filters.maxPrice === p ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary hover:text-primary'}`}
               >
-                Under ${p.toLocaleString()}
+                Under {p.toLocaleString()} MXN
               </button>
             ))}
           </div>

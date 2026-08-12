@@ -64,7 +64,7 @@ export default function ListingCard({ listing, favoriteIds, onToggleFavorite, co
           {/* Price pill */}
           <div className="absolute bottom-2.5 right-2.5">
             <span className="bg-black/70 text-white text-sm font-bold px-3 py-1.5 rounded-full backdrop-blur-sm">
-              ${listing.price_usd?.toLocaleString()}<span className="font-normal text-white/80">/mo</span>
+              MXN {listing.price_mxn?.toLocaleString() || listing.price_usd?.toLocaleString()}<span className="font-normal text-white/80">/mo</span>
             </span>
           </div>
           {/* Pet icon */}
