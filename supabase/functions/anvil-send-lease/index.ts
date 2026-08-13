@@ -30,13 +30,6 @@ serve(async (req) => {
 
     const { bookingId, agreementConditions, tenantSignature, tenantSignatureDate, agentSignature, agentSignatureDate } = await req.json();
 
-    console.log('[anvil] anvil-send-lease invoked', {
-      bookingId,
-      hasAgreementConditions: !!agreementConditions,
-      hasTenantSignature: !!tenantSignature,
-      hasAgentSignature: !!agentSignature,
-      hasAgentSignatureDate: !!agentSignatureDate,
-    });
 
     if (!bookingId) {
       return new Response(JSON.stringify({ error: "bookingId is required" }), {
@@ -150,7 +143,7 @@ serve(async (req) => {
           .from("MLS")
           .getPublicUrl(filePath);
 
-        console.log(`[anvil] Uploaded ${fileName} to ${publicUrl}`);
+
         return publicUrl;
       } catch (err) {
         console.error(`[anvil] Failed to upload ${fileName}:`, err);
@@ -169,9 +162,9 @@ serve(async (req) => {
     // Upload agent signature if provided
     let agentSignatureUrl = agentSignature || conditions.agentSignature;
     if (agentSignatureUrl && !isUrl(agentSignatureUrl)) {
-      console.log('[anvil] uploading raw agent signature for booking', bookingId);
+
       agentSignatureUrl = await uploadSignature(agentSignatureUrl, 'agent');
-      console.log('[anvil] uploaded agent signature url', { agentSignatureUrl });
+
     }
 
     // Upload tenant signature if provided
@@ -181,7 +174,7 @@ serve(async (req) => {
     }
 
     // 5. Fill the PDF template using Anvil Fill PDF API
-    const pdfTemplateId = booking.agent_id ? "QNJGeo9MpCVdIOt3JzJ5" : "3lsppOgvxEvJm26Jy1Qs";
+    const pdfTemplateId = booking.agent_id ? "CHE8u7PYwChHbaVHzG0P" : "YPRHYgUMBXqnVhbRGmad";
     const rentAmount = listing.price_usd || 0;
     const depositAmount = listing.deposit_amount || 0;
     const leaseStart = booking.move_in_date || new Date().toISOString().split("T")[0];
@@ -237,15 +230,60 @@ serve(async (req) => {
         leaseStartDate: conditions.leaseStartDate || formatDate(leaseStart),
         leaseDuration: conditions.leaseDuration || `${booking.lease_duration_months || 12} months`,
         leaseEndDate: conditions.leaseEndDate || formatDate(leaseEnd),
-        monthlyRent: conditions.monthlyRent || `$${rentAmount.toFixed(2)}`,
+        monthlyRent: (() => {
+          let val = (conditions.monthlyRent || `${rentAmount}`).toString().trim();
+          // Remove any leading dollar signs or trailing mxn suffixes
+          val = val.replace(/^\$/, '').replace(/ mxn$/i, '').trim();
+          // Remove commas so parseFloat doesn't get cut off (e.g., '20,000' -> '20')
+          const cleanVal = val.replace(/,/g, '');
+          const num = parseFloat(cleanVal);
+          if (isNaN(num)) return val + " mxn";
+          const formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+          return `${formatted} mxn`;
+        })(),
         rentDueDateDay: conditions.rentDueDateDay || "1",
-        lateFee: conditions.lateFee || "N/A",
-        gracePeriodDays: conditions.gracePeriodDays || "5",
+        lateFee: (() => {
+          let val = (conditions.lateFee || "N/A").toString().trim();
+          if (val === "N/A") return val;
+          val = val.replace(/^\$/, '').replace(/ mxn$/i, '').trim();
+          const cleanVal = val.replace(/,/g, '');
+          const num = parseFloat(cleanVal);
+          if (isNaN(num)) return val + " mxn";
+          const formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+          return `${formatted} mxn`;
+        })(),
+        gracePeriodDays: `${conditions.gracePeriodDays || "5"} days`,
         paymentMethod: conditions.paymentMethod || "Bank Transfer",
-        securityDepositAmount: conditions.securityDepositAmount || depositAmount.toFixed(2),
-        lastMonthRent: conditions.lastMonthRent || "N/A",
+        securityDepositAmount: (() => {
+          let val = (conditions.securityDepositAmount || `${depositAmount}`).toString().trim();
+          val = val.replace(/^\$/, '').replace(/ mxn$/i, '').trim();
+          const cleanVal = val.replace(/,/g, '');
+          const num = parseFloat(cleanVal);
+          if (isNaN(num)) return val + " mxn";
+          const formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+          return `${formatted} mxn`;
+        })(),
+        lastMonthRent: (() => {
+          let val = (conditions.lastMonthRent || "N/A").toString().trim();
+          if (val === "N/A") return val;
+          val = val.replace(/^\$/, '').replace(/ mxn$/i, '').trim();
+          const cleanVal = val.replace(/,/g, '');
+          const num = parseFloat(cleanVal);
+          if (isNaN(num)) return val + " mxn";
+          const formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+          return `${formatted} mxn`;
+        })(),
         advancePaymentMonths: conditions.advancePaymentMonths || "N/A",
-        advanceMonthsPayment: conditions.advanceMonthsPayment || "N/A",
+        advanceMonthsPayment: (() => {
+          let val = (conditions.advanceMonthsPayment || "N/A").toString().trim();
+          if (val === "N/A") return val;
+          val = val.replace(/^\$/, '').replace(/ mxn$/i, '').trim();
+          const cleanVal = val.replace(/,/g, '');
+          const num = parseFloat(cleanVal);
+          if (isNaN(num)) return val + " mxn";
+          const formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+          return `${formatted} mxn`;
+        })(),
 
         fullyFurnished: mark(conditions.fullyFurnished),
         semiFurnished: mark(conditions.semiFurnished),
@@ -279,8 +317,8 @@ serve(async (req) => {
       }
     };
 
-    console.log(`[anvil] Filling PDF template ${pdfTemplateId} for booking ${bookingId}`);
-    // console.log(fillData, '00000000000000000000000')
+
+
 
     const fillResponse = await fetch(`https://app.useanvil.com/api/v1/fill/${pdfTemplateId}.pdf`, {
       method: "POST",
@@ -308,7 +346,7 @@ serve(async (req) => {
       if (oldFileName && oldFileName !== newFileName) {
         try {
           await supabaseAdmin.storage.from("MLS").remove([`leases/${oldFileName}`]);
-          console.log(`[anvil] Deleted old PDF: ${oldFileName}`);
+
         } catch (err) {
           console.warn("[anvil] Could not delete old PDF:", err);
         }
@@ -359,15 +397,8 @@ serve(async (req) => {
       throw new Error("Failed to update booking with lease URL.");
     }
 
-    console.log('[anvil] lease PDF updated for booking', {
-      bookingId,
-      lease_pdf_url: publicUrl,
-      lease_status: newLeaseStatus,
-      bookingStatus: tenantSignature ? 'approved' : 'lease_pending',
-      agentSignatureUrl,
-      landlordSignatureUrl,
-      tenantSignatureUrl,
-    });
+
+
 
     return new Response(JSON.stringify({
       success: true,

@@ -274,19 +274,19 @@ export default function LeaseDetailsForm({
             <h3 className="text-sm font-semibold text-muted-foreground uppercase">4. Rent & Payment</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="monthlyRent">Monthly Rent (MXN $)</Label>
+                <Label htmlFor="monthlyRent">Monthly Rent (MXN)</Label>
                 <Input id="monthlyRent" type="number" step="0.01" value={formData.monthlyRent} onChange={(e) => handleChange('monthlyRent', e.target.value)} required />
               </div>
               <div>
-                <Label htmlFor="securityDepositAmount">Security Deposit (MXN $)</Label>
+                <Label htmlFor="securityDepositAmount">Security Deposit (MXN)</Label>
                 <Input id="securityDepositAmount" type="number" step="0.01" value={formData.securityDepositAmount} onChange={(e) => handleChange('securityDepositAmount', e.target.value)} required />
               </div>
               <div>
-                <Label htmlFor="lastMonthRent">Last Month's Rent (MXN $) <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
+                <Label htmlFor="lastMonthRent">Last Month's Rent (MXN) <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
                 <Input id="lastMonthRent" type="number" step="0.01" value={formData.lastMonthRent} onChange={(e) => handleChange('lastMonthRent', e.target.value)} placeholder="e.g. 15000" />
               </div>
               <div>
-                <Label htmlFor="advancePaymentMonths">Advance Payment (Months) <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
+                <Label htmlFor="advancePaymentMonths">Advance Payment (Months)</Label>
                 <Input 
                   id="advancePaymentMonths" 
                   type="number" 
@@ -300,18 +300,19 @@ export default function LeaseDetailsForm({
                     }
                   }} 
                   placeholder="e.g. 2" 
+                  required
                 />
               </div>
               <div>
-                <Label htmlFor="advanceMonthsPayment">Advance Months Payment (MXN $) <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
-                <Input id="advanceMonthsPayment" type="number" step="0.01" value={formData.advanceMonthsPayment} onChange={(e) => handleChange('advanceMonthsPayment', e.target.value)} placeholder="e.g. 30000" />
+                <Label htmlFor="advanceMonthsPayment">Advance Months Payment (MXN)</Label>
+                <Input id="advanceMonthsPayment" type="number" step="0.01" value={formData.advanceMonthsPayment} onChange={(e) => handleChange('advanceMonthsPayment', e.target.value)} placeholder="e.g. 30000" required />
               </div>
               <div>
                 <Label htmlFor="rentDueDateDay">Rent Due Date (day of month)</Label>
                 <Input id="rentDueDateDay" type="number" min="1" max="31" value={formData.rentDueDateDay} onChange={(e) => handleChange('rentDueDateDay', e.target.value)} required />
               </div>
               <div>
-                <Label htmlFor="lateFee">Late Fee (MXN $)</Label>
+                <Label htmlFor="lateFee">Late Fee (MXN)</Label>
                 <Input id="lateFee" type="number" step="0.01" value={formData.lateFee} onChange={(e) => handleChange('lateFee', e.target.value)} placeholder="e.g., 1000" />
               </div>
               <div>

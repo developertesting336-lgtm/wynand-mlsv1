@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -179,6 +180,8 @@ export default function Refer() {
               ? `${window.location.origin}${listingPath}?agent_ref=${currentUser.id}`
               : `${window.location.origin}${listingPath}?ref=${currentUser.id}`;
 
+            const hasStripeConnected = currentUser?.stripe_connect_id && currentUser?.stripe_onboarding_complete;
+
             return (
               <Card className="mb-10 border-primary/20 bg-primary/5">
                 <CardContent className="p-6 space-y-4">
@@ -187,46 +190,66 @@ export default function Refer() {
                     <h3 className="font-semibold">Your Referral Link</h3>
                   </div>
 
-                  {isAgent && (
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                        Link to (optional — leave blank for all listings)
-                      </label>
-                      <select
-                        className="w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
-                        value={selectedListing}
-                        onChange={e => setSelectedListing(e.target.value)}
+                  {!hasStripeConnected ? (
+                    <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm font-semibold leading-relaxed">
+                      ⚠️ You must connect your bank account first to generate and share your referral link. 
+                      Please go to your <Link 
+                        to={
+                          currentUser.role === 'agent' 
+                            ? '/agent-dashboard' 
+                            : currentUser.role === 'owner' 
+                              ? '/owner-dashboard' 
+                              : '/dashboard'
+                        } 
+                        className="underline text-red-900 hover:text-red-950 font-bold"
                       >
-                        <option value="">All Listings</option>
-                        {agentListings.map(l => (
-                          <option key={l.id} value={l.id}>{l.title}</option>
-                        ))}
-                      </select>
+                        Dashboard
+                      </Link> (payments / settings section) and complete the Stripe Connect integration.
                     </div>
+                  ) : (
+                    <>
+                      {isAgent && (
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                            Link to (optional — leave blank for all listings)
+                          </label>
+                          <select
+                            className="w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
+                            value={selectedListing}
+                            onChange={e => setSelectedListing(e.target.value)}
+                          >
+                            <option value="">All Listings</option>
+                            {agentListings.map(l => (
+                              <option key={l.id} value={l.id}>{l.title}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <p className="text-sm text-muted-foreground">
+                        {isAgent
+                          ? 'Share this link. When clients open your link and request bookings, their referral is automatically tracked.'
+                          : 'Share your unique referral link. When users sign up or submit viewing requests through your link, they are automatically tracked as your referrals.'}
+                      </p>
+
+                      <div className="flex gap-2">
+                        <Input
+                          value={referralUrl}
+                          readOnly
+                          className="bg-white"
+                        />
+                        <Button
+                          onClick={() => {
+                            navigator.clipboard.writeText(referralUrl);
+                            toast.success('Referral link copied to clipboard!');
+                          }}
+                          variant="default"
+                        >
+                          Copy Link
+                        </Button>
+                      </div>
+                    </>
                   )}
-
-                  <p className="text-sm text-muted-foreground">
-                    {isAgent
-                      ? 'Share this link. When clients open your link and request bookings, their referral is automatically tracked.'
-                      : 'Share your unique referral link. When users sign up or submit viewing requests through your link, they are automatically tracked as your referrals.'}
-                  </p>
-
-                  <div className="flex gap-2">
-                    <Input
-                      value={referralUrl}
-                      readOnly
-                      className="bg-white"
-                    />
-                    <Button
-                      onClick={() => {
-                        navigator.clipboard.writeText(referralUrl);
-                        toast.success('Referral link copied to clipboard!');
-                      }}
-                      variant="default"
-                    >
-                      Copy Link
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
             );

@@ -811,9 +811,15 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                             <CheckCircle className="w-3.5 h-3.5 text-slate-500" /> Lease Ended
                           </span>
                         ) : (
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
-                            <Icon className="w-3.5 h-3.5" /> {label}
-                          </span>
+                          (() => {
+                            const canPay = b.status !== 'confirmed' && b.agreement_conditions?.tenantSignature && b.agreement_conditions?.landlordSignature && agentSigned && totalAmount > 0;
+                            const displayLabel = b.status === 'approved' && !canPay ? 'Approved' : label;
+                            return (
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
+                                <Icon className="w-3.5 h-3.5" /> {displayLabel}
+                              </span>
+                            );
+                          })()
                         )}
                       </td>
                       <td className="px-4 py-3">

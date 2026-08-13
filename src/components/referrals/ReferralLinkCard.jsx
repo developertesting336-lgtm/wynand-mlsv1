@@ -97,40 +97,47 @@ export default function ReferralLinkCard({ agent, listings, onCodeUpdated }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-            Link to (optional — leave blank for all listings)
-          </label>
-          <select
-            className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-            value={selectedListing}
-            onChange={e => setSelectedListing(e.target.value)}
-          >
-            <option value="">All Listings</option>
-            {listings.map(l => (
-              <option key={l.id} value={l.id}>{l.title}</option>
-            ))}
-          </select>
-        </div>
-
-
-
-        <div>
-          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-            Share this link
-          </label>
-          <div className="flex gap-2">
-            <Input value={referralUrl} readOnly className="text-xs font-mono bg-muted/50" />
-            <Button size="sm" onClick={copy} className="shrink-0 gap-1.5">
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? 'Copied' : 'Copy'}
-            </Button>
+        {(!agent?.stripe_connect_id || !agent?.stripe_onboarding_complete) ? (
+          <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs font-semibold leading-relaxed">
+            ⚠️ You must connect your bank account first to view and share your referral link. 
+            Please go to the <strong className="underline">Payouts</strong> tab and complete your Stripe Connect integration.
           </div>
-        </div>
+        ) : (
+          <>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                Link to (optional — leave blank for all listings)
+              </label>
+              <select
+                className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                value={selectedListing}
+                onChange={e => setSelectedListing(e.target.value)}
+              >
+                <option value="">All Listings</option>
+                {listings.map(l => (
+                  <option key={l.id} value={l.id}>{l.title}</option>
+                ))}
+              </select>
+            </div>
 
-        <p className="text-xs text-muted-foreground">
-          When a client clicks your link and fills in an inquiry or booking, their referral is automatically tracked to you.
-        </p>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                Share this link
+              </label>
+              <div className="flex gap-2">
+                <Input value={referralUrl} readOnly className="text-xs font-mono bg-muted/50" />
+                <Button size="sm" onClick={copy} className="shrink-0 gap-1.5">
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? 'Copied' : 'Copy'}
+                </Button>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              When a client clicks your link and fills in an inquiry or booking, their referral is automatically tracked to you.
+            </p>
+          </>
+        )}
       </CardContent>
     </Card>
   );

@@ -27,6 +27,17 @@ export default function VerificationBlockingModal({ user, onComplete }) {
         .maybeSingle();
       if (!error && data) {
         setVerification(data);
+        const hasPhoto = !!data.profile_photo || !!user.photo_url;
+        const hasId = (data.identity_documents && data.identity_documents.length > 0) || !!data.id_document_url || !!user.id_document_url;
+        if (hasPhoto && hasId) {
+          onComplete();
+        }
+      } else {
+        const hasPhoto = !!user.photo_url;
+        const hasId = !!user.id_document_url;
+        if (hasPhoto && hasId) {
+          onComplete();
+        }
       }
     } catch (err) {
       console.error('Failed to load verification record:', err);
