@@ -16,16 +16,16 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
   const [agentChatTarget, setAgentChatTarget] = useState('tenant'); // 'tenant' or 'owner'
   const [ownerInfo, setOwnerInfo] = useState(null);
   const chatEndRef = useRef(null);
-  
+
   // Refs to track current values in real-time subscription (avoid stale closures)
   const currentUserRoleRef = useRef(currentUserRole);
   const agentChatTargetRef = useRef(agentChatTarget);
-  
+
   // Update refs when values change
   useEffect(() => {
     currentUserRoleRef.current = currentUserRole;
   }, [currentUserRole]);
-  
+
   useEffect(() => {
     agentChatTargetRef.current = agentChatTarget;
   }, [agentChatTarget]);
@@ -105,12 +105,12 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
           filter: `inquiry_id=eq.${inquiry.id}`,
         },
         (payload) => {
-          console.log('[Real-time] New reply received:', payload.new);
+
           const newReply = payload.new;
-          
+
           // Check if this reply should be visible to current user
           const shouldShow = checkIfReplyVisible(newReply);
-          
+
           if (shouldShow) {
             setReplies(prev => {
               // Avoid duplicates
@@ -123,7 +123,7 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
         }
       )
       .subscribe((status) => {
-        console.log(`[Real-time] Subscription status for inquiry ${inquiry.id}:`, status);
+
         if (status === 'SUBSCRIBED') realtimeConnected = true;
       });
 
@@ -143,7 +143,7 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
   const checkIfReplyVisible = (reply, roleOverride, chatTargetOverride) => {
     const role = roleOverride || currentUserRoleRef.current;
     const chatTarget = chatTargetOverride || agentChatTargetRef.current;
-    
+
     if (role === 'agent') {
       if (chatTarget === 'tenant') {
         return (
@@ -158,7 +158,7 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
         );
       }
     }
-    
+
     // For renter and owner
     if (reply.sender_id === currentUserId) return true;
     if (reply.sender_role === 'agent') {
@@ -205,7 +205,7 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
       });
-      
+
       let recipientType = 'both';
       if (currentUserRole === 'renter') {
         recipientType = 'agent';
@@ -214,7 +214,7 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
       } else if (currentUserRole === 'agent') {
         recipientType = agentChatTarget;
       }
-      
+
       const replyPayload = {
         id: newReplyId,
         inquiry_id: resolvedInquiryId,
@@ -266,7 +266,7 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
   // Determine what to show in the header based on user role
   const headerInfo = useMemo(() => {
     const agentLabel = inquiry.agent_name || inquiry.agent_email || inquiry.agent_id || 'Agent';
-    
+
     if (currentUserRole === 'owner') {
       // Owner sees agent info, not tenant info
       return {
@@ -282,7 +282,7 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
         hideMessage: true,
       };
     }
-    
+
     if (agentChatTarget === 'owner') {
       const ownerLabel = ownerInfo ? (ownerInfo.full_name || ownerInfo.email) : 'Property Owner';
       return {
@@ -330,8 +330,8 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
               {currentUserRole === 'renter' && !inquiry.agent_email
                 ? 'No agent assigned to this listing yet.'
                 : currentUserRole === 'owner' && !inquiry.agent_email
-                ? 'No agent assigned to this listing yet.'
-                : 'You do not have permission to participate in this conversation.'}
+                  ? 'No agent assigned to this listing yet.'
+                  : 'You do not have permission to participate in this conversation.'}
             </p>
           </div>
         )}
@@ -341,21 +341,19 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
         <div className="flex border-b bg-muted/10">
           <button
             onClick={() => setAgentChatTarget('tenant')}
-            className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all ${
-              agentChatTarget === 'tenant'
-                ? 'border-primary text-primary bg-primary/5'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/5'
-            }`}
+            className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all ${agentChatTarget === 'tenant'
+              ? 'border-primary text-primary bg-primary/5'
+              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/5'
+              }`}
           >
             Chat with Renter ({inquiry.name || 'Tenant'})
           </button>
           <button
             onClick={() => setAgentChatTarget('owner')}
-            className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all ${
-              agentChatTarget === 'owner'
-                ? 'border-primary text-primary bg-primary/5'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/5'
-            }`}
+            className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all ${agentChatTarget === 'owner'
+              ? 'border-primary text-primary bg-primary/5'
+              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/5'
+              }`}
           >
             Chat with Owner ({ownerInfo ? (ownerInfo.full_name || ownerInfo.email) : 'Owner'})
           </button>
@@ -385,11 +383,10 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
                   </div>
                 )}
                 <div className={`max-w-[75%] ${isMe ? 'order-1' : ''}`}>
-                  <div className={`rounded-2xl px-3.5 py-2.5 text-sm ${
-                    isMe 
-                      ? 'bg-primary text-primary-foreground rounded-br-md' 
-                      : 'bg-muted text-foreground rounded-bl-md'
-                  }`}>
+                  <div className={`rounded-2xl px-3.5 py-2.5 text-sm ${isMe
+                    ? 'bg-primary text-primary-foreground rounded-br-md'
+                    : 'bg-muted text-foreground rounded-bl-md'
+                    }`}>
                     <p className="font-medium text-xs mb-0.5 opacity-80">
                       {isMe ? 'You' : reply.sender_name}
                       {reply.sender_role !== 'renter' && !isMe && (
@@ -439,8 +436,8 @@ export default function InquiryReplies({ inquiry, currentUserId, currentUserName
             {currentUserRole === 'renter' && !inquiry.agent_email
               ? 'You can only communicate through an agent.'
               : currentUserRole === 'owner' && !inquiry.agent_email
-              ? 'You can only communicate through an agent.'
-              : 'You do not have permission to reply in this conversation.'}
+                ? 'You can only communicate through an agent.'
+                : 'You do not have permission to reply in this conversation.'}
           </div>
         )}
       </div>

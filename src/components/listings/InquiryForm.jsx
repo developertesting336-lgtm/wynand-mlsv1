@@ -141,7 +141,7 @@ export default function InquiryForm({ listing, onSubmitted, compact = false, own
         setSubmitting(false);
         return;
       }
-      console.log('[InquiryForm] Inquiry created successfully:', data);
+
     } catch (inquiryErr) {
       console.error('[InquiryForm] Failed to create inquiry. Full error:', inquiryErr);
       toast.error(`Failed to save inquiry: ${inquiryErr?.message || 'Unknown error'}`);

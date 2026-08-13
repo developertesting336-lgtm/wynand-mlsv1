@@ -55,7 +55,6 @@ async function uploadMediaToVeriff(
   context: string,       // e.g. "document-front", "document-back"
 ): Promise<void> {
   /* 1. Download the file */
-  console.log(`[media] Downloading ${context} from: ${fileUrl}`);
   const fileResp = await fetch(fileUrl);
   if (!fileResp.ok) {
     throw new Error(`Failed to download ${context}: HTTP ${fileResp.status}`);
@@ -85,7 +84,6 @@ async function uploadMediaToVeriff(
 
   /* 5. POST to Veriff media endpoint */
   const mediaUrl = `${veriffBaseUrl}/v1/sessions/${sessionId}/media`;
-  console.log(`[media] Uploading ${context} (${mime}, ${bytes.length} bytes) to ${mediaUrl}`);
 
   const resp = await fetch(mediaUrl, {
     method: 'POST',
@@ -101,7 +99,6 @@ async function uploadMediaToVeriff(
     const err = await resp.text();
     throw new Error(`Veriff media upload failed for ${context}: ${resp.status} – ${err}`);
   }
-  console.log(`[media] ${context} uploaded successfully`);
 }
 
 /* ---------- Edge function ---------- */
@@ -181,7 +178,6 @@ serve(async (req) => {
 
     const { verification: sessionData } = await veriffResp.json();
     const { id: sessionId, url: sessionUrl } = sessionData;
-    console.log(`[session] Created Veriff session: ${sessionId}`);
 
     /* -------- Upload documents to Veriff -------- */
     // Upload ID document as document-front
@@ -193,7 +189,6 @@ serve(async (req) => {
     const submitBody = JSON.stringify({ verification: { status: 'submitted' } });
     const submitSignature = await hmacSignature(submitBody);
 
-    console.log(`[submit] Submitting session ${sessionId}`);
     const submitResp = await fetch(`${veriffBaseUrl}/v1/sessions/${sessionId}`, {
       method: 'PATCH',
       headers: {
@@ -204,7 +199,6 @@ serve(async (req) => {
       body: submitBody,
     });
 
-    console.log(`[submit] Response status: ${submitResp.status}`);
     if (!submitResp.ok) {
       const err = await submitResp.text();
       console.error('Veriff session submit failed:', err);

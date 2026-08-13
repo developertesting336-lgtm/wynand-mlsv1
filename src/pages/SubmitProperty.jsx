@@ -413,30 +413,30 @@ export default function SubmitProperty() {
       if (u.role === 'agent') {
         // Agent listing on behalf of owner: auto-fill agent's own info in agent section
         // Owner contact info (Contact Info section) stays empty for agent to fill in
-        setForm(prev => ({ 
-          ...prev, 
+        setForm(prev => ({
+          ...prev,
           agent_name: u.full_name || '',
           agent_email: u.email || '',
           agent_phone: u.phone_number || '',
         }));
       } else {
         // Owner/other roles listing their own property: pre-fill owner contact info
-        setForm(prev => ({ 
-          ...prev, 
-          contact_email: u.email || '', 
+        setForm(prev => ({
+          ...prev,
+          contact_email: u.email || '',
           whatsapp: u.phone_number || '',
           owner_phone: u.phone_number || '',
           owner_name: u.full_name || '',
         }));
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
 
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files || []);
-    console.log('handlePhotoUpload files', files);
+
     setUploadError(null);
     if (!files.length) return;
 
@@ -444,24 +444,24 @@ export default function SubmitProperty() {
     const rejectedFiles = [];
 
     for (const file of files) {
-        const lowerName = file.name.toLowerCase();
-        const isGif = file.type === 'image/gif' || lowerName.endsWith('.gif');
-        const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|ogg)$/i.test(lowerName);
-        const isImage = file.type.startsWith('image/');
-        const isAllowedExtension = /\.(jpe?g|png|webp|avif)$/i.test(lowerName);
+      const lowerName = file.name.toLowerCase();
+      const isGif = file.type === 'image/gif' || lowerName.endsWith('.gif');
+      const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|ogg)$/i.test(lowerName);
+      const isImage = file.type.startsWith('image/');
+      const isAllowedExtension = /\.(jpe?g|png|webp|avif)$/i.test(lowerName);
 
-        if (!isImage || !isAllowedExtension || isGif || isVideo) {
-          rejectedFiles.push(file.name);
-          continue;
-        }
-        allowedFiles.push(file);
+      if (!isImage || !isAllowedExtension || isGif || isVideo) {
+        rejectedFiles.push(file.name);
+        continue;
       }
+      allowedFiles.push(file);
+    }
 
-      if (rejectedFiles.length) {
-        const message = `Skipped invalid uploads: ${rejectedFiles.join(', ')}. Only JPG, PNG, WebP, and AVIF images are allowed.`;
-        console.warn(message);
-        toast.error(message);
-      }
+    if (rejectedFiles.length) {
+      const message = `Skipped invalid uploads: ${rejectedFiles.join(', ')}. Only JPG, PNG, WebP, and AVIF images are allowed.`;
+      console.warn(message);
+      toast.error(message);
+    }
 
     const remainingSlots = 8 - form.photos.length;
     if (remainingSlots <= 0) {
@@ -482,9 +482,9 @@ export default function SubmitProperty() {
     try {
       const urls = [];
       for (const file of uploadFiles) {
-        console.log('Uploading file', file.name, file.type, file.size);
+
         const result = await base44.integrations.Core.UploadFile({ file });
-        console.log('Upload result', result);
+
         const file_url = result?.file_url;
         if (!file_url) {
           throw new Error('Upload returned no file_url');
@@ -553,12 +553,12 @@ export default function SubmitProperty() {
       if (user.role === 'agent') {
         const subscriptions = await base44.entities.Subscription.filter({ user_id: user.id });
         const activeSub = subscriptions.find(s => s.status === 'active');
-        
+
         if (activeSub) {
           // Count current active listings for this agent
           const myListings = await base44.entities.Listing.filter({ owner_email: user.email });
           const activeListings = myListings.filter(l => l.status !== 'archived').length;
-          
+
           if (activeSub.plan === 'basic' && activeListings >= 5) {
             throw new Error('Basic plan allows up to 5 active listings. Please upgrade to Pro for unlimited listings.');
           }

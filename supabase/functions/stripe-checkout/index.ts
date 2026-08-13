@@ -232,7 +232,7 @@ serve(async (req) => {
     const amountCents = Math.round(amountToCharge * 100);
     const platformFeeCents = Math.round(platformFeeAmount * 100);
 
-    console.log('Creating checkout session', { bookingId, depositAmount, rentAmount, amountToCharge, amountCents, platformFeeCents, destination: profile.stripe_connect_id });
+
 
     // Create the Stripe Checkout Session
     // Get renter email from profile

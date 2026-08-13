@@ -2,7 +2,6 @@
 
 self.addEventListener('push', (event) => {
   if (!event.data) {
-    console.log('Push event received but contains no data.');
     return;
   }
 
@@ -25,7 +24,7 @@ self.addEventListener('push', (event) => {
     );
   } catch (error) {
     console.error('Error displaying push notification:', error);
-    
+
     // Fallback if data is not JSON
     const text = event.data.text();
     event.waitUntil(

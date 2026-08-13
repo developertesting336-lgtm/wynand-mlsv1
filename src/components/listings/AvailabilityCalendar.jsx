@@ -167,7 +167,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
           throw new Error('Complete identity verification and employment verification before booking.');
         }
       }
-      console.log('SubmitRequestMutation called with', form);
+
       const { name, email, note, budget, dates } = form;
       const sortedDates = dates ? [...dates].sort() : [];
       const moveInDate = sortedDates[0];
@@ -194,8 +194,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
           ownerId = ownerProfile.id;
         }
       }
-      console.log('Resolved ownerId:', ownerId);
-      console.log('Submitting booking request for dates', dates);
+
 
       let agentEmail = listing.agent_email;
       if (!agentEmail) {
@@ -229,7 +228,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
         // Get current values from URL query parameters first, then check localStorage
         const queryAgentRef = agentRefCode;
         const queryNormalRef = refCode;
-        
+
         const storageAgentRef = localStorage.getItem('agent_property_referral_code');
         const storageNormalRef = localStorage.getItem('referral_code');
 
@@ -601,7 +600,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
               {showRequestForm ? (
                 <form
                   onSubmit={(e) => {
-                    console.log('Form submitted');
+
                     e.preventDefault();
                     if (verificationLoading) return;
                     if (currentUser?.role === 'renter' && !hasActiveSubscription) {
@@ -639,9 +638,7 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
                     type="submit"
                     className="w-full gap-2"
                     disabled={submitRequestMutation.isPending || verificationLoading}
-                    onClick={() => {
-                      console.log('Submit button clicked');
-                    }}
+
                   >
                     {submitRequestMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     Send Booking Request

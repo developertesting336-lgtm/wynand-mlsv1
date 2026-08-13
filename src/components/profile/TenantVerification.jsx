@@ -219,7 +219,7 @@ export default function TenantVerification({ user, onUserUpdated }) {
 
       // Invalidate cache and notify listeners so Navbar can refresh verifications
       queryClient.invalidateQueries({ queryKey: ['current-user'] });
-      try { window.dispatchEvent(new Event('app:user-updated')); } catch (e) {}
+      try { window.dispatchEvent(new Event('app:user-updated')); } catch (e) { }
       toast.success('Profile photo uploaded');
     } catch (err) {
       console.error('Failed to upload profile photo:', err);
@@ -354,7 +354,7 @@ export default function TenantVerification({ user, onUserUpdated }) {
         })
       });
 
-      console.log(res);
+
 
       let data = res.data;
       if (res && typeof res.json === 'function') {
@@ -442,7 +442,7 @@ export default function TenantVerification({ user, onUserUpdated }) {
           })
         });
 
-        console.log(res);
+
 
         let data = res.data;
         if (res && typeof res.json === 'function') {
@@ -658,7 +658,7 @@ export default function TenantVerification({ user, onUserUpdated }) {
             <Building2 className="w-5 h-5 text-primary" />
             <h3 className="text-lg font-semibold">Property Documents</h3>
           </div>
- 
+
           <div className="flex items-start gap-3 rounded-xl px-4 py-3 border bg-slate-50 border-slate-200">
             <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-slate-600" />
             <div>
@@ -668,7 +668,7 @@ export default function TenantVerification({ user, onUserUpdated }) {
               </p>
             </div>
           </div>
- 
+
           <Card>
             <CardContent className="p-4">
               <MultiUploadDocRow
@@ -684,7 +684,7 @@ export default function TenantVerification({ user, onUserUpdated }) {
           </Card>
         </div>
       )}
- 
+
       {!isOwnerOrAgent && (
         <>
           {/* Employment Verification Section (Belvo) */}
@@ -694,141 +694,141 @@ export default function TenantVerification({ user, onUserUpdated }) {
               <h3 className="text-lg font-semibold">Employment Verification</h3>
             </div>
 
-        <div className={`flex items-start gap-3 rounded-xl px-4 py-3 border ${employmentVerificationStatus === 'approved'
-          ? 'bg-accent/10 border-accent/20'
-          : employmentVerificationStatus === 'started'
-            ? 'bg-amber-50 border-amber-200'
-            : 'bg-slate-50 border-slate-200'
-          }`}>
-          {employmentVerificationStatus === 'approved' ? (
-            <CheckCircle className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${employmentVerificationStatus === 'started' ? 'text-amber-600' : 'text-slate-600'}`} />
-          )}
-          <div>
-            <p className={`text-sm font-semibold ${employmentVerificationStatus === 'approved' ? 'text-accent' : employmentVerificationStatus === 'started' ? 'text-amber-700' : 'text-slate-700'}`}
-            >
-              {employmentVerificationStatus === 'approved'
-                ? 'Employment Verified'
-                : employmentVerificationStatus === 'started'
-                  ? 'Employment Verification In Progress'
-                  : 'Employment Verification Pending'}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {employmentVerificationStatus === 'approved'
-                ? `Verified: ${employer_name}, ${salary} Monthly Salary`
-                : 'Connect your Mexico bank account to verify your employment.'}
-            </p>
-          </div>
-        </div>
+            <div className={`flex items-start gap-3 rounded-xl px-4 py-3 border ${employmentVerificationStatus === 'approved'
+              ? 'bg-accent/10 border-accent/20'
+              : employmentVerificationStatus === 'started'
+                ? 'bg-amber-50 border-amber-200'
+                : 'bg-slate-50 border-slate-200'
+              }`}>
+              {employmentVerificationStatus === 'approved' ? (
+                <CheckCircle className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${employmentVerificationStatus === 'started' ? 'text-amber-600' : 'text-slate-600'}`} />
+              )}
+              <div>
+                <p className={`text-sm font-semibold ${employmentVerificationStatus === 'approved' ? 'text-accent' : employmentVerificationStatus === 'started' ? 'text-amber-700' : 'text-slate-700'}`}
+                >
+                  {employmentVerificationStatus === 'approved'
+                    ? 'Employment Verified'
+                    : employmentVerificationStatus === 'started'
+                      ? 'Employment Verification In Progress'
+                      : 'Employment Verification Pending'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {employmentVerificationStatus === 'approved'
+                    ? `Verified: ${employer_name}, ${salary} Monthly Salary`
+                    : 'Connect your Mexico bank account to verify your employment.'}
+                </p>
+              </div>
+            </div>
 
-        {employmentVerificationStatus !== 'approved' && (
-          <div className="flex justify-end">
-            <Button size="lg" onClick={() => connectBank('employment')} disabled={true} className="gap-2">
-              {connectingPurpose === 'employment' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Building2 className="w-5 h-5" />}
-              {connectingPurpose === 'employment' ? 'Connecting...' : 'Connect Bank for Employment'}
-              <ExternalLink className="w-4 h-4 ml-0.5" />
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Financial Statements Verification Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Building2 className="w-5 h-5 text-primary" />
-          <h3 className="text-lg font-semibold">Financial Statements Verification</h3>
-        </div>
-
-        <div className={`flex items-start gap-3 rounded-xl px-4 py-3 border ${verification?.bank_statement_verification === 'approved'
-          ? 'bg-accent/10 border-accent/20'
-          : verification?.bank_statement_verification === 'started'
-            ? 'bg-amber-50 border-amber-200'
-            : 'bg-slate-50 border-slate-200'}`}
-        >
-          {verification?.bank_statement_verification === 'approved' ? (
-            <CheckCircle className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${verification?.bank_statement_verification === 'started' ? 'text-amber-600' : 'text-slate-600'}`} />
-          )}
-          <div>
-            <p className={`text-sm font-semibold ${verification?.bank_statement_verification === 'approved' ? 'text-accent' : verification?.bank_statement_verification === 'started' ? 'text-amber-700' : 'text-slate-700'}`}
-            >
-              {verification?.bank_statement_verification === 'approved'
-                ? 'Financial Statements Verified'
-                : verification?.bank_statement_verification === 'started'
-                  ? 'Financial Statements Verification In Progress'
-                  : 'Financial Statements Verification Pending'}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {verification?.bank_statement_verification === 'approved'
-                ? 'Your financial statements have been verified through SAT (Tax Authority).'
-                : 'Connect your SAT account to verify your financial statements and income.'}
-            </p>
-
-            {verification?.bank_statement_verification === 'approved' && (
-              <div className="mt-3 grid grid-cols-2 gap-3 text-xs border-t pt-3 border-accent/20">
-                {verification.fiscal_year && (
-                  <div>
-                    <span className="text-muted-foreground block font-medium">Fiscal Year</span>
-                    <span className="font-semibold text-foreground">{verification.fiscal_year}</span>
-                  </div>
-                )}
-                {verification.financial_document_type && (
-                  <div>
-                    <span className="text-muted-foreground block font-medium">Document Type</span>
-                    <span className="font-semibold text-foreground capitalize">
-                      {verification.financial_document_type.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                )}
-                {verification.total_income !== undefined && verification.total_income !== null && (
-                  <div>
-                    <span className="text-muted-foreground block font-medium">Total Income</span>
-                    <span className="font-semibold text-emerald-600 font-mono">
-                      ${Number(verification.total_income).toLocaleString(undefined, { minimumFractionDigits: 2 })} {verification.financial_currency || 'MXN'}
-                    </span>
-                  </div>
-                )}
-                {verification.total_expenses !== undefined && verification.total_expenses !== null && (
-                  <div>
-                    <span className="text-muted-foreground block font-medium">Total Expenses</span>
-                    <span className="font-semibold text-rose-600 font-mono">
-                      ${Number(verification.total_expenses).toLocaleString(undefined, { minimumFractionDigits: 2 })} {verification.financial_currency || 'MXN'}
-                    </span>
-                  </div>
-                )}
+            {employmentVerificationStatus !== 'approved' && (
+              <div className="flex justify-end">
+                <Button size="lg" onClick={() => connectBank('employment')} disabled={true} className="gap-2">
+                  {connectingPurpose === 'employment' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Building2 className="w-5 h-5" />}
+                  {connectingPurpose === 'employment' ? 'Connecting...' : 'Connect Bank for Employment'}
+                  <ExternalLink className="w-4 h-4 ml-0.5" />
+                </Button>
               </div>
             )}
           </div>
-        </div>
 
-        {verification?.bank_statement_verification !== 'approved' && (
-          <div className="flex justify-end">
-            <Button size="lg" onClick={() => connectBank('bank_statement')} disabled={true} className="gap-2">
-              {connectingPurpose === 'bank_statement' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Building2 className="w-5 h-5" />}
-              {connectingPurpose === 'bank_statement' ? 'Connecting...' : 'Connect SAT for Financial Statements'}
-              <ExternalLink className="w-4 h-4 ml-0.5" />
-            </Button>
+          {/* Financial Statements Verification Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">Financial Statements Verification</h3>
+            </div>
+
+            <div className={`flex items-start gap-3 rounded-xl px-4 py-3 border ${verification?.bank_statement_verification === 'approved'
+              ? 'bg-accent/10 border-accent/20'
+              : verification?.bank_statement_verification === 'started'
+                ? 'bg-amber-50 border-amber-200'
+                : 'bg-slate-50 border-slate-200'}`}
+            >
+              {verification?.bank_statement_verification === 'approved' ? (
+                <CheckCircle className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${verification?.bank_statement_verification === 'started' ? 'text-amber-600' : 'text-slate-600'}`} />
+              )}
+              <div>
+                <p className={`text-sm font-semibold ${verification?.bank_statement_verification === 'approved' ? 'text-accent' : verification?.bank_statement_verification === 'started' ? 'text-amber-700' : 'text-slate-700'}`}
+                >
+                  {verification?.bank_statement_verification === 'approved'
+                    ? 'Financial Statements Verified'
+                    : verification?.bank_statement_verification === 'started'
+                      ? 'Financial Statements Verification In Progress'
+                      : 'Financial Statements Verification Pending'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {verification?.bank_statement_verification === 'approved'
+                    ? 'Your financial statements have been verified through SAT (Tax Authority).'
+                    : 'Connect your SAT account to verify your financial statements and income.'}
+                </p>
+
+                {verification?.bank_statement_verification === 'approved' && (
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs border-t pt-3 border-accent/20">
+                    {verification.fiscal_year && (
+                      <div>
+                        <span className="text-muted-foreground block font-medium">Fiscal Year</span>
+                        <span className="font-semibold text-foreground">{verification.fiscal_year}</span>
+                      </div>
+                    )}
+                    {verification.financial_document_type && (
+                      <div>
+                        <span className="text-muted-foreground block font-medium">Document Type</span>
+                        <span className="font-semibold text-foreground capitalize">
+                          {verification.financial_document_type.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                    )}
+                    {verification.total_income !== undefined && verification.total_income !== null && (
+                      <div>
+                        <span className="text-muted-foreground block font-medium">Total Income</span>
+                        <span className="font-semibold text-emerald-600 font-mono">
+                          ${Number(verification.total_income).toLocaleString(undefined, { minimumFractionDigits: 2 })} {verification.financial_currency || 'MXN'}
+                        </span>
+                      </div>
+                    )}
+                    {verification.total_expenses !== undefined && verification.total_expenses !== null && (
+                      <div>
+                        <span className="text-muted-foreground block font-medium">Total Expenses</span>
+                        <span className="font-semibold text-rose-600 font-mono">
+                          ${Number(verification.total_expenses).toLocaleString(undefined, { minimumFractionDigits: 2 })} {verification.financial_currency || 'MXN'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {verification?.bank_statement_verification !== 'approved' && (
+              <div className="flex justify-end">
+                <Button size="lg" onClick={() => connectBank('bank_statement')} disabled={true} className="gap-2">
+                  {connectingPurpose === 'bank_statement' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Building2 className="w-5 h-5" />}
+                  {connectingPurpose === 'bank_statement' ? 'Connecting...' : 'Connect SAT for Financial Statements'}
+                  <ExternalLink className="w-4 h-4 ml-0.5" />
+                </Button>
+              </div>
+            )}
+
+            <Card className="mt-4">
+              <CardContent className="p-4">
+                <MultiUploadDocRow
+                  icon={FileText}
+                  label="Bank Details & Statements"
+                  description="Upload your bank statements or details (PDF, JPG, PNG)"
+                  documents={verification?.bank_documents || []}
+                  folder="bank-details"
+                  onUploaded={addBankDoc}
+                  onDeleted={deleteBankDoc}
+                />
+              </CardContent>
+            </Card>
           </div>
-        )}
-
-        <Card className="mt-4">
-          <CardContent className="p-4">
-            <MultiUploadDocRow
-              icon={FileText}
-              label="Bank Details & Statements"
-              description="Upload your bank statements or details (PDF, JPG, PNG)"
-              documents={verification?.bank_documents || []}
-              folder="bank-details"
-              onUploaded={addBankDoc}
-              onDeleted={deleteBankDoc}
-            />
-          </CardContent>
-        </Card>
-      </div>
-    </>
-  )}
+        </>
+      )}
 
       <p className="text-xs text-muted-foreground">
         Documents are stored securely and only used for verification purposes. They are not shared publicly.

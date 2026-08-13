@@ -65,7 +65,6 @@ serve(async (req: Request) => {
     for (const sub of subscriptions || []) {
 
       if (!sub.last_payment_date) {
-        console.log(`- Skipped: no last_payment_date found.`);
         continue;
       }
 
@@ -88,8 +87,6 @@ serve(async (req: Request) => {
 
         if (updateErr) {
           console.error(`  Failed to set subscription ${sub.id} to inactive:`, updateErr);
-        } else {
-          console.log(`  Successfully set subscription status to inactive.`);
         }
 
         results.push({
@@ -103,7 +100,6 @@ serve(async (req: Request) => {
 
       // We only notify if 3 days remaining (diffDays === 3) or 0 days remaining (diffDays === 0)
       const shouldNotify = (diffDays === 3) || (diffDays === 0);
-      console.log(`- shouldNotify: ${shouldNotify} (diffDays is ${diffDays})`);
 
       if (!shouldNotify) {
         continue;
@@ -128,7 +124,6 @@ serve(async (req: Request) => {
       }
 
       if (existingNotification) {
-        console.log(`  Notification skipped: already sent one in the last 24 hours.`);
         results.push({
           userId: sub.user_id,
           subscriptionId: sub.id,
@@ -249,7 +244,6 @@ serve(async (req: Request) => {
           continue;
         }
         // Parse due date (second date in range)
-        console.log('0000000000000');
 
         const rangeParts = recentPayment.payment_for_month_year?.split(' to ');
         if (!rangeParts || rangeParts.length !== 2) continue;

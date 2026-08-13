@@ -224,7 +224,7 @@ export const auth = {
     }
 
     storeSession(profile)
-    
+
     // Log user login action
     try {
       await auditLogger.log('USER_LOGIN')
@@ -273,7 +273,7 @@ export const auth = {
 export const emailIntegration = {
   async SendEmail({ to, subject, html }) {
     if (import.meta.env.DEV) {
-      console.log('📧 Email (dev):', { to, subject })
+
       return { success: true, devMode: true }
     }
     try {
@@ -305,7 +305,7 @@ export const storageIntegration = {
     const folderPrefix = folder ? `${folder}/` : '';
     const fullPath = `${folderPrefix}${Date.now()}_${fileName}`;
 
-    console.log('Supabase storage upload', { bucket: storageBucket, path: fullPath, fileType: file.type })
+
     const { data, error } = await supabase.storage
       .from(storageBucket)
       .upload(fullPath, file, { cacheControl: '3600', upsert: false })

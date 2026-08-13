@@ -197,9 +197,9 @@ export default function AgentDashboard() {
       if (error) {
         throw error;
       }
-      console.log(data, '541452')
+
       const ownerVerificationRow = data?.find((row) => row.user_id === ownerUserId) || null;
-      console.log(ownerVerificationRow, 'ownerVerificationRow');
+
       const renterVerificationRow = data?.find((row) => row.user_id === renterUserId) || null;
       setOwnerVerification(ownerVerificationRow);
       setRenterVerification(renterVerificationRow);
@@ -235,7 +235,7 @@ export default function AgentDashboard() {
   const isImageUrl = (url) => typeof url === 'string' && /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i.test(url);
 
   const ownerProfilePhotoUrl = ownerVerification?.profile_photo || ownerVerification?.profile_photo_url || ownerVerification?.photo_url;
-  // console.log(ownerProfilePhotoUrl, 'ownerProfilePhotoUrl');
+
   const ownerIdentityDocs = normalizeVerificationDocs(ownerVerification?.identity_documents);
   const renterProfilePhotoUrl = renterVerification?.profile_photo || renterVerification?.profile_photo_url || renterVerification?.photo_url;
   const renterIdentityDocs = normalizeVerificationDocs(renterVerification?.identity_documents);
@@ -962,8 +962,8 @@ export default function AgentDashboard() {
                                           // active booking status: pending, approved, confirmed, lease_pending (where end_lease is not true)
                                           const hasActiveLease = myBookings.some(
                                             b => b.listing_id === listing.id &&
-                                                 ['pending', 'approved', 'confirmed', 'lease_pending'].includes(b.status) &&
-                                                 b.end_lease !== true
+                                              ['pending', 'approved', 'confirmed', 'lease_pending'].includes(b.status) &&
+                                              b.end_lease !== true
                                           );
 
                                           // Allow both agent1 (referrer) and agent2 (referee) to remove referral, but only when there is no active lease
@@ -2264,7 +2264,7 @@ export default function AgentDashboard() {
                                 executed: false
                               });
                             if (error) throw error;
-                            
+
                             // Send push notification to target agent
                             try {
                               await sendPushNotification(

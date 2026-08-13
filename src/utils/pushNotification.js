@@ -30,7 +30,7 @@ export async function registerPushNotifications(userId) {
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/'
     });
-    console.log('Service Worker registered with scope:', registration.scope);
+
 
     // 2. Request Permission
     const permission = await Notification.requestPermission();
@@ -91,7 +91,7 @@ export async function checkPushSubscription(userId) {
   if (Notification.permission === 'default') {
     // Clean up DB if they reset it
     if (userId) {
-      supabase.from('user_push_subscriptions').delete().eq('user_id', userId).then(() => {}).catch(() => {});
+      supabase.from('user_push_subscriptions').delete().eq('user_id', userId).then(() => { }).catch(() => { });
     }
     return 'unsubscribed';
   }
@@ -114,32 +114,32 @@ export async function checkPushSubscription(userId) {
 
   // 5. Browser has active subscription. Check/sync with Supabase DB for this user
   if (userId) {
-      const rawSubscription = JSON.parse(JSON.stringify(subscription));
-      const endpoint = rawSubscription.endpoint;
+    const rawSubscription = JSON.parse(JSON.stringify(subscription));
+    const endpoint = rawSubscription.endpoint;
 
-      const { data } = await supabase
+    const { data } = await supabase
+      .from('user_push_subscriptions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('endpoint', endpoint)
+      .maybeSingle();
+
+    // If DB record is missing for this user & device endpoint, delete old user entries & insert new one
+    if (!data) {
+      await supabase
         .from('user_push_subscriptions')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('endpoint', endpoint)
-        .maybeSingle();
+        .delete()
+        .eq('user_id', userId);
 
-      // If DB record is missing for this user & device endpoint, delete old user entries & insert new one
-      if (!data) {
-        await supabase
-          .from('user_push_subscriptions')
-          .delete()
-          .eq('user_id', userId);
-
-        await supabase
-          .from('user_push_subscriptions')
-          .insert({
-            user_id: userId,
-            endpoint: endpoint,
-            p256dh: rawSubscription.keys?.p256dh,
-            auth: rawSubscription.keys?.auth
-          });
-        return 'subscribed';
+      await supabase
+        .from('user_push_subscriptions')
+        .insert({
+          user_id: userId,
+          endpoint: endpoint,
+          p256dh: rawSubscription.keys?.p256dh,
+          auth: rawSubscription.keys?.auth
+        });
+      return 'subscribed';
     }
   }
 

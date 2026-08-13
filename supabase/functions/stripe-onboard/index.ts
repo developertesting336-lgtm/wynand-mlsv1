@@ -74,7 +74,7 @@ serve(async (req) => {
         await stripe.accounts.retrieve(stripeConnectId);
         accountExists = true;
       } catch (err) {
-        console.log(`Account ${stripeConnectId} retrieve failed: ${err.message}. Creating a new one.`);
+
       }
     }
 

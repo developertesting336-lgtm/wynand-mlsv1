@@ -249,7 +249,6 @@ serve(async (req) => {
             if (payment.payment_type === 'monthly_rent') {
                 // Monthly rent: owner always receives 100%
                 ownerPayoutAmount = payment.amount_centavos;
-                console.log(`[MONTHLY_RENT] Owner receives 100% = ${ownerPayoutAmount}¢`);
 
             } else if (!hasAgent) {
                 if (hasReferralCode) {
@@ -273,14 +272,12 @@ serve(async (req) => {
                         ownerPayoutAmount += diff;
                     }
 
-                    console.log(`[Case 1.5] No agent + referral (Refined IVA): owner=${ownerPayoutAmount}¢, referrer=${referrerPayoutAmount}¢ (base=${referrerBaseCents}¢ - iva=${platformIva}¢), platform=${platformPayoutAmount}¢ (base=${platformBaseCents}¢ + iva=${platformIva}¢)`);
                 } else {
                     // ── Case 1: No agent, no referral ────────────────────────────────
                     const platformFeeCents = Math.round(payment.amount_centavos * 0.10);
                     const ivaCents = Math.round(platformFeeCents * 0.16);
                     platformPayoutAmount = platformFeeCents + ivaCents;
                     ownerPayoutAmount = payment.amount_centavos - platformPayoutAmount;
-                    console.log(`[Case 1] No agent, no referral: owner=${ownerPayoutAmount}¢, platform=${platformPayoutAmount}¢ (fee=${platformFeeCents}¢ + iva=${ivaCents}¢)`);
                 }
 
             } else {
@@ -296,18 +293,15 @@ serve(async (req) => {
                     // ── Case 4: Agent + agent_referral ───────────────────────────────
                     referrerPayoutAmount = Math.round(netCommissionCents * 0.10);
                     agentPayoutAmount = netCommissionCents - referrerPayoutAmount;
-                    console.log(`[Case 4] Agent + agent_referral: agent=${agentPayoutAmount}¢, referring_agent=${referrerPayoutAmount}¢, owner=${ownerPayoutAmount}¢, platform=${platformPayoutAmount}¢`);
 
                 } else if (hasReferralCode) {
                     // ── Case 3: Agent + referral_code ────────────────────────────────
                     referrerPayoutAmount = Math.round(netCommissionCents * 0.10);
                     agentPayoutAmount = netCommissionCents - referrerPayoutAmount;
-                    console.log(`[Case 3] Agent + referral_code: agent=${agentPayoutAmount}¢, referrer=${referrerPayoutAmount}¢, owner=${ownerPayoutAmount}¢, platform=${platformPayoutAmount}¢`);
 
                 } else {
                     // ── Case 2: Agent only ───────────────────────────────────────────
                     agentPayoutAmount = netCommissionCents;
-                    console.log(`[Case 2] Agent only: agent=${agentPayoutAmount}¢, owner=${ownerPayoutAmount}¢, platform=${platformPayoutAmount}¢`);
                 }
             }
 

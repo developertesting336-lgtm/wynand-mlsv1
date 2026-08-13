@@ -69,7 +69,7 @@ export default function ReferralLinkCard({ agent, listings, onCodeUpdated }) {
       }
       setSaving(true);
       const updated = await base44.entities.User.update(agent.id, { referral_code: trimmed });
-      console.log('Referral code saved successfully:', updated);
+
       toast.success('Referral code updated!');
       setEditing(false);
       setCodeInput('');
@@ -99,7 +99,7 @@ export default function ReferralLinkCard({ agent, listings, onCodeUpdated }) {
       <CardContent className="space-y-4">
         {(!agent?.stripe_connect_id || !agent?.stripe_onboarding_complete) ? (
           <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs font-semibold leading-relaxed">
-            ⚠️ You must connect your bank account first to view and share your referral link. 
+            ⚠️ You must connect your bank account first to view and share your referral link.
             Please go to the <strong className="underline">Payouts</strong> tab and complete your Stripe Connect integration.
           </div>
         ) : (

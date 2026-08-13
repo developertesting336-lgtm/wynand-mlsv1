@@ -274,7 +274,7 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
         })
       });
 
-      console.log(res);
+
 
 
       let data = res.data;
@@ -1781,14 +1781,14 @@ export default function UserDashboard() {
         confetti.default({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       });
       toast.success('Payment completed successfully! Your booking is now confirmed.');
-      
+
       // Clear all referral codes and timestamps from storage
       localStorage.removeItem('referral_code');
       localStorage.removeItem('referral_code_timestamp');
       localStorage.removeItem('agent_property_referral_code');
       localStorage.removeItem('agent_property_referral_timestamp');
       sessionStorage.removeItem('referral_code');
-      
+
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (params.get('payment') === 'cancel') {
       toast.error('Payment checkout cancelled.');

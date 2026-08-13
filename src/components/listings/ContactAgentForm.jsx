@@ -172,7 +172,7 @@ export default function ContactAgentForm({ listing, ownerRole = 'agent', refCode
     } catch (e) {
       agentResult = { error: `Server returned ${agentRes.status}` };
     }
-    console.log('[ContactAgentForm] Agent email response:', agentRes.status, agentResult);
+
 
     // Confirmation to sender
     const senderPayload = {
@@ -197,7 +197,7 @@ export default function ContactAgentForm({ listing, ownerRole = 'agent', refCode
     } catch (e) {
       senderResult = { error: `Server returned ${senderRes.status}` };
     }
-    console.log('[ContactAgentForm] Sender confirmation response:', senderRes.status, senderResult);
+
 
     setSubmitting(false);
     setSubmitted(true);
