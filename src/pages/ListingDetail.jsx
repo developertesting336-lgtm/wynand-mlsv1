@@ -292,6 +292,7 @@ export default function ListingDetail() {
                 <NeighborhoodAmenities
                   neighborhood={listing.neighborhood}
                   neighborhoodLabel={NEIGHBORHOOD_LABELS[listing.neighborhood] || listing.neighborhood}
+                  nearbyPlaces={listing.nearby_places}
                 />
               </div>
               <ReviewAverageInline listingId={listing.id} />

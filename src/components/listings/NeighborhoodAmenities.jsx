@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Loader2, UtensilsCrossed, Heart, Building2, Coffee, ShoppingBag, GraduationCap, Dumbbell, X } from 'lucide-react';
+import { MapPin, Loader2, UtensilsCrossed, Heart, Building2, Coffee, ShoppingBag, GraduationCap, Dumbbell, X, Plane } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const CATEGORY_ICONS = {
@@ -11,6 +11,7 @@ const CATEGORY_ICONS = {
   'Supermarkets & Shopping': ShoppingBag,
   'Schools & Education': GraduationCap,
   'Gyms & Fitness': Dumbbell,
+  'Transit & Airports': Plane,
 };
 
 // Offline static dictionary mapping neighborhood keys to notable local PV establishments
@@ -97,11 +98,45 @@ const AMENITIES_BY_NEIGHBORHOOD = {
   }
 };
 
-export default function NeighborhoodAmenities({ neighborhood, neighborhoodLabel }) {
+export default function NeighborhoodAmenities({ neighborhood, neighborhoodLabel, nearbyPlaces }) {
   const [open, setOpen] = useState(false);
 
+  // Group dynamic nearby places if present
+  let hasDynamicPlaces = false;
+  let dynamicCategories = {};
+
+  if (Array.isArray(nearbyPlaces) && nearbyPlaces.length > 0) {
+    hasDynamicPlaces = true;
+    nearbyPlaces.forEach(place => {
+      // Map raw osm tags/types to readable categories
+      let category = 'Local Attractions';
+      const rawType = (place.type || '').toLowerCase();
+      if (rawType.includes('bank')) {
+        category = 'Banks & ATMs';
+      } else if (rawType.includes('gym') || rawType.includes('fitness')) {
+        category = 'Gyms & Fitness';
+      } else if (rawType.includes('beauty') || rawType.includes('salon')) {
+        category = 'Salons & Spas';
+      } else if (rawType.includes('park') || rawType.includes('garden')) {
+        category = 'Parks & Nature';
+      } else if (rawType.includes('mall') || rawType.includes('supermarket')) {
+        category = 'Shopping & Malls';
+      } else if (rawType.includes('aeroway') || rawType.includes('aerodrome') || rawType.includes('terminal') || rawType.includes('railway') || rawType.includes('station') || rawType.includes('bus_station')) {
+        category = 'Transit & Airports';
+      } else if (rawType.includes('museum') || rawType.includes('attraction') || rawType.includes('viewpoint')) {
+        category = 'Tourist Attractions';
+      }
+
+      if (!dynamicCategories[category]) {
+        dynamicCategories[category] = [];
+      }
+      dynamicCategories[category].push(place.name);
+    });
+  }
+
   const key = neighborhood && AMENITIES_BY_NEIGHBORHOOD[neighborhood] ? neighborhood : 'default';
-  const data = AMENITIES_BY_NEIGHBORHOOD[key];
+  const staticData = AMENITIES_BY_NEIGHBORHOOD[key];
+  const displayData = hasDynamicPlaces ? dynamicCategories : staticData;
 
   return (
     <>
@@ -131,7 +166,7 @@ export default function NeighborhoodAmenities({ neighborhood, neighborhoodLabel 
             {/* Body */}
             <div className="p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {Object.entries(data).map(([category, places]) => {
+                {Object.entries(displayData).map(([category, places]) => {
                   if (!places?.length) return null;
                   const Icon = CATEGORY_ICONS[category] || MapPin;
                   return (
