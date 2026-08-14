@@ -17,6 +17,38 @@ export default function AgentDirectory() {
   // Get auth state
   const { user, login, authChecked } = useAuth();
 
+  useEffect(() => {
+    document.title = 'Verified Agents Directory | Puerto Vallarta Real Estate Experts';
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.setAttribute('name', 'description');
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute('content', 'Connect with verified real estate agents in Puerto Vallarta. Get expert help with long-term rentals, property management, and verified leases.');
+
+    const schemaId = 'seo-agents-schema';
+    let scriptTag = document.getElementById(schemaId);
+    if (!scriptTag) {
+      scriptTag = document.createElement('script');
+      scriptTag.id = schemaId;
+      scriptTag.type = 'application/ld+json';
+      document.head.appendChild(scriptTag);
+    }
+    scriptTag.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "name": "Verified Real Estate Agents in Puerto Vallarta",
+      "url": "https://pvverified.com/agents",
+      "description": "Directory list of certified agents hosting properties on PV Verified."
+    });
+
+    return () => {
+      const existing = document.getElementById(schemaId);
+      if (existing) existing.remove();
+    };
+  }, []);
+
   // Disable scroll when not authenticated
   useEffect(() => {
     if (authChecked && !user) {

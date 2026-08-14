@@ -142,9 +142,53 @@ export default function ListingDetail() {
 
   useEffect(() => {
     if (listing) {
+      // Dynamic Head Titles
+      document.title = `${listing.title} | Verified Rentals Puerto Vallarta`;
+      let metaDesc = document.querySelector('meta[name="description"]');
+      if (!metaDesc) {
+        metaDesc = document.createElement('meta');
+        metaDesc.setAttribute('name', 'description');
+        document.head.appendChild(metaDesc);
+      }
+      metaDesc.setAttribute('content', `${listing.title} for rent in ${NEIGHBORHOOD_LABELS[listing.neighborhood] || listing.neighborhood}. ${listing.description?.slice(0, 120)}...`);
+
+      // Dynamic JSON-LD Schema
+      const schemaId = 'seo-listing-detail-schema';
+      let scriptTag = document.getElementById(schemaId);
+      if (!scriptTag) {
+        scriptTag = document.createElement('script');
+        scriptTag.id = schemaId;
+        scriptTag.type = 'application/ld+json';
+        document.head.appendChild(scriptTag);
+      }
+      scriptTag.textContent = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Accommodation",
+        "name": listing.title,
+        "description": listing.description,
+        "image": listing.photos,
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": NEIGHBORHOOD_LABELS[listing.neighborhood] || listing.neighborhood,
+          "addressRegion": "Jalisco",
+          "addressCountry": "MX"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": listing.price_mxn || listing.price_usd,
+          "priceCurrency": listing.price_mxn ? "MXN" : "USD",
+          "availability": "https://schema.org/InStock"
+        }
+      });
+
       base44.entities.Listing.update(listing.id, { views: (listing.views || 0) + 1 }).catch(() => { });
+
+      return () => {
+        const existing = document.getElementById(schemaId);
+        if (existing) existing.remove();
+      };
     }
-  }, [listing?.id]);
+  }, [listing]);
 
   if (isLoading) {
     return (

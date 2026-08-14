@@ -1,0 +1,16 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Directories
+Disallow: /admin/
+Disallow: /owner/
+Disallow: /agent/
+Disallow: /renter/
+Disallow: /booking/
+
+# Host
+Host: https://pvverified.com
+
+# Sitemaps
+Sitemap: https://pvverified.com/sitemap.xml

@@ -116,6 +116,38 @@ export default function Listings() {
     });
   };
 
+  useEffect(() => {
+    document.title = 'Browse Rentals | Verified Properties in Puerto Vallarta';
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.setAttribute('name', 'description');
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute('content', 'Filter and search verified long-term rentals in Puerto Vallarta. Find villas, condos, and apartments with guaranteed landlord listings.');
+
+    const schemaId = 'seo-listings-schema';
+    let scriptTag = document.getElementById(schemaId);
+    if (!scriptTag) {
+      scriptTag = document.createElement('script');
+      scriptTag.id = schemaId;
+      scriptTag.type = 'application/ld+json';
+      document.head.appendChild(scriptTag);
+    }
+    scriptTag.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "SearchResultsPage",
+      "name": "Verified Properties for Rent in Puerto Vallarta",
+      "url": "https://pvverified.com/listings",
+      "description": "Directory of verified long-term rentals in Puerto Vallarta."
+    });
+
+    return () => {
+      const existing = document.getElementById(schemaId);
+      if (existing) existing.remove();
+    };
+  }, []);
+
   const { data: listings = [], isLoading } = useQuery({
     queryKey: ['listings'],
     queryFn: () => base44.entities.Listing.filter({ status: 'approved' }, '-created_date', 100),
