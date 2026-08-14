@@ -26,10 +26,10 @@ export default function ListingCard({ listing, favoriteIds, onToggleFavorite, co
           {onToggleCompare && (
             <button
               onClick={e => { e.preventDefault(); e.stopPropagation(); onToggleCompare(listing.id); }}
-              className={`absolute bottom-2.5 right-2.5 z-10 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold transition-colors ${isComparing ? 'bg-primary text-primary-foreground' : 'bg-black/40 text-white backdrop-blur-sm hover:bg-black/60'}`}
+              className={`absolute bottom-2.5 left-2.5 z-10 flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-colors shadow-sm ${isComparing ? 'bg-primary text-primary-foreground' : 'bg-black/60 text-white backdrop-blur-sm hover:bg-black/80'}`}
               aria-label="Toggle compare"
             >
-              <ArrowLeftRight className="w-3 h-3" />
+              <ArrowLeftRight className="w-3.5 h-3.5" />
               {isComparing ? 'Selected' : 'Compare'}
             </button>
           )}
@@ -69,8 +69,8 @@ export default function ListingCard({ listing, favoriteIds, onToggleFavorite, co
           </div>
           {/* Pet icon */}
           {listing.pet_friendly && (
-            <div className="absolute bottom-2.5 left-2.5 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-              🐾
+            <div className={`absolute top-2.5 z-10 bg-black/60 text-white text-xs px-2 py-1 rounded-full ${onToggleFavorite && !isAgent ? 'right-12' : 'right-2.5'}`}>
+              🐾 Pet Friendly
             </div>
           )}
         </div>

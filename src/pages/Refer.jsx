@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, DollarSign, Users, TrendingUp, Handshake, Loader2 } from 'lucide-react';
+import { CheckCircle, DollarSign, Users, TrendingUp, Handshake, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -498,7 +498,13 @@ export default function Refer() {
       )}
       {authChecked && !user && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-8 text-center border border-slate-100">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-8 text-center border border-slate-100 relative">
+            <Link
+              to="/"
+              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-5 h-5" />
+            </Link>
             <h2 className="text-2xl font-bold mb-2">Want to Refer Someone?</h2>
             <p className="text-muted-foreground mb-6">
               Create an account or sign in to get your unique referral links and start earning 15% commission.
