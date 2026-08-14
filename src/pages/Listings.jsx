@@ -30,6 +30,7 @@ export default function Listings() {
       sessionStorage.setItem('referral_code', urlRefCode);
       localStorage.setItem('referral_code', urlRefCode);
       localStorage.setItem('referral_code_timestamp', new Date().toISOString());
+      localStorage.removeItem('referral_target_listing_id'); // Clear target listing ID for global links
       
       // Clear agent ref
       localStorage.removeItem('agent_property_referral_code');
@@ -42,6 +43,7 @@ export default function Listings() {
       sessionStorage.removeItem('referral_code');
       localStorage.removeItem('referral_code');
       localStorage.removeItem('referral_code_timestamp');
+      localStorage.removeItem('referral_target_listing_id');
     }
   }, [urlRefCode, urlAgentRefCode]);
 

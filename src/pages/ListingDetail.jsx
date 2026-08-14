@@ -50,17 +50,27 @@ export default function ListingDetail() {
     if (refCode) {
       localStorage.setItem('referral_code', refCode);
       localStorage.setItem('referral_code_timestamp', new Date().toISOString());
+      if (listingId && window.location.pathname.includes('/listings/')) {
+        localStorage.setItem('referral_target_listing_id', listingId);
+      } else {
+        localStorage.removeItem('referral_target_listing_id');
+      }
       // Remove other type to avoid overlaps
       localStorage.removeItem('agent_property_referral_code');
       localStorage.removeItem('agent_property_referral_timestamp');
     } else if (agentRefCode) {
       localStorage.setItem('agent_property_referral_code', agentRefCode);
       localStorage.setItem('agent_property_referral_timestamp', new Date().toISOString());
+      if (listingId && window.location.pathname.includes('/listings/')) {
+        localStorage.setItem('referral_target_listing_id', listingId);
+      } else {
+        localStorage.removeItem('referral_target_listing_id');
+      }
       // Remove other type to avoid overlaps
       localStorage.removeItem('referral_code');
       localStorage.removeItem('referral_code_timestamp');
     }
-  }, [refCode, agentRefCode]);
+  }, [refCode, agentRefCode, listingId]);
 
   // Disable scroll when user is not authenticated
   useEffect(() => {

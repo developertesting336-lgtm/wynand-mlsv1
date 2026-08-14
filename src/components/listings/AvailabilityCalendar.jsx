@@ -279,8 +279,23 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
           }
         }
 
+        // Resolve normal tenant referral:
+        // If a target listing ID is stored, only credit the referrer if they book that specific property.
+        // If no target listing ID is stored, it was a global listings page referral, so they can book any property.
+        let finalReferralCode = null;
+        if (finalNormalRef) {
+          const targetListingId = localStorage.getItem('referral_target_listing_id');
+          if (!targetListingId || targetListingId === listing.id) {
+            finalReferralCode = finalNormalRef;
+          } else {
+            console.warn(`[REFERRAL] Ignoring normal referral code. Referral target property was ${targetListingId}, but user is booking ${listing.id}`);
+          }
+        }
+
         // If the referral matches the property, clear standard normal referral code (exclusive)
-        const finalReferralCode = resolvedAgentReferral ? null : (finalNormalRef || null);
+        if (resolvedAgentReferral) {
+          finalReferralCode = null;
+        }
 
         const { error: bookingError } = await supabase
           .from('bookings')

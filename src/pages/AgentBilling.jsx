@@ -44,8 +44,6 @@ const PLANS = [
 ];
 
 
-
-
 export default function AgentBilling() {
   const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
@@ -53,7 +51,7 @@ export default function AgentBilling() {
   const [loadingBoost, setLoadingBoost] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    base44.auth.me().then(setUser).catch(() => { });
   }, []);
 
   const { data: subscription, isLoading: subLoading } = useQuery({
@@ -105,7 +103,7 @@ export default function AgentBilling() {
   const handleFeatureSubscription = async (listingId) => {
     const maxFeatured = activeSub?.plan === 'pro' ? 3 : 0;
     const currentDbFeaturedCount = myListings.filter(l => l.is_featured).length;
- 
+
     if (currentDbFeaturedCount >= maxFeatured) {
       toast.error(`You have reached the maximum limit of ${maxFeatured} featured listings on the Pro plan.`);
       return;
@@ -243,7 +241,7 @@ export default function AgentBilling() {
                 >
                   {loadingPlan === plan.key ? <Loader2 className="w-4 h-4 animate-spin" /> :
                     activeSub?.plan === plan.key ? 'Current Plan' :
-                    activeSub ? 'Switch Plan' : 'Subscribe'}
+                      activeSub ? 'Switch Plan' : 'Subscribe'}
                 </Button>
               </CardContent>
             </Card>

@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, DollarSign, Users, TrendingUp, Handshake } from 'lucide-react';
+import { CheckCircle, DollarSign, Users, TrendingUp, Handshake, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 const INITIAL = {
   client_name: '', client_email: '', client_phone: '',
@@ -22,16 +23,81 @@ export default function Refer() {
   const [currentUser, setCurrentUser] = useState(null);
   const [agentListings, setAgentListings] = useState([]);
   const [selectedListing, setSelectedListing] = useState('');
+  const [propertySearchText, setPropertySearchText] = useState('');
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Debounced search text state with 600ms delay
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(propertySearchText);
+      setVisibleCount(10); // Reset page count on debounced query change
+    }, 600);
+    return () => clearTimeout(handler);
+  }, [propertySearchText]);
 
   // Get auth state
   const { user, login, authChecked } = useAuth();
 
-  // Load agent's listings if role is agent
+  const [allListings, setAllListings] = useState([]);
+
+  // Load appropriate listings for generating referral link based on user role
   useEffect(() => {
-    if (user?.role === 'agent' && user?.email) {
-      base44.entities.Listing.filter({ agent_email: user.email }, '-created_date', 100)
-        .then(setAgentListings)
-        .catch(console.error);
+    if (user?.role && user?.email) {
+      const loadReferralProperties = async () => {
+        try {
+          console.log('[DEBUG_REFER] User role:', user.role, 'User email:', user.email);
+          // Fetch all active/approved listings
+          const listings = await base44.entities.Listing.filter({ status: 'approved' }, '-created_date', 500);
+          console.log('[DEBUG_REFER] Total active listings fetched:', listings.length, listings);
+
+          // Fetch bookings to filter out those already on lease / booked
+          let busyListingIds = new Set();
+          try {
+            const { data: activeBookings, error: bookingsError } = await supabase
+              .from('bookings')
+              .select('listing_id, status, end_lease')
+              .in('status', ['approved', 'confirmed']);
+
+            if (bookingsError) {
+              console.warn('[DEBUG_REFER] RLS or database block fetching bookings:', bookingsError.message);
+            } else if (activeBookings) {
+              console.log('[DEBUG_REFER] Active bookings found:', activeBookings.length, activeBookings);
+              // Only consider the listing "busy" if it has an approved/confirmed booking AND the lease has NOT ended (end_lease is false or null)
+              activeBookings
+                .filter(b => b.end_lease !== true)
+                .forEach(b => busyListingIds.add(b.listing_id));
+            }
+          } catch (err) {
+            console.error('[DEBUG_REFER] Failed to fetch bookings status (RLS/Permissions):', err);
+          }
+
+          console.log('[DEBUG_REFER] Busy listing IDs:', Array.from(busyListingIds));
+
+          // Filter out booked/leased listings
+          let availableListings = listings.filter(l => !busyListingIds.has(l.id));
+          console.log('[DEBUG_REFER] Available listings after busy filter:', availableListings.length);
+
+          if (user.role === 'owner') {
+            // Owner should not see his own properties for creating individual property referral link
+            availableListings = availableListings.filter(l => l.owner_email !== user.email);
+            console.log('[DEBUG_REFER] Available listings after owner filter (excluding own):', availableListings.length);
+          } else if (user.role === 'agent') {
+            // Filter to agent's own listings
+            availableListings = availableListings.filter(l => l.agent_email === user.email);
+            console.log('[DEBUG_REFER] Available listings after agent filter (only own):', availableListings.length);
+          }
+
+          setAgentListings(availableListings);
+          console.log('[DEBUG_REFER] Final listings set in state:', availableListings);
+        } catch (err) {
+          console.error('[DEBUG_REFER] Error loading referral listings:', err);
+        }
+      };
+
+      loadReferralProperties();
     }
   }, [user?.email, user?.role]);
 
@@ -208,28 +274,107 @@ export default function Refer() {
                     </div>
                   ) : (
                     <>
-                      {isAgent && (
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                            Link to (optional — leave blank for all listings)
-                          </label>
-                          <select
-                            className="w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
-                            value={selectedListing}
-                            onChange={e => setSelectedListing(e.target.value)}
-                          >
-                            <option value="">All Listings</option>
-                            {agentListings.map(l => (
-                              <option key={l.id} value={l.id}>{l.title}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                      <div className="relative">
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                          Link to (optional — leave blank for all listings)
+                        </label>
+                        
+                        {/* Searchable Custom Dropdown Trigger */}
+                        <button
+                          type="button"
+                          onClick={() => setDropdownOpen(!dropdownOpen)}
+                          className="w-full h-10 px-3 border rounded-md bg-white text-left text-sm flex items-center justify-between shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          <span>
+                            {selectedListing
+                              ? agentListings.find(l => l.id === selectedListing)?.title || 'Selected Listing'
+                              : 'All Listings'}
+                          </span>
+                          <span className="text-muted-foreground text-xs font-semibold">▼</span>
+                        </button>
+                        
+                        {dropdownOpen && (
+                          <div className="absolute left-0 right-0 mt-1 border border-input rounded-md bg-white p-2 shadow-lg z-20">
+                            <input
+                              type="text"
+                              className="w-full h-8 px-2 text-xs border rounded mb-2 focus:outline-none focus:ring-1 focus:ring-primary"
+                              placeholder="Type to search properties..."
+                              value={propertySearchText}
+                              onChange={e => setPropertySearchText(e.target.value)}
+                            />
+                            <div 
+                              className="max-h-60 overflow-y-auto space-y-1"
+                              onScroll={e => {
+                                const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                                // Check if user scrolled to the bottom (within 10px threshold) and we are not already loading
+                                if (!isLoadingMore && scrollHeight - scrollTop <= clientHeight + 10) {
+                                  const query = debouncedSearch.toLowerCase().trim();
+                                  const filtered = agentListings.filter(l => 
+                                    l.title.toLowerCase().includes(query) || 
+                                    (l.neighborhood && l.neighborhood.toLowerCase().includes(query))
+                                  );
+                                  if (filtered.length > visibleCount) {
+                                    setIsLoadingMore(true);
+                                    setTimeout(() => {
+                                      setVisibleCount(prev => prev + 10);
+                                      setIsLoadingMore(false);
+                                    }, 500);
+                                  }
+                                }
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedListing('');
+                                  setDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${!selectedListing ? 'bg-primary text-primary-foreground font-semibold' : 'hover:bg-muted'}`}
+                              >
+                                All Listings
+                              </button>
+                              {(() => {
+                                const query = debouncedSearch.toLowerCase().trim();
+                                const filtered = agentListings.filter(l => 
+                                  l.title.toLowerCase().includes(query) || 
+                                  (l.neighborhood && l.neighborhood.toLowerCase().includes(query))
+                                );
+                                const paginated = filtered.slice(0, visibleCount);
+                                
+                                return (
+                                  <>
+                                    {paginated.map(l => (
+                                      <button
+                                        key={l.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedListing(l.id);
+                                          setDropdownOpen(false);
+                                        }}
+                                        className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${selectedListing === l.id ? 'bg-primary text-primary-foreground font-semibold' : 'hover:bg-muted'}`}
+                                      >
+                                        {l.title}
+                                      </button>
+                                    ))}
+                                    {filtered.length === 0 && (
+                                      <div className="text-center text-xs text-muted-foreground py-2">No matching properties found</div>
+                                    )}
+                                    {isLoadingMore && (
+                                      <div className="flex items-center justify-center py-2 gap-1 text-xs text-muted-foreground">
+                                        <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                                        Loading...
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
                       <p className="text-sm text-muted-foreground">
-                        {isAgent
-                          ? 'Share this link. When clients open your link and request bookings, their referral is automatically tracked.'
-                          : 'Share your unique referral link. When users sign up or submit viewing requests through your link, they are automatically tracked as your referrals.'}
+                        Share this link. When clients open your link and register or request bookings, their referral is automatically tracked to your account.
                       </p>
 
                       <div className="flex gap-2">
