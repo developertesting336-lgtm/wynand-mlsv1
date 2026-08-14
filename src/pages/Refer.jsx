@@ -48,10 +48,10 @@ export default function Refer() {
     if (user?.role && user?.email) {
       const loadReferralProperties = async () => {
         try {
-          console.log('[DEBUG_REFER] User role:', user.role, 'User email:', user.email);
+
           // Fetch all active/approved listings
           const listings = await base44.entities.Listing.filter({ status: 'approved' }, '-created_date', 500);
-          console.log('[DEBUG_REFER] Total active listings fetched:', listings.length, listings);
+
 
           // Fetch bookings to filter out those already on lease / booked
           let busyListingIds = new Set();
@@ -64,7 +64,7 @@ export default function Refer() {
             if (bookingsError) {
               console.warn('[DEBUG_REFER] RLS or database block fetching bookings:', bookingsError.message);
             } else if (activeBookings) {
-              console.log('[DEBUG_REFER] Active bookings found:', activeBookings.length, activeBookings);
+
               // Only consider the listing "busy" if it has an approved/confirmed booking AND the lease has NOT ended (end_lease is false or null)
               activeBookings
                 .filter(b => b.end_lease !== true)
@@ -74,24 +74,23 @@ export default function Refer() {
             console.error('[DEBUG_REFER] Failed to fetch bookings status (RLS/Permissions):', err);
           }
 
-          console.log('[DEBUG_REFER] Busy listing IDs:', Array.from(busyListingIds));
+
 
           // Filter out booked/leased listings
           let availableListings = listings.filter(l => !busyListingIds.has(l.id));
-          console.log('[DEBUG_REFER] Available listings after busy filter:', availableListings.length);
+
 
           if (user.role === 'owner') {
             // Owner should not see his own properties for creating individual property referral link
             availableListings = availableListings.filter(l => l.owner_email !== user.email);
-            console.log('[DEBUG_REFER] Available listings after owner filter (excluding own):', availableListings.length);
           } else if (user.role === 'agent') {
             // Filter to agent's own listings
             availableListings = availableListings.filter(l => l.agent_email === user.email);
-            console.log('[DEBUG_REFER] Available listings after agent filter (only own):', availableListings.length);
+
           }
 
           setAgentListings(availableListings);
-          console.log('[DEBUG_REFER] Final listings set in state:', availableListings);
+
         } catch (err) {
           console.error('[DEBUG_REFER] Error loading referral listings:', err);
         }
@@ -258,15 +257,15 @@ export default function Refer() {
 
                   {!hasStripeConnected ? (
                     <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm font-semibold leading-relaxed">
-                      ⚠️ You must connect your bank account first to generate and share your referral link. 
-                      Please go to your <Link 
+                      ⚠️ You must connect your bank account first to generate and share your referral link.
+                      Please go to your <Link
                         to={
-                          currentUser.role === 'agent' 
-                            ? '/agent-dashboard' 
-                            : currentUser.role === 'owner' 
-                              ? '/owner-dashboard' 
+                          currentUser.role === 'agent'
+                            ? '/agent-dashboard'
+                            : currentUser.role === 'owner'
+                              ? '/owner-dashboard'
                               : '/dashboard'
-                        } 
+                        }
                         className="underline text-red-900 hover:text-red-950 font-bold"
                       >
                         Dashboard
@@ -278,7 +277,7 @@ export default function Refer() {
                         <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                           Link to (optional — leave blank for all listings)
                         </label>
-                        
+
                         {/* Searchable Custom Dropdown Trigger */}
                         <button
                           type="button"
@@ -292,7 +291,7 @@ export default function Refer() {
                           </span>
                           <span className="text-muted-foreground text-xs font-semibold">▼</span>
                         </button>
-                        
+
                         {dropdownOpen && (
                           <div className="absolute left-0 right-0 mt-1 border border-input rounded-md bg-white p-2 shadow-lg z-20">
                             <input
@@ -302,15 +301,15 @@ export default function Refer() {
                               value={propertySearchText}
                               onChange={e => setPropertySearchText(e.target.value)}
                             />
-                            <div 
+                            <div
                               className="max-h-60 overflow-y-auto space-y-1"
                               onScroll={e => {
                                 const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
                                 // Check if user scrolled to the bottom (within 10px threshold) and we are not already loading
                                 if (!isLoadingMore && scrollHeight - scrollTop <= clientHeight + 10) {
                                   const query = debouncedSearch.toLowerCase().trim();
-                                  const filtered = agentListings.filter(l => 
-                                    l.title.toLowerCase().includes(query) || 
+                                  const filtered = agentListings.filter(l =>
+                                    l.title.toLowerCase().includes(query) ||
                                     (l.neighborhood && l.neighborhood.toLowerCase().includes(query))
                                   );
                                   if (filtered.length > visibleCount) {
@@ -335,12 +334,12 @@ export default function Refer() {
                               </button>
                               {(() => {
                                 const query = debouncedSearch.toLowerCase().trim();
-                                const filtered = agentListings.filter(l => 
-                                  l.title.toLowerCase().includes(query) || 
+                                const filtered = agentListings.filter(l =>
+                                  l.title.toLowerCase().includes(query) ||
                                   (l.neighborhood && l.neighborhood.toLowerCase().includes(query))
                                 );
                                 const paginated = filtered.slice(0, visibleCount);
-                                
+
                                 return (
                                   <>
                                     {paginated.map(l => (

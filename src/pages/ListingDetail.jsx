@@ -303,6 +303,9 @@ export default function ListingDetail() {
                   neighborhood={listing.neighborhood}
                   neighborhoodLabel={NEIGHBORHOOD_LABELS[listing.neighborhood] || listing.neighborhood}
                   nearbyPlaces={listing.nearby_places}
+                  listingLatitude={listing.latitude}
+                  listingLongitude={listing.longitude}
+                  propertyTitle={listing.title}
                 />
               </div>
               <ReviewAverageInline listingId={listing.id} />
@@ -378,12 +381,12 @@ export default function ListingDetail() {
             )} */}
 
           {/* Referral banner */}
-          {refCode && (
+          {/* {refCode && (
             <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-xl px-4 py-2.5 text-sm">
               <Users className="w-4 h-4 text-primary shrink-0" />
               <span>You were referred by an agent — your inquiry will be tracked to them.</span>
             </div>
-          )}
+          )} */}
 
           {/* Verification trust bar */}
           {listing.is_verified ? (

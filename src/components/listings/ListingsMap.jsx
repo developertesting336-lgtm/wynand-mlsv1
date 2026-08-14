@@ -18,28 +18,51 @@ L.Icon.Default.mergeOptions({
 
 const PV_CENTER = [20.6534, -105.2253];
 
-function createPriceIcon(price, isVerified, isFeatured, isActive) {
-  const bg = isFeatured ? '#f59e0b' : isVerified ? '#0ea5e9' : '#1e293b';
-  const label = price ? `$${(price / 1000).toFixed(price % 1000 === 0 ? 0 : 1)}k` : '?';
-  const scale = isActive ? 'transform:scale(1.2);z-index:1000;' : '';
+function createPriceIcon(title, priceMxn, isVerified, isFeatured, isActive) {
+  const label = title || 'Property';
+  const priceVal = priceMxn ? Number(priceMxn) : 0;
+  const priceLabel = priceVal ? `${priceVal.toLocaleString()} MXN` : '';
+  const markerUrl = isFeatured 
+    ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png'
+    : isVerified
+      ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png'
+      : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-black.png';
+
+  const scale = isActive ? 'transform:scale(1.15);z-index:1000;' : '';
+
   return L.divIcon({
     className: '',
-    html: `<div style="
-      background:${bg};
-      color:white;
-      font-weight:700;
-      font-size:12px;
-      padding:4px 9px;
-      border-radius:20px;
-      white-space:nowrap;
-      box-shadow:0 2px 10px rgba(0,0,0,0.3);
-      border:${isActive ? '2.5px solid #fff' : '2px solid white'};
-      cursor:pointer;
-      transition:transform 0.15s;
-      ${scale}
-    ">${label}/mo</div>`,
-    iconAnchor: [28, 16],
-    popupAnchor: [0, -20],
+    html: `
+      <div style="position:relative; width:25px; height:41px; ${scale}">
+        <!-- Leaflet Pin Marker Image -->
+        <img src="${markerUrl}" style="width:25px; height:41px; display:block;" />
+        
+        <!-- Text Label outside / above the pin -->
+        <div style="
+          position:absolute;
+          bottom:45px;
+          left:50%;
+          transform:translateX(-50%);
+          background:rgba(255, 255, 255, 0.95);
+          color:#1e293b;
+          font-weight:700;
+          font-size:11px;
+          padding:4px 8px;
+          border-radius:4px;
+          box-shadow:0 2px 6px rgba(0,0,0,0.15);
+          border:1px solid #cbd5e1;
+          pointer-events:none;
+          text-align:center;
+          white-space:nowrap;
+        ">
+          <div style="max-width:150px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${label}</div>
+          ${priceLabel ? `<div style="font-size:9.5px; font-weight:600; opacity:0.8; margin-top:1px;">${priceLabel}</div>` : ''}
+        </div>
+      </div>
+    `,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
   });
 }
 
@@ -161,25 +184,30 @@ function SidePanel({ listings, activeId, onHover, onClose }) {
 }
 
 const NEIGHBORHOOD_COORDS = {
-  romantica: [20.6025, -105.2372],
-  marina_vallarta: [20.6653, -105.2536],
-  nuevo_vallarta: [20.6922, -105.2891],
-  centro: [20.6120, -105.2335],
-  amapas: [20.5960, -105.2355],
+  boca_de_tomatlan: [20.5186, -105.3129],
+  mismaloya: [20.5317, -105.2892],
+  garza_blanca: [20.5593, -105.2673],
+  playas_gemelas: [20.5678, -105.2635],
+  sierra_del_mar: [20.5702, -105.2575],
   conchas_chinas: [20.5878, -105.2311],
-  fluvial: [20.6405, -105.2285],
+  amapas: [20.5960, -105.2355],
+  romantica: [20.6025, -105.2372],
+  centro: [20.6120, -105.2335],
+  cinco_de_diciembre: [20.6225, -105.2320],
   versalles: [20.6355, -105.2315],
-  pitillal: [20.6489, -105.2132],
-  las_juntas: [20.6865, -105.2325],
+  las_glorias: [20.6288, -105.2356],
+  fluvial: [20.6405, -105.2285],
+  el_caloso: [20.6085, -105.2232],
   hotel_zone: [20.6300, -105.2410],
-  south_side: [20.6010, -105.2375],
+  marina_vallarta: [20.6653, -105.2536],
+  north_vallarta: [20.6785, -105.2345],
+  pitillal: [20.6489, -105.2132],
+  nuevo_vallarta: [20.6922, -105.2891],
+  flamingos: [20.7185, -105.3054],
   bucerias: [20.7554, -105.3323],
   la_cruz: [20.7297, -105.3789],
   punta_mita: [20.7681, -105.5264],
   sayulita: [20.8689, -105.4408],
-  cinco_de_diciembre: [20.6225, -105.2320],
-  alta_vista: [20.6045, -105.2310],
-  lazaro_cardenas: [20.6200, -105.2280],
 };
 
 export default function ListingsMap({ listings }) {
@@ -299,14 +327,13 @@ export default function ListingsMap({ listings }) {
             pathOptions={{ color: '#0ea5e9', weight: 2, fillOpacity: 0.07, dashArray: '6,4' }}
           />
         )}
-
         {withCoords.map(listing => {
           const inView = visibleListings.includes(listing);
           return (
             <Marker
               key={listing.id}
               position={[listing.latitude, listing.longitude]}
-              icon={createPriceIcon(listing.price_usd, listing.is_verified, listing.is_featured, activeId === listing.id)}
+              icon={createPriceIcon(listing.title, listing.price_mxn, listing.is_verified, listing.is_featured, activeId === listing.id)}
               opacity={drawnBounds && !inView ? 0.3 : 1}
               eventHandlers={{
                 click: () => setActiveId(listing.id),

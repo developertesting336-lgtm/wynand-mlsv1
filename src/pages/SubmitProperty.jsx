@@ -13,7 +13,7 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/lib/supabase';
 import { isSubscriptionActive } from '@/lib/utils';
 import { toast } from 'sonner';
-import { NEIGHBORHOODS, FURNISHED_OPTIONS, RENTAL_TYPES } from '@/lib/constants';
+import { NEIGHBORHOODS, FURNISHED_OPTIONS, RENTAL_TYPES, GROUPED_NEIGHBORHOODS } from '@/lib/constants';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -550,8 +550,8 @@ export default function SubmitProperty() {
       const lowerName = file.name.toLowerCase();
       const isGif = file.type === 'image/gif' || lowerName.endsWith('.gif');
       const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|ogg)$/i.test(lowerName);
-      const isImage = file.type.startsWith('image/');
-      const isAllowedExtension = /\.(jpe?g|png|webp|avif)$/i.test(lowerName);
+      const isImage = file.type.startsWith('image/') || lowerName.endsWith('.jfif');
+      const isAllowedExtension = /\.(jpe?g|png|webp|avif|jfif)$/i.test(lowerName);
 
       if (!isImage || !isAllowedExtension || isGif || isVideo) {
         rejectedFiles.push(file.name);
@@ -561,7 +561,7 @@ export default function SubmitProperty() {
     }
 
     if (rejectedFiles.length) {
-      const message = `Skipped invalid uploads: ${rejectedFiles.join(', ')}. Only JPG, PNG, WebP, and AVIF images are allowed.`;
+      const message = `Skipped invalid uploads: ${rejectedFiles.join(', ')}. Only JPG, JPEG, JFIF, PNG, WebP, and AVIF images are allowed.`;
       console.warn(message);
       toast.error(message);
     }
@@ -697,25 +697,30 @@ export default function SubmitProperty() {
 
       // Resolve latitude and longitude coordinates based on neighborhood to perform Overpass API queries
       const NEIGHBORHOOD_COORDS = {
-        romantica: [20.6025, -105.2372],
-        marina_vallarta: [20.6653, -105.2536],
-        nuevo_vallarta: [20.6922, -105.2891],
-        centro: [20.6120, -105.2335],
-        amapas: [20.5960, -105.2355],
+        boca_de_tomatlan: [20.5186, -105.3129],
+        mismaloya: [20.5317, -105.2892],
+        garza_blanca: [20.5593, -105.2673],
+        playas_gemelas: [20.5678, -105.2635],
+        sierra_del_mar: [20.5702, -105.2575],
         conchas_chinas: [20.5878, -105.2311],
-        fluvial: [20.6405, -105.2285],
+        amapas: [20.5960, -105.2355],
+        romantica: [20.6025, -105.2372],
+        centro: [20.6120, -105.2335],
+        cinco_de_diciembre: [20.6225, -105.2320],
         versalles: [20.6355, -105.2315],
-        pitillal: [20.6489, -105.2132],
-        las_juntas: [20.6865, -105.2325],
+        las_glorias: [20.6288, -105.2356],
+        fluvial: [20.6405, -105.2285],
+        el_caloso: [20.6085, -105.2232],
         hotel_zone: [20.6300, -105.2410],
-        south_side: [20.6010, -105.2375],
+        marina_vallarta: [20.6653, -105.2536],
+        north_vallarta: [20.6785, -105.2345],
+        pitillal: [20.6489, -105.2132],
+        nuevo_vallarta: [20.6922, -105.2891],
+        flamingos: [20.7185, -105.3054],
         bucerias: [20.7554, -105.3323],
         la_cruz: [20.7297, -105.3789],
         punta_mita: [20.7681, -105.5264],
         sayulita: [20.8689, -105.4408],
-        cinco_de_diciembre: [20.6225, -105.2320],
-        alta_vista: [20.6045, -105.2310],
-        lazaro_cardenas: [20.6200, -105.2280],
       };
 
       const coords = NEIGHBORHOOD_COORDS[form.neighborhood] || [20.6534, -105.2253];
@@ -866,7 +871,18 @@ export default function SubmitProperty() {
                 <Select required value={form.neighborhood} onValueChange={v => update('neighborhood', v)}>
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
-                    {NEIGHBORHOODS.map(n => <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>)}
+                    {GROUPED_NEIGHBORHOODS.map(group => (
+                      <React.Fragment key={group.label}>
+                        <div className="px-2 py-1.5 text-xs font-bold text-muted-foreground uppercase bg-muted/40 tracking-wider">
+                          {group.label}
+                        </div>
+                        {group.options.map(o => (
+                          <SelectItem key={o.value} value={o.value} className="pl-4">
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </React.Fragment>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1033,7 +1049,7 @@ export default function SubmitProperty() {
                       <span className="text-xs text-muted-foreground mt-1">Add Photos (max 8)</span>
                     </>
                   )}
-                  <input type="file" multiple accept="image/png,image/jpeg,image/webp,image/avif" onChange={handlePhotoUpload} className="hidden" />
+                  <input type="file" multiple accept="image/png,image/jpeg,image/webp,image/avif,image/jfif" onChange={handlePhotoUpload} className="hidden" />
                 </label>
               </div>
             </div>

@@ -13,10 +13,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { X, Plus, Loader2, Upload, Trash2 } from 'lucide-react';
-import { NEIGHBORHOODS, FURNISHED_OPTIONS, RENTAL_TYPES, NEIGHBORHOOD_LABELS } from '@/lib/constants';
+import { X, Plus, Loader2, Upload, Trash2, Search, MapPin } from 'lucide-react';
+import { NEIGHBORHOODS, FURNISHED_OPTIONS, RENTAL_TYPES, NEIGHBORHOOD_LABELS, GROUPED_NEIGHBORHOODS } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix leaflet default icon
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+function MapEventsHandler({ onMapClick, targetCoords }) {
+  const map = useMapEvents({
+    click(e) {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+
+  React.useEffect(() => {
+    if (targetCoords) {
+      map.setView(targetCoords, 16);
+    }
+  }, [targetCoords, map]);
+
+  return null;
+}
 
 export default function EditPropertyModal({ listing, isOpen, onClose }) {
   const queryClient = useQueryClient();
@@ -30,6 +57,9 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
     bathrooms: listing.bathrooms?.toString() || '',
     neighborhood: listing.neighborhood || '',
     address: listing.address || '',
+    city: listing.city || '',
+    latitude: listing.latitude || '',
+    longitude: listing.longitude || '',
     furnished: listing.furnished || 'furnished',
     pet_friendly: listing.pet_friendly || false,
     rental_type: listing.rental_type || 'long_term',
@@ -48,8 +78,81 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [cityLoading, setCityLoading] = useState(false);
+  const [mapTargetCoords, setMapTargetCoords] = useState(listing.latitude ? [listing.latitude, listing.longitude] : null);
 
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+
+  const handleAddressSearch = async () => {
+    const neighborhoodObj = NEIGHBORHOODS.find(n => n.value === form.neighborhood);
+    const neighborhoodLabel = neighborhoodObj ? neighborhoodObj.label : '';
+    const searchString = [form.address, neighborhoodLabel, 'Mexico'].filter(Boolean).join(', ');
+    if (!searchString.trim()) return;
+
+    setAddressLoading(true);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1`;
+      const response = await fetch(url, {
+        headers: {
+          'Accept-Language': 'en-US,en;q=0.9',
+          'User-Agent': 'PVVerifiedRentalsEditPropertyModal'
+        }
+      });
+      if (response.ok) {
+        const results = await response.json();
+        if (results && results.length > 0) {
+          const lat = parseFloat(results[0].lat);
+          const lon = parseFloat(results[0].lon);
+          setMapTargetCoords([lat, lon]);
+          update('latitude', lat);
+          update('longitude', lon);
+          toast.success('Address location found!');
+        } else {
+          toast.error('Address location not found on map.');
+        }
+      } else {
+        toast.error('Search failed.');
+      }
+    } catch (err) {
+      console.error('Nominatim search failed', err);
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const handleCitySearch = async () => {
+    if (!form.city || !form.city.trim()) return;
+    setCityLoading(true);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(form.city.trim() + ', Mexico')}&limit=1`;
+      const response = await fetch(url, {
+        headers: {
+          'Accept-Language': 'en-US,en;q=0.9',
+          'User-Agent': 'PVVerifiedRentalsEditPropertyModal'
+        }
+      });
+      if (response.ok) {
+        const results = await response.json();
+        if (results && results.length > 0) {
+          const lat = parseFloat(results[0].lat);
+          const lon = parseFloat(results[0].lon);
+          setMapTargetCoords([lat, lon]);
+          update('latitude', lat);
+          update('longitude', lon);
+          toast.success('City center found!');
+        } else {
+          toast.error('City not found.');
+        }
+      } else {
+        toast.error('Search failed.');
+      }
+    } catch (err) {
+      console.error('Nominatim search failed', err);
+    } finally {
+      setCityLoading(false);
+    }
+  };
 
   const updateListing = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Listing.update(id, data),
@@ -75,8 +178,8 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
       const lowerName = file.name.toLowerCase();
       const isGif = file.type === 'image/gif' || lowerName.endsWith('.gif');
       const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|ogg)$/i.test(lowerName);
-      const isImage = file.type.startsWith('image/');
-      const isAllowedExtension = /\.(jpe?g|png|webp|avif)$/i.test(lowerName);
+      const isImage = file.type.startsWith('image/') || lowerName.endsWith('.jfif');
+      const isAllowedExtension = /\.(jpe?g|png|webp|avif|jfif)$/i.test(lowerName);
 
       if (!isImage || !isAllowedExtension || isGif || isVideo) {
         rejectedFiles.push(file.name);
@@ -86,7 +189,7 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
     }
 
     if (rejectedFiles.length) {
-      toast.error(`Skipped invalid uploads: ${rejectedFiles.join(', ')}. Only JPG, PNG, WebP, and AVIF images are allowed.`);
+      toast.error(`Skipped invalid uploads: ${rejectedFiles.join(', ')}. Only JPG, JPEG, JFIF, PNG, WebP, and AVIF images are allowed.`);
     }
 
     const remainingSlots = 8 - form.photos.length;
@@ -126,10 +229,83 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
     }
     setSaving(true);
     try {
+      const NEIGHBORHOOD_COORDS = {
+        boca_de_tomatlan: [20.5186, -105.3129],
+        mismaloya: [20.5317, -105.2892],
+        garza_blanca: [20.5593, -105.2673],
+        playas_gemelas: [20.5678, -105.2635],
+        sierra_del_mar: [20.5702, -105.2575],
+        conchas_chinas: [20.5878, -105.2311],
+        amapas: [20.5960, -105.2355],
+        romantica: [20.6025, -105.2372],
+        centro: [20.6120, -105.2335],
+        cinco_de_diciembre: [20.6225, -105.2320],
+        versalles: [20.6355, -105.2315],
+        las_glorias: [20.6288, -105.2356],
+        fluvial: [20.6405, -105.2285],
+        el_caloso: [20.6085, -105.2232],
+        hotel_zone: [20.6300, -105.2410],
+        marina_vallarta: [20.6653, -105.2536],
+        north_vallarta: [20.6785, -105.2345],
+        pitillal: [20.6489, -105.2132],
+        nuevo_vallarta: [20.6922, -105.2891],
+        flamingos: [20.7185, -105.3054],
+        bucerias: [20.7554, -105.3323],
+        la_cruz: [20.7297, -105.3789],
+        punta_mita: [20.7681, -105.5264],
+        sayulita: [20.8689, -105.4408],
+      };
+
+      const coords = NEIGHBORHOOD_COORDS[form.neighborhood] || [20.6534, -105.2253];
+      const latitude = form.latitude ? Number(form.latitude) : coords[0];
+      const longitude = form.longitude ? Number(form.longitude) : coords[1];
+
+      let nearbyPlaces = [];
+      try {
+        const query = `[out:json];
+        (
+          node(around:10000,${latitude},${longitude})["tourism"~"attraction|museum|viewpoint"];
+          node(around:10000,${latitude},${longitude})["amenity"~"bank|gym|beauty|cinema|mall|supermarket|company|theatre|office"];
+          node(around:10000,${latitude},${longitude})["leisure"~"fitness_centre|cinema|theatre"];
+          node(around:10000,${latitude},${longitude})["shop"~"mall|supermarket|beauty"];
+          node(around:10000,${latitude},${longitude})["aeroway"~"aerodrome|terminal"];
+          node(around:10000,${latitude},${longitude})["railway"~"station|halt"];
+          node(around:10000,${latitude},${longitude})["amenity"~"bus_station"];
+        );
+        out;`;
+        const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && Array.isArray(data.elements)) {
+            const validElements = data.elements.filter(el => {
+              const name = el.tags?.name;
+              const type = (el.tags?.amenity || el.tags?.leisure || el.tags?.tourism || el.tags?.shop || el.tags?.aeroway || el.tags?.railway || '').toLowerCase();
+              return name && name.trim().length > 0 && type !== 'parking' && type !== 'park' && !name.toLowerCase().includes('parking');
+            });
+
+            nearbyPlaces = validElements.slice(0, 15).map(el => {
+              const type = el.tags?.aeroway || el.tags?.railway || el.tags?.tourism || el.tags?.amenity || el.tags?.leisure || el.tags?.shop || 'Attraction';
+              return {
+                name: el.tags?.name,
+                type: type,
+                lat: el.lat,
+                lon: el.lon,
+                distance: 'Nearby'
+              };
+            });
+          }
+        }
+      } catch (osmErr) {
+        console.warn('OSM fetch failed', osmErr);
+      }
+
+      const { city: formCity, ...formDataToSend } = form;
+
       await updateListing.mutateAsync({
         id: listing.id,
         data: {
-          ...form,
+          ...formDataToSend,
           price_usd: Number(form.price_usd),
           price_mxn: form.price_mxn ? Number(form.price_mxn) : null,
           bedrooms: Number(form.bedrooms),
@@ -142,6 +318,9 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
           owner_name: form.owner_name || null,
           owner_phone: form.owner_phone || null,
           owner_email: user?.role === 'agent' ? (form.contact_email || form.agent_email) : user?.email,
+          latitude: latitude,
+          longitude: longitude,
+          nearby_places: nearbyPlaces,
         },
       });
     } catch {
@@ -206,8 +385,17 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
                 <Select required value={form.neighborhood} onValueChange={v => update('neighborhood', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {NEIGHBORHOODS.map(n => (
-                      <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+                    {GROUPED_NEIGHBORHOODS.map(group => (
+                      <React.Fragment key={group.label}>
+                        <div className="px-2 py-1.5 text-xs font-bold text-muted-foreground uppercase bg-muted/40 tracking-wider">
+                          {group.label}
+                        </div>
+                        {group.options.map(o => (
+                          <SelectItem key={o.value} value={o.value} className="pl-4">
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </React.Fragment>
                     ))}
                   </SelectContent>
                 </Select>
@@ -224,10 +412,92 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
                 </Select>
               </div>
             </div>
-            <div>
-              <Label>Address</Label>
-              <Input value={form.address} onChange={e => update('address', e.target.value)} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Address</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    value={form.address} 
+                    onChange={e => update('address', e.target.value)} 
+                    placeholder="e.g. Calle Febronio Uribe 123"
+                    className="flex-1"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddressSearch();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleAddressSearch}
+                    disabled={addressLoading}
+                  >
+                    {addressLoading ? '...' : 'Find'}
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label>City</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={form.city}
+                    onChange={e => update('city', e.target.value)}
+                    placeholder="e.g. Puerto Vallarta"
+                    className="flex-1"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCitySearch();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleCitySearch}
+                    disabled={cityLoading}
+                  >
+                    {cityLoading ? '...' : 'Find'}
+                  </Button>
+                </div>
+              </div>
             </div>
+
+            {/* Map Pin Dropper */}
+            <div className="space-y-2">
+              <Label>Pinpoint Location * (Click on map to drop pin)</Label>
+              <div className="h-64 rounded-xl border border-slate-200 overflow-hidden relative z-10">
+                <MapContainer
+                  center={
+                    form.latitude && form.longitude
+                      ? [Number(form.latitude), Number(form.longitude)]
+                      : [20.6534, -105.2253]
+                  }
+                  zoom={13}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  />
+                  <MapEventsHandler
+                    onMapClick={(lat, lng) => {
+                      update('latitude', lat);
+                      update('longitude', lng);
+                    }}
+                    targetCoords={mapTargetCoords}
+                  />
+                  {form.latitude && form.longitude && (
+                    <Marker position={[Number(form.latitude), Number(form.longitude)]} />
+                  )}
+                </MapContainer>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                <div>Latitude: {form.latitude || 'Not set'}</div>
+                <div>Longitude: {form.longitude || 'Not set'}</div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Rental Type</Label>
@@ -295,7 +565,7 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
                   <input
                     type="file"
                     multiple
-                    accept="image/png,image/jpeg,image/webp,image/avif"
+                    accept="image/png,image/jpeg,image/webp,image/avif,image/jfif"
                     onChange={handlePhotoUpload}
                     className="hidden"
                   />

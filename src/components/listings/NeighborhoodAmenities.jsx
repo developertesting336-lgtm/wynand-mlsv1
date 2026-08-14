@@ -1,6 +1,27 @@
 import React, { useState } from 'react';
 import { MapPin, Loader2, UtensilsCrossed, Heart, Building2, Coffee, ShoppingBag, GraduationCap, Dumbbell, X, Plane } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix leaflet default icon
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+// Custom red icon for the property itself
+const propertyIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
 
 const CATEGORY_ICONS = {
   'Places to Eat': UtensilsCrossed,
@@ -98,7 +119,7 @@ const AMENITIES_BY_NEIGHBORHOOD = {
   }
 };
 
-export default function NeighborhoodAmenities({ neighborhood, neighborhoodLabel, nearbyPlaces }) {
+export default function NeighborhoodAmenities({ neighborhood, neighborhoodLabel, nearbyPlaces, listingLatitude, listingLongitude, propertyTitle }) {
   const [open, setOpen] = useState(false);
 
   // Group dynamic nearby places if present
@@ -138,6 +159,50 @@ export default function NeighborhoodAmenities({ neighborhood, neighborhoodLabel,
   const staticData = AMENITIES_BY_NEIGHBORHOOD[key];
   const displayData = hasDynamicPlaces ? dynamicCategories : staticData;
 
+  const mapCenter = listingLatitude && listingLongitude ? [Number(listingLatitude), Number(listingLongitude)] : [20.6534, -105.2253];
+
+  // Custom function to create labeled markers
+  const createLabeledIcon = (name, subLabel, isProp = false) => {
+    const markerUrl = isProp
+      ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png'
+      : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png';
+
+    return L.divIcon({
+      className: '',
+      html: `
+        <div style="position:relative; width:25px; height:41px;">
+          <!-- Leaflet Pin Marker Image -->
+          <img src="${markerUrl}" style="width:25px; height:41px; display:block;" />
+          
+          <!-- Text Label outside / above the pin -->
+          <div style="
+            position:absolute;
+            bottom:45px;
+            left:50%;
+            transform:translateX(-50%);
+            background:rgba(255, 255, 255, 0.95);
+            color:#1e293b;
+            font-weight:700;
+            font-size:10px;
+            padding:3px 6px;
+            border-radius:4px;
+            box-shadow:0 2px 6px rgba(0,0,0,0.15);
+            border:1px solid #cbd5e1;
+            pointer-events:none;
+            text-align:center;
+            white-space:nowrap;
+          ">
+            <div style="max-width:140px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${name}</div>
+            ${subLabel ? `<div style="font-size:9.5px; font-weight:600; opacity:0.75; margin-top:1px; text-transform:capitalize;">${subLabel}</div>` : ''}
+          </div>
+        </div>
+      `,
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+    });
+  };
+
   return (
     <>
       <Button variant="outline" size="sm" className="gap-2" onClick={() => setOpen(true)}>
@@ -147,7 +212,7 @@ export default function NeighborhoodAmenities({ neighborhood, neighborhoodLabel,
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setOpen(false)}>
           <div
-            className="bg-card rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+            className="bg-card rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
@@ -164,7 +229,40 @@ export default function NeighborhoodAmenities({ neighborhood, neighborhoodLabel,
             </div>
 
             {/* Body */}
-            <div className="p-6">
+            <div className="p-6 space-y-6">
+              {/* Map displaying the property and nearby locations */}
+              {listingLatitude && listingLongitude && (
+                <div className="h-80 rounded-xl overflow-hidden border border-slate-200 relative z-10">
+                  <MapContainer center={mapCenter} zoom={14} style={{ height: '100%', width: '100%' }}>
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    />
+                    {/* The property itself */}
+                    <Marker position={mapCenter} icon={createLabeledIcon(propertyTitle || 'Property Location', 'Target', true)}>
+                      <Popup>
+                        <div className="font-semibold text-sm">{propertyTitle || 'Property Location'}</div>
+                      </Popup>
+                    </Marker>
+
+                    {/* Nearby landmarks */}
+                    {Array.isArray(nearbyPlaces) && nearbyPlaces.map((place, idx) => {
+                      if (!place.lat || !place.lon) return null;
+                      return (
+                        <Marker key={idx} position={[Number(place.lat), Number(place.lon)]} icon={createLabeledIcon(place.name, place.type)}>
+                          <Popup>
+                            <div className="text-xs">
+                              <span className="font-bold block">{place.name}</span>
+                              <span className="text-muted-foreground capitalize">{place.type || 'Attraction'}</span>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    })}
+                  </MapContainer>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 {Object.entries(displayData).map(([category, places]) => {
                   if (!places?.length) return null;
