@@ -369,11 +369,12 @@ export default function SubmitProperty() {
   const [addressLoading, setAddressLoading] = useState(false);
   const [cityLoading, setCityLoading] = useState(false);
   const [mapTargetCoords, setMapTargetCoords] = useState(null);
+  const [mapSearchAddress, setMapSearchAddress] = useState('');
 
   const handleAddressSearch = async () => {
     const neighborhoodObj = NEIGHBORHOODS.find(n => n.value === form.neighborhood);
     const neighborhoodLabel = neighborhoodObj ? neighborhoodObj.label : '';
-    const searchString = [form.address, neighborhoodLabel, 'Mexico'].filter(Boolean).join(', ');
+    const searchString = [mapSearchAddress, neighborhoodLabel, 'Mexico'].filter(Boolean).join(', ');
     if (!searchString.trim()) return;
 
     setAddressLoading(true);
@@ -704,48 +705,52 @@ export default function SubmitProperty() {
           const mapDiv = document.createElement('div');
           const service = new window.google.maps.places.PlacesService(mapDiv);
 
-          // Use keyword/name parameter instead of types array because Places API nearbySearch expects a single string for type
-          const request = {
-            location: new window.google.maps.LatLng(latitude, longitude),
-            radius: 10000,
-            keyword: 'restaurant'
-          };
-
-          nearbyPlaces = await new Promise((resolve) => {
-            const timer = setTimeout(() => {
-              console.warn('Google Places call timed out after 5 seconds');
-              resolve([]);
-            }, 5000);
-
-            try {
+          // Execute multiple parallel queries to guarantee we fetch a rich set of 15-20 results across categories
+          const queries = ['restaurant', 'supermarket', 'mall', 'bank', 'gym', 'cafe', 'cinema', 'tourist attraction'];
+          const fetchPromises = queries.map(term => {
+            return new Promise((resolve) => {
+              const request = {
+                location: new window.google.maps.LatLng(latitude, longitude),
+                radius: 7000,
+                keyword: term
+              };
               service.nearbySearch(request, (results, status) => {
-                clearTimeout(timer);
-                console.log('Places status:', status, 'Results count:', results?.length);
                 if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-                  const mapped = results.slice(0, 15).map(place => {
-                    const mainType = place.types?.[0] || 'Attraction';
-                    return {
-                      name: place.name,
-                      type: mainType,
-                      lat: place.geometry?.location?.lat(),
-                      lon: place.geometry?.location?.lng(),
-                      distance: 'Nearby'
-                    };
-                  });
-                  resolve(mapped);
+                  resolve(results);
                 } else {
-                  console.warn('Nearby search returned status:', status);
                   resolve([]);
                 }
               });
-            } catch (err) {
-              clearTimeout(timer);
-              console.error('Nearby search execution error:', err);
-              resolve([]);
+            });
+          });
+
+          const resultsArray = await Promise.all(fetchPromises);
+          // Limit each query term category's results to 10 max, flatten, and filter duplicates by place_id
+          const seenIds = new Set();
+          const merged = [];
+
+          resultsArray.forEach(list => {
+            // Keep up to 10 places from each category list
+            const limitedList = list.slice(0, 10);
+            for (const place of limitedList) {
+              if (place.place_id && !seenIds.has(place.place_id)) {
+                seenIds.add(place.place_id);
+                merged.push(place);
+              }
             }
           });
-        } else {
-          console.warn('Google Maps places library is not loaded on window');
+
+          // Increase budget up to 60 places total to ensure all categories display results
+          nearbyPlaces = merged.slice(0, 60).map(place => {
+            const mainType = place.types?.[0] || 'Attraction';
+            return {
+              name: place.name,
+              type: mainType,
+              lat: place.geometry?.location?.lat(),
+              lon: place.geometry?.location?.lng(),
+              distance: 'Nearby'
+            };
+          });
         }
       } catch (placeErr) {
         console.error('Google Places fetch failed', placeErr);
@@ -878,53 +883,72 @@ export default function SubmitProperty() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Full Address</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={form.address}
-                    onChange={e => update('address', e.target.value)}
-                    placeholder="Street, number, colonia..."
-                    className="flex-1"
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddressSearch();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    onClick={handleAddressSearch}
-                    disabled={addressLoading}
-                  >
-                    {addressLoading ? '...' : 'Find Address'}
-                  </Button>
+            <div>
+              <Label>Full Address *</Label>
+              <Input
+                value={form.address}
+                onChange={e => update('address', e.target.value)}
+                placeholder="Street name, number, building name..."
+                required
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Location</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Find Address on Map</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={mapSearchAddress}
+                      onChange={e => setMapSearchAddress(e.target.value)}
+                      placeholder="Enter search location to move map..."
+                      className="flex-1"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddressSearch();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAddressSearch}
+                      disabled={addressLoading}
+                    >
+                      {addressLoading ? '...' : 'Find Address'}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <Label>City</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={form.city}
-                    onChange={e => update('city', e.target.value)}
-                    placeholder="e.g. Puerto Vallarta"
-                    className="flex-1"
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleCitySearch();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    onClick={handleCitySearch}
-                    disabled={cityLoading}
-                  >
-                    {cityLoading ? '...' : 'Find City'}
-                  </Button>
+                <div>
+                  <Label>City</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={form.city}
+                      onChange={e => update('city', e.target.value)}
+                      placeholder="e.g. Puerto Vallarta"
+                      className="flex-1"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCitySearch();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleCitySearch}
+                      disabled={cityLoading}
+                    >
+                      {cityLoading ? '...' : 'Find City'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -966,6 +990,13 @@ export default function SubmitProperty() {
                 <div>Longitude: {form.longitude || 'Not set'}</div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Rental Terms</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Rental Type</Label>

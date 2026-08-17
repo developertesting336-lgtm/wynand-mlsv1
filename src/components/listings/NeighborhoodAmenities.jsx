@@ -76,19 +76,29 @@ export default function NeighborhoodAmenities({ neighborhood, neighborhoodLabel,
     nearbyPlaces.forEach(place => {
       let category = 'Local Attractions';
       const rawType = (place.type || '').toLowerCase();
-      if (rawType.includes('bank')) {
+      const rawName = (place.name || '').toLowerCase();
+
+      if (rawType.includes('restaurant') || rawType.includes('food') || rawType.includes('meal') || rawName.includes('restaurant') || rawName.includes('taco') || rawName.includes('grill') || rawName.includes('cocina')) {
+        category = 'Places to Eat';
+      } else if (rawType.includes('cafe') || rawType.includes('coffee') || rawName.includes('cafe') || rawName.includes('coffee') || rawName.includes('starbucks')) {
+        category = 'Coffee Shops';
+      } else if (rawType.includes('bank') || rawType.includes('atm') || rawType.includes('finance') || rawName.includes('bank') || rawName.includes('atm') || rawName.includes('banorte') || rawName.includes('bbva') || rawName.includes('banamex') || rawName.includes('hsbc')) {
         category = 'Banks & ATMs';
-      } else if (rawType.includes('gym') || rawType.includes('fitness')) {
+      } else if (rawType.includes('gym') || rawType.includes('fitness') || rawName.includes('gym') || rawName.includes('fitness') || rawName.includes('sport')) {
         category = 'Gyms & Fitness';
-      } else if (rawType.includes('beauty') || rawType.includes('salon')) {
+      } else if (rawType.includes('beauty') || rawType.includes('hair') || rawType.includes('spa') || rawName.includes('beauty') || rawName.includes('salon') || rawName.includes('spa') || rawName.includes('barber')) {
         category = 'Salons & Spas';
-      } else if (rawType.includes('park') || rawType.includes('garden')) {
+      } else if (rawType.includes('park') || rawType.includes('garden') || rawName.includes('park') || rawName.includes('garden') || rawName.includes('plaza')) {
         category = 'Parks & Nature';
-      } else if (rawType.includes('mall') || rawType.includes('supermarket')) {
-        category = 'Shopping & Malls';
-      } else if (rawType.includes('aeroway') || rawType.includes('aerodrome') || rawType.includes('terminal') || rawType.includes('railway') || rawType.includes('station') || rawType.includes('bus_station')) {
+      } else if (rawType.includes('mall') || rawType.includes('supermarket') || rawType.includes('store') || rawType.includes('grocery') || rawName.includes('mall') || rawName.includes('supermarket') || rawName.includes('walmart') || rawName.includes('soriana') || rawName.includes('oxxo') || rawName.includes('ley')) {
+        category = 'Supermarkets & Shopping';
+      } else if (rawType.includes('transit') || rawType.includes('aeroway') || rawType.includes('airport') || rawType.includes('bus') || rawType.includes('station') || rawName.includes('airport') || rawName.includes('bus') || rawName.includes('station') || rawName.includes('terminal')) {
         category = 'Transit & Airports';
-      } else if (rawType.includes('museum') || rawType.includes('attraction') || rawType.includes('viewpoint')) {
+      } else if (rawType.includes('cinema') || rawType.includes('movie') || rawType.includes('theater') || rawName.includes('cinema') || rawName.includes('cinepolis') || rawName.includes('theater') || rawName.includes('theatre')) {
+        category = 'Cinemas & Entertainment';
+      } else if (rawType.includes('hospital') || rawType.includes('doctor') || rawType.includes('health') || rawType.includes('pharmacy') || rawName.includes('hospital') || rawName.includes('clinic') || rawName.includes('doctor') || rawName.includes('medical') || rawName.includes('farmacia')) {
+        category = 'Hospitals & Clinics';
+      } else if (rawType.includes('museum') || rawType.includes('tourist') || rawType.includes('attraction') || rawType.includes('viewpoint') || rawName.includes('museum') || rawName.includes('attraction') || rawName.includes('viewpoint') || rawName.includes('mirador') || rawName.includes('gallery') || rawName.includes('art')) {
         category = 'Tourist Attractions';
       }
 

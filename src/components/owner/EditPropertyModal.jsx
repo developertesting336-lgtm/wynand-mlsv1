@@ -232,42 +232,55 @@ export default function EditPropertyModal({ listing, isOpen, onClose }) {
 
       let nearbyPlaces = [];
       try {
-        // Use Google Maps PlacesService (loaded in window) to bypass CORS issues on the client-side
         if (window.google && window.google.maps && window.google.maps.places) {
           const mapDiv = document.createElement('div');
           const service = new window.google.maps.places.PlacesService(mapDiv);
-          
-          const request = {
-            location: new window.google.maps.LatLng(latitude, longitude),
-            radius: 10000,
-            keyword: 'restaurant'
-          };
 
-          nearbyPlaces = await new Promise((resolve) => {
-            const timer = setTimeout(() => resolve([]), 5000);
-            try {
+          // Execute multiple parallel queries to guarantee we fetch a rich set of 15-20 results across categories
+          const queries = ['restaurant', 'supermarket', 'mall', 'bank', 'gym', 'cafe', 'cinema', 'tourist attraction'];
+          const fetchPromises = queries.map(term => {
+            return new Promise((resolve) => {
+              const request = {
+                location: new window.google.maps.LatLng(latitude, longitude),
+                radius: 7000,
+                keyword: term
+              };
               service.nearbySearch(request, (results, status) => {
-                clearTimeout(timer);
                 if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-                  const mapped = results.slice(0, 15).map(place => {
-                    const mainType = place.types?.[0] || 'Attraction';
-                    return {
-                      name: place.name,
-                      type: mainType,
-                      lat: place.geometry?.location?.lat(),
-                      lon: place.geometry?.location?.lng(),
-                      distance: 'Nearby'
-                    };
-                  });
-                  resolve(mapped);
+                  resolve(results);
                 } else {
                   resolve([]);
                 }
               });
-            } catch (err) {
-              clearTimeout(timer);
-              resolve([]);
+            });
+          });
+
+          const resultsArray = await Promise.all(fetchPromises);
+          // Limit each query term category's results to 10 max, flatten, and filter duplicates by place_id
+          const seenIds = new Set();
+          const merged = [];
+
+          resultsArray.forEach(list => {
+            // Keep up to 10 places from each category list
+            const limitedList = list.slice(0, 10);
+            for (const place of limitedList) {
+              if (place.place_id && !seenIds.has(place.place_id)) {
+                seenIds.add(place.place_id);
+                merged.push(place);
+              }
             }
+          });
+
+          // Increase budget up to 60 places total to ensure all categories display results
+          nearbyPlaces = merged.slice(0, 60).map(place => {
+            const mainType = place.types?.[0] || 'Attraction';
+            return {
+              name: place.name,
+              type: mainType,
+              lat: place.geometry?.location?.lat(),
+              lon: place.geometry?.location?.lng(),
+              distance: 'Nearby'
+            };
           });
         }
       } catch (placeErr) {
