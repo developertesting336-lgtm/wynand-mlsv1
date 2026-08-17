@@ -30,6 +30,33 @@ create table public.agent_reviews (
 ) TABLESPACE pg_default;
 
 
+create table public.appointments (
+  id uuid not null default gen_random_uuid (),
+  listing_id uuid not null,
+  agent_id uuid null,
+  owner_id uuid null,
+  renter_id uuid not null,
+  appointment_date timestamp without time zone null,
+  agent_scheduled_slots text[] null default '{}'::text[],
+  owner_accepted boolean null default false,
+  created_date timestamp without time zone null default now(),
+  updated_date timestamp without time zone null default now(),
+  constraint appointments_pkey primary key (id),
+  constraint appointments_agent_id_fkey foreign KEY (agent_id) references profiles (id) on delete set null,
+  constraint appointments_listing_id_fkey foreign KEY (listing_id) references listings (id) on delete CASCADE,
+  constraint appointments_owner_id_fkey foreign KEY (owner_id) references profiles (id) on delete set null,
+  constraint appointments_renter_id_fkey foreign KEY (renter_id) references profiles (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists idx_appointments_listing_id on public.appointments using btree (listing_id) TABLESPACE pg_default;
+
+create index IF not exists idx_appointments_renter_id on public.appointments using btree (renter_id) TABLESPACE pg_default;
+
+create index IF not exists idx_appointments_agent_id on public.appointments using btree (agent_id) TABLESPACE pg_default;
+
+create index IF not exists idx_appointments_owner_id on public.appointments using btree (owner_id) TABLESPACE pg_default;
+
+
 create table public.audit_logs (
   id uuid not null default gen_random_uuid (),
   user_id uuid null,
@@ -59,8 +86,12 @@ create table public.bookings (
   lease_status text null default 'pending'::text,
   lease_pdf_url text null,
   agreement_conditions jsonb null,
-  inspection_report jsonb null,
   end_lease boolean not null default false,
+  move_out_date date null,
+  inspection_report jsonb null,
+  maintenance_requests jsonb null,
+  move_out_report jsonb null,
+  agent_referral uuid null,
   constraint bookings_pkey primary key (id),
   constraint bookings_agent_id_fkey foreign KEY (agent_id) references profiles (id),
   constraint bookings_listing_id_fkey foreign KEY (listing_id) references listings (id),
@@ -74,6 +105,34 @@ or DELETE
 or
 update on bookings for EACH row
 execute FUNCTION log_table_change ();
+
+
+create table public.chat_messages (
+  id uuid not null default gen_random_uuid (),
+  booking_id uuid not null,
+  sender_id uuid not null,
+  message text not null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint chat_messages_pkey primary key (id),
+  constraint chat_messages_booking_id_fkey foreign KEY (booking_id) references bookings (id) on delete CASCADE,
+  constraint chat_messages_sender_id_fkey foreign KEY (sender_id) references profiles (id) on delete CASCADE,
+  constraint chat_messages_message_length check ((char_length(message) <= 4000)),
+  constraint chat_messages_message_not_blank check (
+    (
+      char_length(
+        TRIM(
+          both
+          from
+            message
+        )
+      ) > 0
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_chat_messages_booking_created on public.chat_messages using btree (booking_id, created_at) TABLESPACE pg_default;
+
 
 
 create table public.favorites (
@@ -115,7 +174,9 @@ create table public.inquiry_replies (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_inquiry_replies_inquiry_id on public.inquiry_replies using btree (inquiry_id) TABLESPACE pg_default;
+
 create index IF not exists idx_inquiry_replies_recipient_type on public.inquiry_replies using btree (recipient_type) TABLESPACE pg_default;
+
 
 
 create table public.listings (
@@ -153,8 +214,10 @@ create table public.listings (
   agent_name text null,
   owner_phone text null,
   blocked_dates jsonb null default '[]'::jsonb,
+  nearby_places jsonb null default '[]'::jsonb,
   constraint listings_pkey primary key (id)
 ) TABLESPACE pg_default;
+
 
 
 create table public.notifications (
@@ -170,14 +233,16 @@ create table public.notifications (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_notifications_user_id on public.notifications using btree (user_id) TABLESPACE pg_default;
+
 create index IF not exists idx_notifications_created_at on public.notifications using btree (created_at) TABLESPACE pg_default;
+
 
 
 create table public.payments (
   id uuid not null default gen_random_uuid (),
   booking_id uuid null,
   payee_stripe_connect_id text null,
-  amount_centavos integer null,
+  amount_centavos bigint null,
   amount_mxn numeric null,
   currency text null,
   stripe_event_id text null,
@@ -192,14 +257,18 @@ create table public.payments (
   payout_error text null,
   payment_type text null,
   payment_for_month_year text null,
+  additional_data jsonb null default '{}'::jsonb,
   constraint payments_pkey primary key (id),
   constraint payments_booking_id_fkey foreign KEY (booking_id) references bookings (id),
   constraint payments_listing_id_fkey foreign KEY (listing_id) references listings (id)
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_payments_booking_id on public.payments using btree (booking_id) TABLESPACE pg_default;
+
 create index IF not exists idx_payments_payee_id on public.payments using btree (payee_id) TABLESPACE pg_default;
+
 create index IF not exists idx_payments_payer_id on public.payments using btree (payer_id) TABLESPACE pg_default;
+
 create index IF not exists idx_payments_payout_status on public.payments using btree (payout_status) TABLESPACE pg_default;
 
 create trigger audit_payments_trigger
@@ -210,11 +279,12 @@ update on payments for EACH row
 execute FUNCTION log_table_change ();
 
 
+
 create table public.platform_earnings (
   id uuid not null default gen_random_uuid (),
   user_id uuid not null,
   booking_id uuid null,
-  amount_centavos integer not null,
+  amount_centavos bigint not null,
   amount_mxn numeric not null,
   currency text not null default 'USD'::text,
   payout_status text null,
@@ -226,7 +296,9 @@ create table public.platform_earnings (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_platform_earnings_booking on public.platform_earnings using btree (booking_id) TABLESPACE pg_default;
+
 create index IF not exists idx_platform_earnings_user on public.platform_earnings using btree (user_id) TABLESPACE pg_default;
+
 
 
 create table public.profiles (
@@ -234,8 +306,28 @@ create table public.profiles (
   email text not null,
   full_name text null,
   role text null default 'renter'::text,
-  google_id text null,
-  photo_url text null,
+  id_verified boolean null default false,
+  created_date timestamp with time zone null default now(),
+  last_login timestamp with time zone null,
+  stripe_connect_id text null,
+  stripe_onboarding_complete boolean not null default false,
+  phone_number text null,
+  referral_code text null,
+  signatures text[] null default '{}'::text[],
+  reset_otp text null,
+  reset_otp_expires_at timestamp with time zone null,
+  constraint profiles_pkey primary key (id),
+  constraint profiles_email_key unique (email),
+  constraint profiles_phone_number_key unique (phone_number)
+) TABLESPACE pg_default;
+
+
+
+create table public.profiles (
+  id uuid not null,
+  email text not null,
+  full_name text null,
+  role text null default 'renter'::text,
   id_verified boolean null default false,
   created_date timestamp with time zone null default now(),
   last_login timestamp with time zone null,
@@ -272,7 +364,7 @@ create table public.referral_payments (
   booking_id uuid not null,
   payer_id uuid not null,
   referrer_id uuid not null,
-  amount_centavos integer not null,
+  amount_centavos bigint not null,
   amount_mxn numeric not null,
   currency text not null default 'USD'::text,
   payout_status text not null default 'pending'::text,
@@ -287,7 +379,9 @@ create table public.referral_payments (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_referral_payments_booking on public.referral_payments using btree (booking_id) TABLESPACE pg_default;
+
 create index IF not exists idx_referral_payments_referrer on public.referral_payments using btree (referrer_id) TABLESPACE pg_default;
+
 create index IF not exists idx_referral_payments_status on public.referral_payments using btree (payout_status) TABLESPACE pg_default;
 
 
@@ -308,6 +402,8 @@ create table public.sale_referrals (
   paid_date timestamp with time zone null,
   created_date timestamp with time zone null default now(),
   referrer_id uuid not null default gen_random_uuid (),
+  agent_id uuid null,
+  updated_date timestamp with time zone null default now(),
   constraint sale_referrals_pkey primary key (id),
   constraint sale_referrals_referrer_id_fkey foreign KEY (referrer_id) references profiles (id) on delete CASCADE
 ) TABLESPACE pg_default;
@@ -358,7 +454,6 @@ create index IF not exists idx_user_push_subscriptions_user_id on public.user_pu
 create table public.verifications (
   id uuid not null default gen_random_uuid (),
   user_id uuid not null,
-  profile_photo text null,
   id_document_url text null,
   employment_proof_url text null,
   veriff_session_id text null,
@@ -380,164 +475,8 @@ create table public.verifications (
   identity_documents json null,
   bank_documents json null,
   property_documents jsonb null,
+  profile_photo text null,
   constraint tenant_verifications_pkey primary key (id),
   constraint tenant_verifications_user_id_key unique (user_id),
   constraint tenant_verifications_user_id_fkey foreign KEY (user_id) references profiles (id) on delete CASCADE
 ) TABLESPACE pg_default;
-
-
--- Paid owner/renter conversations. Apply this block in Supabase SQL Editor.
-create table if not exists public.chat_messages (
-  id uuid not null default gen_random_uuid(),
-  booking_id uuid not null,
-  sender_id uuid not null,
-  message text not null,
-  created_at timestamp with time zone not null default now(),
-  updated_at timestamp with time zone not null default now(),
-  constraint chat_messages_pkey primary key (id),
-  constraint chat_messages_booking_id_fkey foreign key (booking_id)
-    references public.bookings (id) on delete cascade,
-  constraint chat_messages_sender_id_fkey foreign key (sender_id)
-    references public.profiles (id) on delete cascade,
-  constraint chat_messages_message_not_blank check (char_length(trim(message)) > 0),
-  constraint chat_messages_message_length check (char_length(message) <= 4000)
-) tablespace pg_default;
-
-create index if not exists idx_chat_messages_booking_created
-  on public.chat_messages (booking_id, created_at);
-
-alter table public.chat_messages enable row level security;
-
-drop policy if exists "Paid booking participants can read chat" on public.chat_messages;
-create policy "Paid booking participants can read chat"
-  on public.chat_messages for select
-  using (
-    exists (
-      select 1
-      from public.bookings b
-      where b.id = chat_messages.booking_id
-        and b.status = 'confirmed'
-        and (b.renter_id = auth.uid() or b.owner_id = auth.uid())
-    )
-  );
-
-drop policy if exists "Paid booking participants can send chat" on public.chat_messages;
-create policy "Paid booking participants can send chat"
-  on public.chat_messages for insert
-  with check (
-    sender_id = auth.uid()
-    and exists (
-      select 1
-      from public.bookings b
-      where b.id = chat_messages.booking_id
-        and b.status = 'confirmed'
-        and (b.renter_id = auth.uid() or b.owner_id = auth.uid())
-    )
-  );
-
-drop policy if exists "Senders can update their chat" on public.chat_messages;
-create policy "Senders can update their chat"
-  on public.chat_messages for update
-  using (sender_id = auth.uid())
-  with check (sender_id = auth.uid());
-
-drop policy if exists "Senders can delete their chat" on public.chat_messages;
-create policy "Senders can delete their chat"
-  on public.chat_messages for delete
-  using (sender_id = auth.uid());
-
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_publication_tables
-    where pubname = 'supabase_realtime'
-      and schemaname = 'public'
-      and tablename = 'chat_messages'
-  ) then
-    alter publication supabase_realtime add table public.chat_messages;
-  end if;
-end
-$$;
-
--- Allow owners and renters to load each other's verification profile photo
--- only after the booking has been paid and confirmed.
-drop policy if exists "Confirmed booking participants can view verifications" on public.verifications;
-create policy "Confirmed booking participants can view verifications"
-  on public.verifications for select
-  to authenticated
-  using (
-    exists (
-      select 1
-      from public.bookings b
-      where b.status = 'confirmed'
-        and (
-          (b.owner_id = auth.uid() and b.renter_id = verifications.user_id)
-          or (b.renter_id = auth.uid() and b.owner_id = verifications.user_id)
-        )
-    )
-  );
-
--- Policy to allow users, admins, and agents to view verifications
-drop policy if exists "Users and admins can view verifications" on public.verifications;
-create policy "Users and admins can view verifications"
-  on public.verifications for select
-  to authenticated
-  using (
-    (user_id = auth.uid()) OR is_admin() OR is_agent()
-  );
-
--- ── APPOINTMENTS TABLE ────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.appointments (
-  id uuid NOT null DEFAULT gen_random_uuid (),
-  listing_id uuid NOT null,
-  agent_id uuid null,
-  owner_id uuid null,
-  renter_id uuid NOT null,
-  appointment_date timestamp without time zone null,
-  agent_scheduled_slots text[] null DEFAULT '{}'::text[],
-  owner_accepted boolean null DEFAULT false,
-  created_date timestamp without time zone null DEFAULT now(),
-  updated_date timestamp without time zone null DEFAULT now(),
-  CONSTRAINT appointments_pkey PRIMARY KEY (id),
-  CONSTRAINT appointments_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES listings (id) ON DELETE CASCADE,
-  CONSTRAINT appointments_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES profiles (id) ON DELETE SET NULL,
-  CONSTRAINT appointments_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES profiles (id) ON DELETE SET NULL,
-  CONSTRAINT appointments_renter_id_fkey FOREIGN KEY (renter_id) REFERENCES profiles (id) ON DELETE CASCADE
-) TABLESPACE pg_default;
-
-CREATE INDEX IF NOT EXISTS idx_appointments_listing_id ON public.appointments USING btree (listing_id) TABLESPACE pg_default;
-CREATE INDEX IF NOT EXISTS idx_appointments_renter_id ON public.appointments USING btree (renter_id) TABLESPACE pg_default;
-CREATE INDEX IF NOT EXISTS idx_appointments_agent_id ON public.appointments USING btree (agent_id) TABLESPACE pg_default;
-CREATE INDEX IF NOT EXISTS idx_appointments_owner_id ON public.appointments USING btree (owner_id) TABLESPACE pg_default;
-
-CREATE TRIGGER audit_appointments_trigger
-AFTER INSERT OR UPDATE OR DELETE ON public.appointments
-FOR EACH ROW EXECUTE FUNCTION log_table_change();
-
-ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view their own appointments"
-  ON public.appointments FOR SELECT
-  TO authenticated
-  USING (
-    (auth.uid() = renter_id) OR
-    (auth.uid() = agent_id) OR
-    (auth.uid() = owner_id) OR
-    is_admin()
-  );
-
-CREATE POLICY "Renters can insert their own appointments"
-  ON public.appointments FOR INSERT
-  TO authenticated
-  WITH CHECK (auth.uid() = renter_id);
-
-CREATE POLICY "Involved parties can update appointments"
-  ON public.appointments FOR UPDATE
-  TO authenticated
-  USING (
-    (auth.uid() = renter_id) OR
-    (auth.uid() = agent_id) OR
-    (auth.uid() = owner_id) OR
-    is_admin()
-  );
