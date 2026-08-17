@@ -31,6 +31,8 @@ export async function registerPushNotifications(userId) {
       scope: '/'
     });
 
+    // Wait until the service worker is active and ready
+    await navigator.serviceWorker.ready;
 
     // 2. Request Permission
     const permission = await Notification.requestPermission();
