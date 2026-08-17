@@ -14,17 +14,9 @@ import { supabase } from '@/lib/supabase';
 import { isSubscriptionActive } from '@/lib/utils';
 import { toast } from 'sonner';
 import { NEIGHBORHOODS, FURNISHED_OPTIONS, RENTAL_TYPES, GROUPED_NEIGHBORHOODS } from '@/lib/constants';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 
-// Fix leaflet default icon
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+// Google maps library loaded
 
 // ─── Country data for phone picker (195 countries) ───────────────────────────
 const COUNTRIES = [
@@ -346,24 +338,13 @@ function PhoneInput({ value, onChange }) {
     </div>
   );
 }
-
-function MapEventsHandler({ onMapClick, targetCoords }) {
-  const map = useMapEvents({
-    click(e) {
-      onMapClick(e.latlng.lat, e.latlng.lng);
-    },
+export default function SubmitProperty() {
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries: ['places']
   });
 
-  useEffect(() => {
-    if (targetCoords) {
-      map.setView(targetCoords, 16);
-    }
-  }, [targetCoords, map]);
-
-  return null;
-}
-
-export default function SubmitProperty() {
   const [user, setUser] = useState(null);
   const [form, setForm] = useState({
     title: '', description: '', price_usd: '', price_mxn: '',
@@ -397,19 +378,14 @@ export default function SubmitProperty() {
 
     setAddressLoading(true);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchString)}&limit=1`;
-      const response = await fetch(url, {
-        headers: {
-          'Accept-Language': 'en-US,en;q=0.9',
-          'User-Agent': 'PVVerifiedRentalsSubmitPropertyPage'
-        }
-      });
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(searchString)}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+      const response = await fetch(url);
       if (response.ok) {
         const results = await response.json();
-        if (results && results.length > 0) {
-          const lat = parseFloat(results[0].lat);
-          const lon = parseFloat(results[0].lon);
-          setMapTargetCoords([lat, lon]);
+        if (results.status === 'OK' && results.results && results.results.length > 0) {
+          const lat = parseFloat(results.results[0].geometry.location.lat);
+          const lon = parseFloat(results.results[0].geometry.location.lng);
+          setMapTargetCoords({ lat, lng: lon });
           update('latitude', lat);
           update('longitude', lon);
           toast.success('Address location found!');
@@ -420,7 +396,7 @@ export default function SubmitProperty() {
         toast.error('Search failed.');
       }
     } catch (err) {
-      console.error('Nominatim search failed', err);
+      console.error('Google Maps geocode failed', err);
     } finally {
       setAddressLoading(false);
     }
@@ -430,19 +406,14 @@ export default function SubmitProperty() {
     if (!form.city.trim()) return;
     setCityLoading(true);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(form.city.trim() + ', Mexico')}&limit=1`;
-      const response = await fetch(url, {
-        headers: {
-          'Accept-Language': 'en-US,en;q=0.9',
-          'User-Agent': 'PVVerifiedRentalsSubmitPropertyPage'
-        }
-      });
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(form.city.trim() + ', Mexico')}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+      const response = await fetch(url);
       if (response.ok) {
         const results = await response.json();
-        if (results && results.length > 0) {
-          const lat = parseFloat(results[0].lat);
-          const lon = parseFloat(results[0].lon);
-          setMapTargetCoords([lat, lon]);
+        if (results.status === 'OK' && results.results && results.results.length > 0) {
+          const lat = parseFloat(results.results[0].geometry.location.lat);
+          const lon = parseFloat(results.results[0].geometry.location.lng);
+          setMapTargetCoords({ lat, lng: lon });
           update('latitude', lat);
           update('longitude', lon);
           toast.success('City center found!');
@@ -453,7 +424,7 @@ export default function SubmitProperty() {
         toast.error('Search failed.');
       }
     } catch (err) {
-      console.error('Nominatim search failed', err);
+      console.error('Google Maps geocode failed', err);
     } finally {
       setCityLoading(false);
     }
@@ -723,50 +694,61 @@ export default function SubmitProperty() {
         sayulita: [20.8689, -105.4408],
       };
 
-      const coords = NEIGHBORHOOD_COORDS[form.neighborhood] || [20.6534, -105.2253];
-      const latitude = form.latitude ? Number(form.latitude) : coords[0];
-      const longitude = form.longitude ? Number(form.longitude) : coords[1];
+      // Resolve latitude and longitude coordinates based on form or fallback coordinates mapping
+      const latitude = form.latitude ? Number(form.latitude) : (NEIGHBORHOOD_COORDS[form.neighborhood] ? NEIGHBORHOOD_COORDS[form.neighborhood][0] : 20.6534);
+      const longitude = form.longitude ? Number(form.longitude) : (NEIGHBORHOOD_COORDS[form.neighborhood] ? NEIGHBORHOOD_COORDS[form.neighborhood][1] : -105.2253);
 
       let nearbyPlaces = [];
       try {
-        const query = `[out:json];
-        (
-          node(around:10000,${latitude},${longitude})["tourism"~"attraction|museum|viewpoint"];
-          node(around:10000,${latitude},${longitude})["amenity"~"bank|gym|beauty|cinema|mall|supermarket|company|theatre|office"];
-          node(around:10000,${latitude},${longitude})["leisure"~"fitness_centre|cinema|theatre"];
-          node(around:10000,${latitude},${longitude})["shop"~"mall|supermarket|beauty"];
-          node(around:10000,${latitude},${longitude})["aeroway"~"aerodrome|terminal"];
-          node(around:10000,${latitude},${longitude})["railway"~"station|halt"];
-          node(around:10000,${latitude},${longitude})["amenity"~"bus_station"];
-        );
-        out;`;
-        const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-        const response = await fetch(url);
-        if (response.ok) {
-          const data = await response.json();
-          if (data && Array.isArray(data.elements)) {
-            // Filter elements that have a valid name and are not parks/parking
-            const validElements = data.elements.filter(el => {
-              const name = el.tags?.name;
-              const type = (el.tags?.amenity || el.tags?.leisure || el.tags?.tourism || el.tags?.shop || el.tags?.aeroway || el.tags?.railway || '').toLowerCase();
-              return name && name.trim().length > 0 && type !== 'parking' && type !== 'park' && !name.toLowerCase().includes('parking');
-            });
+        if (window.google && window.google.maps && window.google.maps.places) {
+          const mapDiv = document.createElement('div');
+          const service = new window.google.maps.places.PlacesService(mapDiv);
 
-            // Map and limit to top 15 clean results
-            nearbyPlaces = validElements.slice(0, 15).map(el => {
-              const type = el.tags?.aeroway || el.tags?.railway || el.tags?.tourism || el.tags?.amenity || el.tags?.leisure || el.tags?.shop || 'Attraction';
-              return {
-                name: el.tags?.name,
-                type: type,
-                lat: el.lat,
-                lon: el.lon,
-                distance: 'Nearby'
-              };
-            });
-          }
+          // Use keyword/name parameter instead of types array because Places API nearbySearch expects a single string for type
+          const request = {
+            location: new window.google.maps.LatLng(latitude, longitude),
+            radius: 10000,
+            keyword: 'restaurant'
+          };
+
+          nearbyPlaces = await new Promise((resolve) => {
+            const timer = setTimeout(() => {
+              console.warn('Google Places call timed out after 5 seconds');
+              resolve([]);
+            }, 5000);
+
+            try {
+              service.nearbySearch(request, (results, status) => {
+                clearTimeout(timer);
+                console.log('Places status:', status, 'Results count:', results?.length);
+                if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+                  const mapped = results.slice(0, 15).map(place => {
+                    const mainType = place.types?.[0] || 'Attraction';
+                    return {
+                      name: place.name,
+                      type: mainType,
+                      lat: place.geometry?.location?.lat(),
+                      lon: place.geometry?.location?.lng(),
+                      distance: 'Nearby'
+                    };
+                  });
+                  resolve(mapped);
+                } else {
+                  console.warn('Nearby search returned status:', status);
+                  resolve([]);
+                }
+              });
+            } catch (err) {
+              clearTimeout(timer);
+              console.error('Nearby search execution error:', err);
+              resolve([]);
+            }
+          });
+        } else {
+          console.warn('Google Maps places library is not loaded on window');
         }
-      } catch (osmErr) {
-        console.warn('OSM fetch failed', osmErr);
+      } catch (placeErr) {
+        console.error('Google Places fetch failed', placeErr);
       }
 
       const { city: formCity, ...listingData } = form;
@@ -951,30 +933,33 @@ export default function SubmitProperty() {
             <div className="space-y-2">
               <Label>Pinpoint Location * (Click on map to drop pin)</Label>
               <div className="h-64 rounded-xl border border-slate-200 overflow-hidden relative z-10">
-                <MapContainer
-                  center={
-                    form.latitude && form.longitude
-                      ? [Number(form.latitude), Number(form.longitude)]
-                      : [20.6534, -105.2253]
-                  }
-                  zoom={13}
-                  style={{ height: '100%', width: '100%' }}
-                >
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  />
-                  <MapEventsHandler
-                    onMapClick={(lat, lng) => {
-                      update('latitude', lat);
-                      update('longitude', lng);
+                {isLoaded ? (
+                  <GoogleMap
+                    mapContainerStyle={{ height: '100%', width: '100%' }}
+                    center={
+                      form.latitude && form.longitude
+                        ? { lat: Number(form.latitude), lng: Number(form.longitude) }
+                        : { lat: 20.6534, lng: -105.2253 }
+                    }
+                    zoom={13}
+                    onClick={(e) => {
+                      if (e.latLng) {
+                        update('latitude', e.latLng.lat());
+                        update('longitude', e.latLng.lng());
+                      }
                     }}
-                    targetCoords={mapTargetCoords}
-                  />
-                  {form.latitude && form.longitude && (
-                    <Marker position={[Number(form.latitude), Number(form.longitude)]} />
-                  )}
-                </MapContainer>
+                  >
+                    {form.latitude && form.longitude && (
+                      <Marker
+                        position={{ lat: Number(form.latitude), lng: Number(form.longitude) }}
+                      />
+                    )}
+                  </GoogleMap>
+                ) : (
+                  <div className="flex items-center justify-center h-full bg-slate-50 text-muted-foreground text-sm">
+                    Loading Maps...
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
                 <div>Latitude: {form.latitude || 'Not set'}</div>
