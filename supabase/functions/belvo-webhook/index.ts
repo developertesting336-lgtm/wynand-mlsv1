@@ -55,6 +55,7 @@ serve(async (req) => {
       let employerName = "";
 
       if (records.length > 0) {
+
         const record = records[0];
         const empHistory = record.employment_records || [];
         if (empHistory.length > 0) {

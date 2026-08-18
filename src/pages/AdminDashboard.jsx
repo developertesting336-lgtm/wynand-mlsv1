@@ -351,6 +351,9 @@ export default function AdminDashboard() {
   const [confirmUserAction, setConfirmUserAction] = useState(null); // { user, verified: boolean }
   const [selectedUserDocs, setSelectedUserDocs] = useState(null); // { userName, identityDocs, bankDocs }
   const [activeReferralAssign, setActiveReferralAssign] = useState(null); // { referralId, currentAgentId }
+  const [activePropertyAgentAssign, setActivePropertyAgentAssign] = useState(null); // { listingId, currentAgentEmail }
+  const [selectedPropertyAgent, setSelectedPropertyAgent] = useState(null); // profile object of the selected agent (or null for unassigned)
+  const [agentFilter, setAgentFilter] = useState('all'); // 'all' | 'with_agent' | 'no_agent'
   const [agentSelectorSearch, setAgentSelectorSearch] = useState('');
   const [agentSelectorPage, setAgentSelectorPage] = useState(1);
   const [activeTab, setActiveTab] = useState(() => {
@@ -564,7 +567,7 @@ export default function AdminDashboard() {
     data: paginatedResult = { data: [], count: 0 },
     isLoading: paginatedLoading,
   } = useQuery({
-    queryKey: ['admin-listings-paginated', page, pageSize, debouncedPropertiesSearch],
+    queryKey: ['admin-listings-paginated', page, pageSize, debouncedPropertiesSearch, agentFilter],
     queryFn: async () => {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
@@ -572,9 +575,18 @@ export default function AdminDashboard() {
         .from('listings')
         .select('*', { count: 'exact' })
         .order('created_date', { ascending: false });
+      
       if (propertiesSearch.trim()) {
         query = query.ilike('title', `%${propertiesSearch.trim()}%`);
       }
+      
+      if (agentFilter === 'with_agent') {
+        query = query.not('agent_email', 'is', null).not('agent_email', 'eq', '');
+      } else if (agentFilter === 'no_agent') {
+        // Query listings where agent_email is null OR matches empty string
+        query = query.or('agent_email.is.null,agent_email.eq.""');
+      }
+
       const { data, error, count } = await query.range(from, to);
       if (error) throw error;
       return { data: data || [], count: count || 0 };
@@ -951,14 +963,27 @@ export default function AdminDashboard() {
 
         <TabsContent value="properties" className="mt-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                value={propertiesSearch}
-                onChange={(e) => { setPropertiesSearch(e.target.value); setPage(1); }}
-                placeholder="Search properties by title"
-                className="pl-10 pr-3 h-11 rounded-2xl border border-slate-200 bg-slate-50 shadow-sm focus:border-slate-300 focus:ring-2 focus:ring-primary/10"
-              />
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  value={propertiesSearch}
+                  onChange={(e) => { setPropertiesSearch(e.target.value); setPage(1); }}
+                  placeholder="Search properties by title"
+                  className="pl-10 pr-3 h-11 rounded-2xl border border-slate-200 bg-slate-50 shadow-sm focus:border-slate-300 focus:ring-2 focus:ring-primary/10"
+                />
+              </div>
+              <div className="w-full md:w-48">
+                <select
+                  value={agentFilter}
+                  onChange={(e) => { setAgentFilter(e.target.value); setPage(1); }}
+                  className="w-full h-11 px-3 rounded-2xl border border-slate-200 bg-slate-50 shadow-sm text-sm text-slate-700 font-medium focus:border-slate-300 focus:ring-2 focus:ring-primary/10 cursor-pointer"
+                >
+                  <option value="all">All Properties</option>
+                  <option value="with_agent">With Agent</option>
+                  <option value="no_agent">No Agent</option>
+                </select>
+              </div>
             </div>
           </div>
           {allListings.length === 0 ? (
@@ -971,6 +996,7 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Title</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Address</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Owner</th>
+                    <th className="px-4 py-3 font-semibold text-muted-foreground">Agent</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Price</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Actions</th>
@@ -1000,6 +1026,28 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3">
                         <div className="text-sm">{listing.owner_name || 'Unknown'}</div>
                         <div className="text-xs text-muted-foreground">{listing.owner_email || ''}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {listing.agent_email ? (
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{listing.agent_name || 'Agent'}</span>
+                            <span className="text-xs text-muted-foreground">{listing.agent_email}</span>
+                          </div>
+                        ) : (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="text-xs px-2.5 py-1.5 text-primary border-primary/25 bg-primary/5 hover:bg-primary/10"
+                            onClick={() => {
+                              setActivePropertyAgentAssign({ listingId: listing.id, currentAgentEmail: null });
+                              setSelectedPropertyAgent(null);
+                              setAgentSelectorSearch('');
+                              setAgentSelectorPage(1);
+                            }}
+                          >
+                            Assign Agent
+                          </Button>
+                        )}
                       </td>
                       <td className="px-4 py-3 font-semibold">
                         {listing.price_mxn || listing.price_usd}
@@ -1891,6 +1939,167 @@ export default function AdminDashboard() {
               className="w-full sm:w-auto"
             >
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Searchable Paginated Agent Assignment Dialog for Listings */}
+      <Dialog open={!!activePropertyAgentAssign} onOpenChange={(open) => !open && setActivePropertyAgentAssign(null)}>
+        <DialogContent className="max-w-md bg-white p-6 rounded-2xl shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Assign Agent to Property</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground mt-1">
+              Select an agent to assign to manage this listing.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="my-4 space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                value={agentSelectorSearch}
+                onChange={(e) => {
+                  setAgentSelectorSearch(e.target.value);
+                  setAgentSelectorPage(1);
+                }}
+                placeholder="Search agent name or email..."
+                className="pl-9 h-10 rounded-xl border border-slate-200"
+              />
+            </div>
+
+            {(() => {
+              const allAgents = allProfilesList.filter(u => u.role === 'agent');
+              const filteredAgents = allAgents.filter(a => {
+                const term = agentSelectorSearch.trim().toLowerCase();
+                if (!term) return true;
+                return [a.full_name, a.email].filter(Boolean).some(val => val.toLowerCase().includes(term));
+              });
+
+              const limit = 10;
+              const pagesCount = Math.max(1, Math.ceil(filteredAgents.length / limit));
+              const displayedAgents = filteredAgents.slice((agentSelectorPage - 1) * limit, agentSelectorPage * limit);
+
+              return (
+                <div className="space-y-3">
+                  <div className="max-h-[300px] overflow-y-auto divide-y divide-border border rounded-xl bg-slate-50/50">
+                    <div
+                      onClick={() => {
+                        setSelectedPropertyAgent('unassign');
+                      }}
+                      className={`p-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer flex items-center justify-between transition-colors ${
+                        selectedPropertyAgent === 'unassign' ? 'bg-rose-50/50 border border-dashed border-rose-300' : ''
+                      }`}
+                    >
+                      <span>Unassign Agent / Clear</span>
+                      {(selectedPropertyAgent === 'unassign' || (!selectedPropertyAgent && !activePropertyAgentAssign?.currentAgentEmail)) && (
+                        <CheckCircle className="w-4 h-4 text-rose-600" />
+                      )}
+                    </div>
+
+                    {displayedAgents.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-6">No matching agents found</p>
+                    ) : (
+                      displayedAgents.map(a => {
+                        const isSelected = selectedPropertyAgent === 'unassign' 
+                          ? false 
+                          : (selectedPropertyAgent ? selectedPropertyAgent.email === a.email : activePropertyAgentAssign?.currentAgentEmail === a.email);
+                        
+                        return (
+                          <div
+                            key={a.id}
+                            onClick={() => {
+                              setSelectedPropertyAgent(a);
+                            }}
+                            className={`p-3 text-xs hover:bg-muted/50 cursor-pointer flex items-center justify-between transition-colors ${
+                              isSelected ? 'bg-primary/5 font-semibold text-primary' : ''
+                            }`}
+                          >
+                            <div>
+                              <p className="font-medium text-slate-800">{a.full_name || 'Agent'}</p>
+                              <p className="text-slate-500 text-[10px]">{a.email}</p>
+                            </div>
+                            {isSelected && <CheckCircle className="w-4 h-4 text-primary" />}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {pagesCount > 1 && (
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 px-1">
+                      <span>Page {agentSelectorPage} of {pagesCount}</span>
+                      <div className="flex gap-2">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={agentSelectorPage <= 1}
+                          onClick={() => setAgentSelectorPage(p => p - 1)}
+                        >
+                          Prev
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={agentSelectorPage >= pagesCount}
+                          onClick={() => setAgentSelectorPage(p => p + 1)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          <DialogFooter className="flex flex-row justify-end gap-2 border-t pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setActivePropertyAgentAssign(null)}
+              className="px-4"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={updateListing.isPending}
+              onClick={async () => {
+                if (selectedPropertyAgent === 'unassign') {
+                  try {
+                    await updateListing.mutateAsync({
+                      id: activePropertyAgentAssign.listingId,
+                      data: { agent_email: null, agent_name: null, agent_phone: null }
+                    });
+                    setActivePropertyAgentAssign(null);
+                  } catch (err) {
+                    toast.error(`Assignment failed: ${err.message || err}`);
+                  }
+                } else if (selectedPropertyAgent) {
+                  try {
+                    await updateListing.mutateAsync({
+                      id: activePropertyAgentAssign.listingId,
+                      data: {
+                        agent_email: selectedPropertyAgent.email,
+                        agent_name: selectedPropertyAgent.full_name || 'Agent',
+                        agent_phone: selectedPropertyAgent.phone_number || null
+                      }
+                    });
+                    setActivePropertyAgentAssign(null);
+                  } catch (err) {
+                    toast.error(`Assignment failed: ${err.message || err}`);
+                  }
+                } else {
+                  // No change was made
+                  setActivePropertyAgentAssign(null);
+                }
+              }}
+              className="px-4 gap-2"
+            >
+              {updateListing.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
