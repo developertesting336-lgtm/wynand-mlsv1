@@ -404,10 +404,10 @@ create table public.sale_referrals (
   referrer_id uuid not null default gen_random_uuid (),
   agent_id uuid null,
   updated_date timestamp with time zone null default now(),
+  ref_applied boolean null default false,
   constraint sale_referrals_pkey primary key (id),
   constraint sale_referrals_referrer_id_fkey foreign KEY (referrer_id) references profiles (id) on delete CASCADE
 ) TABLESPACE pg_default;
-
 
 create table public.subscriptions (
   id uuid not null default gen_random_uuid (),

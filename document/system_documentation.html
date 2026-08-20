@@ -377,12 +377,12 @@
 
       <h3>2. Client Sale Referrals (Lead Generation)</h3>
       <p>
-        Users can submit client leads (Buyer/Seller referrals) directly to Pvverified.
+        Users can submit client leads (Buyer/Seller referrals) directly to Pvverified via the Refer and Earn page, which are stored in the database.
       </p>
       <ul>
-        <li>Admins track these leads and assign an agent to close the transaction.</li>
-        <li>Once the referred client completes a sale (yielding a standard 6% real estate commission), the original
-          referrer receives a **Referral Fee** (typically 20% of the agent's commission) paid out automatically.</li>
+        <li><strong>Automatic Booking Matching:</strong> When a booking request is made, if no active referral code is present in the session, the system searches the referral database matching the client's email.</li>
+        <li><strong>Lead Priority:</strong> It prioritizes matching "Buyer" type referrals over "Seller" type referrals, returning the oldest valid match first to ensure the initial referrer is credited.</li>
+        <li><strong>One-Time Commission Limitation:</strong> To prevent duplicate commission payouts on subsequent leases, if the client has any referral already applied (<code>ref_applied</code> set to true), no referral is credited. Once a referral payout succeeds, the system automatically flags that lead's <code>ref_applied</code> status as true.</li>
       </ul>
     </section>
 
