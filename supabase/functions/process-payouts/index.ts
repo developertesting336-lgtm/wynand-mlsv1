@@ -443,6 +443,61 @@ serve(async (req) => {
                         payout_transfer_id: referrerTransferId || null,
                         paid_date: referrerTransferId ? new Date().toISOString() : null,
                     });
+
+                    // If the transfer was successful, find the oldest matching sale_referral record and set ref_applied to true
+                    if (referrerTransferId) {
+                        try {
+                            // Find renter profile email
+                            const { data: renterProfile } = await supabase
+                                .from('profiles')
+                                .select('email')
+                                .eq('id', payment.payer_id)
+                                .maybeSingle();
+
+                            if (renterProfile?.email) {
+                                // Find the oldest matching sale_referral (buyer prioritized, then seller) that is not yet applied
+                                let referralRecord = null;
+                                const { data: buyerRecord } = await supabase
+                                    .from('sale_referrals')
+                                    .select('id')
+                                    .eq('client_email', renterProfile.email)
+                                    .eq('referrer_id', referrerUUID)
+                                    .eq('referral_type', 'buyer')
+                                    .or('ref_applied.is.null,ref_applied.eq.false')
+                                    .order('created_date', { ascending: true })
+                                    .limit(1)
+                                    .maybeSingle();
+
+                                if (buyerRecord) {
+                                    referralRecord = buyerRecord;
+                                } else {
+                                    const { data: sellerRecord } = await supabase
+                                        .from('sale_referrals')
+                                        .select('id')
+                                        .eq('client_email', renterProfile.email)
+                                        .eq('referrer_id', referrerUUID)
+                                        .eq('referral_type', 'seller')
+                                        .or('ref_applied.is.null,ref_applied.eq.false')
+                                        .order('created_date', { ascending: true })
+                                        .limit(1)
+                                        .maybeSingle();
+                                    if (sellerRecord) {
+                                        referralRecord = sellerRecord;
+                                    }
+                                }
+
+                                if (referralRecord?.id) {
+                                    await supabase
+                                        .from('sale_referrals')
+                                        .update({ ref_applied: true })
+                                        .eq('id', referralRecord.id);
+                                    console.log(`[PAYOUT] Marked sale_referral ${referralRecord.id} as ref_applied=true`);
+                                }
+                            }
+                        } catch (applyErr) {
+                            console.error('Error updating sale_referral ref_applied status:', applyErr);
+                        }
+                    }
                 }
 
                 // 6. Determine additional_data payload for audit

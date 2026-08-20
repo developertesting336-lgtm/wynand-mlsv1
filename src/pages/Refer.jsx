@@ -185,7 +185,7 @@ export default function Refer() {
               We've received your referral for <strong>{form.client_name}</strong>.
             </p>
             <p className="text-muted-foreground mb-6">
-              If the deal closes, you'll earn a <strong className="text-green-600">15% referral fee</strong> on our commission. We'll keep you updated every step of the way.
+              If the deal closes, you can earn upto <strong className="text-green-600">15% referral fee</strong> on our commission. We'll keep you updated every step of the way.
             </p>
             <Button onClick={() => { setForm(INITIAL); setSubmitted(false); }}>
               Submit Another Referral
@@ -222,7 +222,7 @@ export default function Refer() {
           {[
             { icon: Users, title: 'Refer a Client', desc: 'Fill out the form below with your contact details and your client\'s information.' },
             { icon: Handshake, title: 'We Do the Work', desc: 'Our team contacts your client and handles the entire buying or selling process.' },
-            { icon: DollarSign, title: 'Earn 15%', desc: 'When the deal closes, you receive 15% of our commission — automatically.' },
+            { icon: DollarSign, title: 'Earn 15%', desc: 'When the deal closes, you can receive 15% of our commission — automatically.' },
           ].map(({ icon: Icon, title, desc }) => (
             <Card key={title} className="text-center">
               <CardContent className="p-6">
@@ -400,7 +400,7 @@ export default function Refer() {
           })()
         )}
 
-        {/* Form commented out
+
         <Card>
           <CardHeader>
             <CardTitle>Submit a Referral</CardTitle>
@@ -487,7 +487,7 @@ export default function Refer() {
             </form>
           </CardContent>
         </Card>
-        */}
+
       </div>
 
       {/* Show login prompt if not authenticated */}

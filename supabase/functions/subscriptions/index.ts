@@ -86,7 +86,7 @@ serve(async (req: any) => {
           pro: { amount: 129900, name: 'Pro Agent Plan' },   // 1299 MXN
         }
         : {
-          basic: { amount: 34200, name: 'Premium Membership' }, // 342 MXN
+          basic: { amount: 16900, name: 'Premium Membership' }, // 169 MXN
         };
 
       const planInfo = planPrices[plan] || planPrices[normalizedRole === 'agent' ? 'basic' : 'basic'];

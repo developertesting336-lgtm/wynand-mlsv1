@@ -1684,11 +1684,8 @@ export default function AdminDashboard() {
                   <tr className="bg-muted/50 text-left">
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Client</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Referrer</th>
-                    <th className="px-4 py-3 font-semibold text-muted-foreground">Assigned Agent</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Type</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Est. Value (MXN)</th>
-                    <th className="px-4 py-3 font-semibold text-muted-foreground">Commission</th>
-                    <th className="px-4 py-3 font-semibold text-muted-foreground">Status</th>
                     <th className="px-4 py-3 font-semibold text-muted-foreground">Date</th>
                   </tr>
                 </thead>
@@ -1709,64 +1706,6 @@ export default function AdminDashboard() {
                           <div className="font-medium">{referrer?.full_name || 'Unknown'}</div>
                           <div className="text-xs text-muted-foreground">{referrer?.email || ''}</div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-1 items-start">
-                            {agent ? (
-                              <div className="text-xs">
-                                <span className="font-semibold text-slate-800">{agent.full_name || 'Agent'}</span>
-                                <span className="block text-slate-500">{agent.email}</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic">Unassigned</span>
-                            )}
-                            {(() => {
-                              // If unassigned, they can always assign
-                              if (!ref.agent_id) {
-                                return (
-                                  <Button
-                                    size="xs"
-                                    variant="outline"
-                                    className="mt-1 text-[10px] h-6 px-2"
-                                    onClick={() => {
-                                      setActiveReferralAssign({ referralId: ref.id, currentAgentId: ref.agent_id });
-                                      setAgentSelectorSearch('');
-                                      setAgentSelectorPage(1);
-                                    }}
-                                  >
-                                    Assign Agent
-                                  </Button>
-                                );
-                              }
-
-                              // If assigned, only allow changing within 30 minutes of updated_date
-                              const updatedDateVal = ref.updated_date || ref.created_date;
-                              const isEditable = (() => {
-                                if (!updatedDateVal) return true;
-                                const diffMs = new Date() - new Date(updatedDateVal);
-                                const diffMins = diffMs / (1000 * 60);
-                                return diffMins <= 30;
-                              })();
-
-                              if (isEditable) {
-                                return (
-                                  <Button
-                                    size="xs"
-                                    variant="outline"
-                                    className="mt-1 text-[10px] h-6 px-2"
-                                    onClick={() => {
-                                      setActiveReferralAssign({ referralId: ref.id, currentAgentId: ref.agent_id });
-                                      setAgentSelectorSearch('');
-                                      setAgentSelectorPage(1);
-                                    }}
-                                  >
-                                    Change Agent
-                                  </Button>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </div>
-                        </td>
                         <td className="px-4 py-3 capitalize">{ref.referral_type}</td>
                         <td className="px-4 py-3 font-medium">
                           {ref.estimated_value_usd ? (
@@ -1774,18 +1713,6 @@ export default function AdminDashboard() {
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
-                        </td>
-                        <td className="px-4 py-3 font-medium">
-                          {ref.commission_amount ? (
-                            `${parseFloat(ref.commission_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`
-                          ) : (
-                            <span className="text-muted-foreground">{ref.commission_pct || 15}%</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant={ref.status === 'paid' ? 'default' : 'secondary'} className="capitalize">
-                            {ref.status || 'pending'}
-                          </Badge>
                         </td>
                         <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                           {ref.created_date ? format(new Date(ref.created_date), 'MMM d, yyyy') : 'N/A'}

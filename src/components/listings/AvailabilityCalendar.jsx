@@ -292,6 +292,55 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
           }
         }
 
+        // Fallback: If no referrer ID is present, search the sale_referrals table matching current user's email
+        if (!finalReferralCode && !resolvedAgentReferral && currentUser?.email) {
+          try {
+            // First check if this client already has any sale referral where ref_applied = true
+            const { data: alreadyAppliedReferrals } = await supabase
+              .from('sale_referrals')
+              .select('id')
+              .eq('client_email', currentUser.email)
+              .eq('ref_applied', true)
+              .limit(1);
+
+            if (alreadyAppliedReferrals && alreadyAppliedReferrals.length > 0) {
+              console.log('[REFERRAL] Client email already has an applied sale referral. Commission skipped.');
+            } else {
+              // 1. Query matching buyer referrals first (oldest first)
+              const { data: buyerReferrals } = await supabase
+                .from('sale_referrals')
+                .select('referrer_id')
+                .eq('client_email', currentUser.email)
+                .eq('referral_type', 'buyer')
+                .or('ref_applied.is.null,ref_applied.eq.false')
+                .order('created_date', { ascending: true })
+                .limit(1);
+
+              if (buyerReferrals && buyerReferrals.length > 0) {
+                finalReferralCode = buyerReferrals[0].referrer_id;
+                console.log(`[REFERRAL] Matched oldest valid buyer referral_id: ${finalReferralCode}`);
+              } else {
+                // 2. Query matching seller referrals if no buyer referrals found (oldest first)
+                const { data: sellerReferrals } = await supabase
+                  .from('sale_referrals')
+                  .select('referrer_id')
+                  .eq('client_email', currentUser.email)
+                  .eq('referral_type', 'seller')
+                  .or('ref_applied.is.null,ref_applied.eq.false')
+                  .order('created_date', { ascending: true })
+                  .limit(1);
+
+                if (sellerReferrals && sellerReferrals.length > 0) {
+                  finalReferralCode = sellerReferrals[0].referrer_id;
+                  console.log(`[REFERRAL] Matched oldest valid seller referral_id: ${finalReferralCode}`);
+                }
+              }
+            }
+          } catch (referralErr) {
+            console.error('Failed to look up matching sale referral:', referralErr);
+          }
+        }
+
         // If the referral matches the property, clear standard normal referral code (exclusive)
         if (resolvedAgentReferral) {
           finalReferralCode = null;
