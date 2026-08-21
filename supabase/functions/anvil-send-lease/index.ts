@@ -174,7 +174,8 @@ serve(async (req) => {
     }
 
     // 5. Fill the PDF template using Anvil Fill PDF API
-    const pdfTemplateId = booking.agent_id ? "CHE8u7PYwChHbaVHzG0P" : "YPRHYgUMBXqnVhbRGmad";
+    // const pdfTemplateId = booking.agent_id ? "CHE8u7PYwChHbaVHzG0P" : "YPRHYgUMBXqnVhbRGmad";
+    const pdfTemplateId = booking.agent_id ? "IbUHbrExKlvkU24sf9F1" : "IbUHbrExKlvkU24sf9F1";
     const rentAmount = listing.price_usd || 0;
     const depositAmount = listing.deposit_amount || 0;
     const leaseStart = booking.move_in_date || new Date().toISOString().split("T")[0];
@@ -219,7 +220,22 @@ serve(async (req) => {
       useInteractiveFields: false,
       data: {
         landlordName: conditions.landlordName || ownerProfile.full_name || ownerProfile.email || "Owner",
+        OwnerEmail: ownerProfile.email || "",
+        OwnerphoneNumber: ownerProfile.phone_number || ownerProfile.phone || "",
         tenantName: conditions.tenantName || renterProfile.full_name || renterProfile.email || "Renter",
+        Nationality: conditions.nationality || "",
+        PassportNumber: conditions.passportNumber || "",
+        TenantEmail: renterProfile.email || "",
+        TenantEmail2: conditions.tenantEmail2 || "",
+        TenantphoneNumber: renterProfile.phone_number || renterProfile.phone || "",
+        BankAccountNumber: conditions.bankAccountNumber || "",
+        Branch: conditions.branch || "",
+        Bank: conditions.bank || "",
+        BankAddress1: conditions.bankAddress1 || "",
+        BankAddress2: conditions.bankAddress2 || "",
+        Clabe: conditions.clabe || "",
+        SwiftCode: conditions.swiftCode || "",
+        Reference: conditions.reference || "",
         totalRooms: conditions.totalRooms || listing.bedrooms || listing.total_rooms || "N/A",
         totalBedrooms: conditions.totalBedrooms || listing.bedrooms || "N/A",
         totalBathrooms: conditions.totalBathrooms || listing.bathrooms || "N/A",
@@ -227,14 +243,27 @@ serve(async (req) => {
         propertyCity: conditions.propertyCity || listing.city || "",
         propertyState: conditions.propertyState || listing.state || "",
         propertyUnit: conditions.propertyUnit || listing.unit || "",
-        leaseStartDate: conditions.leaseStartDate || formatDate(leaseStart),
-        leaseDuration: conditions.leaseDuration || `${booking.lease_duration_months || 12} months`,
-        leaseEndDate: conditions.leaseEndDate || formatDate(leaseEnd),
+        LeaseStartDate: conditions.leaseStartDate ? formatDate(conditions.leaseStartDate) : formatDate(leaseStart),
+        LeaseDuration: `${conditions.leaseDuration || booking.lease_duration_months || 12} months`,
+        LeaseEndDate: conditions.leaseEndDate ? formatDate(conditions.leaseEndDate) : formatDate(leaseEnd),
+        PaymentDate: (() => {
+          try {
+            const dateStr = conditions.leaseStartDate || leaseStart;
+            const d = new Date(dateStr);
+            const day = d.getDate();
+            if (isNaN(day)) return "1st";
+            const j = day % 10, k = day % 100;
+            if (j === 1 && k !== 11) return `${day}st`;
+            if (j === 2 && k !== 12) return `${day}nd`;
+            if (j === 3 && k !== 13) return `${day}rd`;
+            return `${day}th`;
+          } catch {
+            return "1st";
+          }
+        })(),
         monthlyRent: (() => {
-          let val = (conditions.monthlyRent || `${rentAmount}`).toString().trim();
-          // Remove any leading dollar signs or trailing mxn suffixes
+          let val = (conditions.monthlyRent || listing.price_mxn || listing.price_usd || rentAmount).toString().trim();
           val = val.replace(/^\$/, '').replace(/ mxn$/i, '').trim();
-          // Remove commas so parseFloat doesn't get cut off (e.g., '20,000' -> '20')
           const cleanVal = val.replace(/,/g, '');
           const num = parseFloat(cleanVal);
           if (isNaN(num)) return val + " mxn";
@@ -255,7 +284,7 @@ serve(async (req) => {
         gracePeriodDays: `${conditions.gracePeriodDays || "5"} days`,
         paymentMethod: conditions.paymentMethod || "Bank Transfer",
         securityDepositAmount: (() => {
-          let val = (conditions.securityDepositAmount || `${depositAmount}`).toString().trim();
+          let val = (conditions.securityDepositAmount || depositAmount).toString().trim();
           val = val.replace(/^\$/, '').replace(/ mxn$/i, '').trim();
           const cleanVal = val.replace(/,/g, '');
           const num = parseFloat(cleanVal);
@@ -285,6 +314,16 @@ serve(async (req) => {
           return `${formatted} mxn`;
         })(),
 
+        ownerResidentialAddress: conditions.ownerResidentialAddress || "",
+        ownerResidentialCity: conditions.ownerResidentialCity || "",
+        ownerResidentialState: conditions.ownerResidentialState || "",
+        ownerAlternateEmail: conditions.ownerAlternateEmail || "",
+        ownerAlternatePhone: conditions.ownerAlternatePhone || "",
+        EarlyMoveOnDate: conditions.earlyMoveInDate ? formatDate(conditions.earlyMoveInDate) : "",
+        InternetIncluded: conditions.internetIncluded ? "be included" : "not be included",
+        ParkingAvailable: conditions.ParkingAvailable ? "one parking space" : "no parking space",
+        PersonsAllowed: conditions.personsAllowed || "N/A",
+
         fullyFurnished: mark(conditions.fullyFurnished),
         semiFurnished: mark(conditions.semiFurnished),
         unFurnished: mark(conditions.unFurnished),
@@ -292,7 +331,6 @@ serve(async (req) => {
         noPetsAllowed: mark(conditions.noPetsAllowed),
         petsNegotiable: mark(conditions.petsNegotiable),
 
-        ParkingAvailable: mark(conditions.ParkingAvailable),
         balconyTerrace: mark(conditions.balconyTerrace),
         gardenYard: mark(conditions.gardenYard),
         centralAC: mark(conditions.centralAC),
@@ -300,7 +338,6 @@ serve(async (req) => {
         waterIncluded: mark(conditions.waterIncluded),
         electricityIncluded: mark(conditions.electricityIncluded),
         gasIncluded: mark(conditions.gasIncluded),
-        internetIncluded: mark(conditions.internetIncluded),
         trashSewageIncluded: mark(conditions.trashSewageIncluded),
         otherUtilitiesIncluded: mark(conditions.otherUtilitiesIncluded),
         UtilitiesIncluded: mark(conditions.UtilitiesIncluded),

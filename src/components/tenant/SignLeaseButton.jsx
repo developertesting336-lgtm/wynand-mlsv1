@@ -16,8 +16,24 @@ export default function SignLeaseButton({ booking, listing, onSigned }) {
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
 
+  const [tenantFormData, setTenantFormData] = useState({
+    nationality: '',
+    passportNumber: '',
+    tenantEmail2: '',
+    bankAccountNumber: '',
+    branch: '',
+    bank: '',
+    bankAddress1: '',
+    bankAddress2: '',
+    clabe: '',
+    swiftCode: '',
+    reference: '',
+  });
+
   useEffect(() => {
-    base44.auth.me().then(setUserProfile).catch(() => {});
+    base44.auth.me().then((u) => {
+      setUserProfile(u);
+    }).catch(() => { });
   }, []);
 
   const handleSignClick = () => {
@@ -40,11 +56,11 @@ export default function SignLeaseButton({ booking, listing, onSigned }) {
           u8arr[n] = bstr.charCodeAt(n);
         }
         const file = new File([u8arr], `signs/signature_tenant_${booking.id}.png`, { type: mime });
-        
+
         // Upload file to Supabase storage bucket via base44 SDK
         const uploadResult = await base44.integrations.Core.UploadFile({ file });
         signatureUrl = uploadResult?.file_url;
-        
+
         if (!signatureUrl) {
           throw new Error('Failed to obtain signature public URL from storage.');
         }
@@ -72,12 +88,25 @@ export default function SignLeaseButton({ booking, listing, onSigned }) {
         }
       }
 
-      // Prepare merged conditions to preserve landlord's entries
+      // Prepare merged conditions to preserve landlord's entries and add tenant details
       const existingConditions = booking.agreement_conditions || {};
       const mergedConditions = {
         ...existingConditions,
         tenantSignature: signatureUrl,
-        tenantSignatureDate: new Date().toISOString()
+        tenantSignatureDate: new Date().toISOString(),
+        nationality: tenantFormData.nationality,
+        passportNumber: tenantFormData.passportNumber,
+        tenantEmail: userProfile?.email || '',
+        tenantEmail2: tenantFormData.tenantEmail2,
+        tenantPhone: userProfile?.phone_number || '',
+        bankAccountNumber: tenantFormData.bankAccountNumber,
+        branch: tenantFormData.branch,
+        bank: tenantFormData.bank,
+        bankAddress1: tenantFormData.bankAddress1,
+        bankAddress2: tenantFormData.bankAddress2,
+        clabe: tenantFormData.clabe,
+        swiftCode: tenantFormData.swiftCode,
+        reference: tenantFormData.reference,
       };
 
       // Update booking with tenant signature status and merged conditions
@@ -99,7 +128,20 @@ export default function SignLeaseButton({ booking, listing, onSigned }) {
           bookingId: booking.id,
           agreementConditions: mergedConditions,
           tenantSignature: signatureUrl,
-          tenantSignatureDate: new Date().toISOString()
+          tenantSignatureDate: new Date().toISOString(),
+          nationality: tenantFormData.nationality,
+          passportNumber: tenantFormData.passportNumber,
+          tenantEmail: userProfile?.email || '',
+          tenantEmail2: tenantFormData.tenantEmail2,
+          tenantPhone: userProfile?.phone_number || '',
+          bankAccountNumber: tenantFormData.bankAccountNumber,
+          branch: tenantFormData.branch,
+          bank: tenantFormData.bank,
+          bankAddress1: tenantFormData.bankAddress1,
+          bankAddress2: tenantFormData.bankAddress2,
+          clabe: tenantFormData.clabe,
+          swiftCode: tenantFormData.swiftCode,
+          reference: tenantFormData.reference,
         }
       });
 
@@ -198,8 +240,161 @@ export default function SignLeaseButton({ booking, listing, onSigned }) {
                 </ul>
               </div>
 
+              {/* Renter Personal & Bank Information Form */}
+              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-4">
+                <h4 className="font-semibold text-sm text-slate-800 border-b pb-2">Renter Details & Identity Verification</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Nationality *</label>
+                    <input
+                      type="text"
+                      required
+                      value={tenantFormData.nationality}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, nationality: e.target.value })}
+                      placeholder="e.g. Mexican / American"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Passport Number / ID *</label>
+                    <input
+                      type="text"
+                      required
+                      value={tenantFormData.passportNumber}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, passportNumber: e.target.value })}
+                      placeholder="Passport Number"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Account Email</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={userProfile?.email || ''}
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-slate-100 text-slate-500 cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Alternate Email *</label>
+                    <input
+                      type="email"
+                      required
+                      value={tenantFormData.tenantEmail2}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, tenantEmail2: e.target.value })}
+                      placeholder="alternate@email.com"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Contact Number</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={userProfile?.phone_number || ''}
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-slate-100 text-slate-500 cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                <h4 className="font-semibold text-sm text-slate-800 border-b pb-2 pt-2">Renter Bank Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Bank Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={tenantFormData.bank}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, bank: e.target.value })}
+                      placeholder="e.g. BBVA"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Bank Branch *</label>
+                    <input
+                      type="text"
+                      required
+                      value={tenantFormData.branch}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, branch: e.target.value })}
+                      placeholder="Branch name"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Bank Address Line 1 *</label>
+                    <input
+                      type="text"
+                      required
+                      value={tenantFormData.bankAddress1}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, bankAddress1: e.target.value })}
+                      placeholder="Address Line 1"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Bank Address Line 2</label>
+                    <input
+                      type="text"
+                      value={tenantFormData.bankAddress2}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, bankAddress2: e.target.value })}
+                      placeholder="Address Line 2"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Bank Account Number *</label>
+                    <input
+                      type="text"
+                      required
+                      value={tenantFormData.bankAccountNumber}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, bankAccountNumber: e.target.value })}
+                      placeholder="Account Number"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">CLABE *</label>
+                    <input
+                      type="text"
+                      required
+                      value={tenantFormData.clabe}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, clabe: e.target.value })}
+                      placeholder="18-digit CLABE"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Swift Code</label>
+                    <input
+                      type="text"
+                      value={tenantFormData.swiftCode}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, swiftCode: e.target.value })}
+                      placeholder="SWIFT/BIC Code"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Reference / Concept</label>
+                    <input
+                      type="text"
+                      value={tenantFormData.reference}
+                      onChange={(e) => setTenantFormData({ ...tenantFormData, reference: e.target.value })}
+                      placeholder="Payment Reference"
+                      className="w-full text-xs h-9 px-3 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <Button
-                onClick={() => setShowSignaturePad(true)}
+                onClick={() => {
+                  if (!tenantFormData.nationality || !tenantFormData.passportNumber || !tenantFormData.tenantEmail2 || !tenantFormData.bank || !tenantFormData.branch || !tenantFormData.bankAddress1 || !tenantFormData.bankAccountNumber || !tenantFormData.clabe) {
+                    toast.error("Please fill in all mandatory fields before signing.");
+                    return;
+                  }
+                  setShowSignaturePad(true);
+                }}
                 className="w-full bg-blue-600 hover:bg-blue-700"
                 disabled={!booking.lease_pdf_url}
               >

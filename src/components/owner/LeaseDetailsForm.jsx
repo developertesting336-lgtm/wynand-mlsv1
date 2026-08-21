@@ -86,6 +86,13 @@ export default function LeaseDetailsForm({
     lastMonthRent: getInitialValue('lastMonthRent', ''),
     advancePaymentMonths: getInitialValue('advancePaymentMonths', ''),
     advanceMonthsPayment: getInitialValue('advanceMonthsPayment', ''),
+    ownerResidentialAddress: getInitialValue('ownerResidentialAddress', ''),
+    ownerResidentialCity: getInitialValue('ownerResidentialCity', ''),
+    ownerResidentialState: getInitialValue('ownerResidentialState', ''),
+    ownerAlternateEmail: getInitialValue('ownerAlternateEmail', ''),
+    ownerAlternatePhone: getInitialValue('ownerAlternatePhone', ''),
+    earlyMoveInDate: getInitialValue('earlyMoveInDate', ''),
+    personsAllowed: getInitialValue('personsAllowed', ''),
   });
 
   // Parse address if it exists to prefill city and state
@@ -200,7 +207,7 @@ export default function LeaseDetailsForm({
 
           {/* Parties Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase">1. The Parties</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase">1. The Parties & Owner Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="landlordName">Landlord/Owner Name</Label>
@@ -209,6 +216,29 @@ export default function LeaseDetailsForm({
               <div>
                 <Label htmlFor="tenantName">Tenant/Renter Name</Label>
                 <Input id="tenantName" value={formData.tenantName} readOnly className="bg-muted" />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+              <div className="md:col-span-3">
+                <Label htmlFor="ownerResidentialAddress">Owner Residential Address</Label>
+                <Input id="ownerResidentialAddress" value={formData.ownerResidentialAddress} onChange={(e) => handleChange('ownerResidentialAddress', e.target.value)} placeholder="Owner's home residential address" required />
+              </div>
+              <div>
+                <Label htmlFor="ownerResidentialCity">Owner Residential City</Label>
+                <Input id="ownerResidentialCity" value={formData.ownerResidentialCity} onChange={(e) => handleChange('ownerResidentialCity', e.target.value)} placeholder="City" required />
+              </div>
+              <div>
+                <Label htmlFor="ownerResidentialState">Owner Residential State</Label>
+                <Input id="ownerResidentialState" value={formData.ownerResidentialState} onChange={(e) => handleChange('ownerResidentialState', e.target.value)} placeholder="State" required />
+              </div>
+              <div>
+                <Label htmlFor="ownerAlternateEmail">Owner Alternate Email</Label>
+                <Input id="ownerAlternateEmail" type="email" value={formData.ownerAlternateEmail} onChange={(e) => handleChange('ownerAlternateEmail', e.target.value)} placeholder="alternate@email.com" required />
+              </div>
+              <div>
+                <Label htmlFor="ownerAlternatePhone">Owner Alternate Contact Number</Label>
+                <Input id="ownerAlternatePhone" value={formData.ownerAlternatePhone} onChange={(e) => handleChange('ownerAlternatePhone', e.target.value)} placeholder="Alternate phone" required />
               </div>
             </div>
           </div>
@@ -247,16 +277,24 @@ export default function LeaseDetailsForm({
                 <Label htmlFor="propertyUnit">Unit / Apt #</Label>
                 <Input id="propertyUnit" value={formData.propertyUnit} onChange={(e) => handleChange('propertyUnit', e.target.value)} placeholder="e.g., Apt 4B" />
               </div>
+              <div>
+                <Label htmlFor="personsAllowed">Persons Allowed</Label>
+                <Input id="personsAllowed" type="number" min="1" value={formData.personsAllowed} onChange={(e) => handleChange('personsAllowed', e.target.value)} placeholder="e.g., 4" required />
+              </div>
             </div>
           </div>
 
           {/* Lease Term Section */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase">3. Lease Term & Duration</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="leaseStartDate">Lease Start Date</Label>
                 <Input id="leaseStartDate" type="date" value={formData.leaseStartDate} onChange={(e) => handleChange('leaseStartDate', e.target.value)} required />
+              </div>
+              <div>
+                <Label htmlFor="earlyMoveInDate">Early Move In Date <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
+                <Input id="earlyMoveInDate" type="date" value={formData.earlyMoveInDate} onChange={(e) => handleChange('earlyMoveInDate', e.target.value)} />
               </div>
               <div>
                 <Label htmlFor="leaseDuration">Lease Duration (months)</Label>
@@ -319,14 +357,17 @@ export default function LeaseDetailsForm({
                 <Label htmlFor="gracePeriodDays">Grace Period (days)</Label>
                 <Input id="gracePeriodDays" type="number" value={formData.gracePeriodDays} onChange={(e) => handleChange('gracePeriodDays', e.target.value)} required />
               </div>
+              {/* Payment Method commented out
               <div>
                 <Label htmlFor="paymentMethod">Payment Method</Label>
                 <Input id="paymentMethod" value={formData.paymentMethod} onChange={(e) => handleChange('paymentMethod', e.target.value)} required />
               </div>
+              */}
             </div>
           </div>
 
-          {/* Property Furnishing Type */}
+          {/* Property Furnishing Type & Pet Policy & Property Features & Utilities Commented Out */}
+          {/*
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase">6. Property Furnishing Type</h3>
             <RadioGroup value={formData.propertyFurnishingType} onValueChange={(value) => handleChange('propertyFurnishingType', value)} className="flex flex-wrap gap-4">
@@ -345,7 +386,6 @@ export default function LeaseDetailsForm({
             </RadioGroup>
           </div>
 
-          {/* Pet Policy */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase">7. Pet Policy</h3>
             <RadioGroup value={formData.petPolicy} onValueChange={(value) => handleChange('petPolicy', value)} className="flex flex-wrap gap-4">
@@ -364,7 +404,6 @@ export default function LeaseDetailsForm({
             </RadioGroup>
           </div>
 
-          {/* Property Features */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase">8. Property Features</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -396,8 +435,6 @@ export default function LeaseDetailsForm({
                 <Checkbox id="heatingIncluded" checked={formData.heatingIncluded} onCheckedChange={(checked) => handleChange('heatingIncluded', checked)} />
                 <Label htmlFor="heatingIncluded">Heating Included</Label>
               </div>
-              
-              
               <div className="flex items-center space-x-2">
                 <Checkbox id="otherUtilitiesIncluded" checked={formData.otherUtilitiesIncluded} onCheckedChange={(checked) => handleChange('otherUtilitiesIncluded', checked)} />
                 <Label htmlFor="otherUtilitiesIncluded">Other Utilities</Label>
@@ -405,7 +442,6 @@ export default function LeaseDetailsForm({
             </div>
           </div>
 
-          {/* Utilities Section */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase">9. Utilities</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -431,8 +467,33 @@ export default function LeaseDetailsForm({
               </div>
             </div>
           </div>
+          */}
 
-          {/* Emergency Contact Section */}
+          {/* New Inclusion Configuration */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase">Lease Inclusions</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="internetIncluded" 
+                  checked={formData.internetIncluded} 
+                  onCheckedChange={(checked) => handleChange('internetIncluded', checked)} 
+                />
+                <Label htmlFor="internetIncluded" className="text-sm font-medium">Internet Included</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="ParkingAvailable" 
+                  checked={formData.ParkingAvailable} 
+                  onCheckedChange={(checked) => handleChange('ParkingAvailable', checked)} 
+                />
+                <Label htmlFor="ParkingAvailable" className="text-sm font-medium">Parking Available</Label>
+              </div>
+            </div>
+          </div>
+
+          {/* Emergency Contact & Response Time Commented Out */}
+          {/*
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase">10. Emergency Contact</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -447,7 +508,6 @@ export default function LeaseDetailsForm({
             </div>
           </div>
 
-          {/* Additional Terms Section */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase">11. Additional Terms & Conditions</h3>
             <div>
@@ -455,6 +515,7 @@ export default function LeaseDetailsForm({
               <Textarea id="additionalTermsConditions" value={formData.additionalTermsConditions} onChange={(e) => handleChange('additionalTermsConditions', e.target.value)} placeholder="Add any additional clauses, restrictions, or special conditions..." rows={4} />
             </div>
           </div>
+          */}
 
           {/* Owner Documents Section */}
           <div className="space-y-4">
