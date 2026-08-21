@@ -175,7 +175,7 @@ serve(async (req) => {
 
     // 5. Fill the PDF template using Anvil Fill PDF API
     // const pdfTemplateId = booking.agent_id ? "CHE8u7PYwChHbaVHzG0P" : "YPRHYgUMBXqnVhbRGmad";
-    const pdfTemplateId = booking.agent_id ? "IbUHbrExKlvkU24sf9F1" : "IbUHbrExKlvkU24sf9F1";
+    const pdfTemplateId = booking.agent_id ? "HuletYwh3TZoIH8jZSBR" : "HuletYwh3TZoIH8jZSBR";
     const rentAmount = listing.price_usd || 0;
     const depositAmount = listing.deposit_amount || 0;
     const leaseStart = booking.move_in_date || new Date().toISOString().split("T")[0];
@@ -223,7 +223,7 @@ serve(async (req) => {
         OwnerEmail: ownerProfile.email || "",
         OwnerphoneNumber: ownerProfile.phone_number || ownerProfile.phone || "",
         tenantName: conditions.tenantName || renterProfile.full_name || renterProfile.email || "Renter",
-        Nationality: conditions.nationality || "",
+        TenantNationality: conditions.nationality || "",
         PassportNumber: conditions.passportNumber || "",
         TenantEmail: renterProfile.email || "",
         TenantEmail2: conditions.tenantEmail2 || "",
