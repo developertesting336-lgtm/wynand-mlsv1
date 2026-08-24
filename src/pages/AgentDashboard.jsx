@@ -107,7 +107,7 @@ export default function AgentDashboard() {
       try {
         let queryBuilder = supabase
           .from('profiles')
-          .select('id, full_name, email, role')
+          .select('id, full_name, email, role, referral_code')
           .eq('role', 'agent')
           .neq('id', user?.id);
 
@@ -2313,7 +2313,8 @@ export default function AgentDashboard() {
                         onClick={async () => {
                           setSendingReferralAgentId(ag.id);
                           try {
-                            const referralLink = `${window.location.origin}/listings/${referralModalListing.id}?agent_ref=${ag.id}`;
+                            const recipientCode = ag.referral_code || ag.id;
+                            const referralLink = `${window.location.origin}/listings/${referralModalListing.id}?agent_ref=${recipientCode}`;
                             const { error } = await supabase
                               .from('property_referrals')
                               .insert({

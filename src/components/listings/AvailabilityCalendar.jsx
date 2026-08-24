@@ -265,11 +265,24 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
         let resolvedAgentReferral = null;
         if (finalAgentRef) {
           try {
+            // First check if finalAgentRef is already a UUID or look up by referral_code
+            let targetAgentId = finalAgentRef;
+            if (finalAgentRef.length === 10) {
+              const { data: matchedProfile } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('referral_code', finalAgentRef)
+                .maybeSingle();
+              if (matchedProfile) {
+                targetAgentId = matchedProfile.id;
+              }
+            }
+
             const { data: matchedReferral } = await supabase
               .from('property_referrals')
               .select('agent_referral_id')
               .eq('listing_id', listing.id)
-              .eq('agent_referral_id', finalAgentRef)
+              .eq('agent_referral_id', targetAgentId)
               .maybeSingle();
             if (matchedReferral) {
               resolvedAgentReferral = matchedReferral.agent_referral_id;
@@ -286,7 +299,22 @@ export default function AvailabilityCalendar({ listing, currentUser, refCode = '
         if (finalNormalRef) {
           const targetListingId = localStorage.getItem('referral_target_listing_id');
           if (!targetListingId || targetListingId === listing.id) {
-            finalReferralCode = finalNormalRef;
+            let targetUserId = finalNormalRef;
+            if (finalNormalRef.length === 10) {
+              try {
+                const { data: matchedProfile } = await supabase
+                  .from('profiles')
+                  .select('id')
+                  .eq('referral_code', finalNormalRef)
+                  .maybeSingle();
+                if (matchedProfile) {
+                  targetUserId = matchedProfile.id;
+                }
+              } catch (profileErr) {
+                console.error('Failed to look up matching profile for normal referral code:', profileErr);
+              }
+            }
+            finalReferralCode = targetUserId;
           } else {
             console.warn(`[REFERRAL] Ignoring normal referral code. Referral target property was ${targetListingId}, but user is booking ${listing.id}`);
           }

@@ -16,16 +16,52 @@ export default function ReferralLinkCard({ agent, listings, onCodeUpdated }) {
   const [checking, setChecking] = useState(false);
   const [codeError, setCodeError] = useState('');
 
-  // Use stored referral_code from profile, fallback to email-based default
+  // Use stored referral_code from profile, fallback to generating a 10-digit random code
   const storedCode = agent?.referral_code || '';
-  const defaultCode = agent?.email
-    ? 'REF-' + agent.email.split('@')[0].toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)
-    : '';
+  const generateRandom10DigitCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 10; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+  const defaultCode = generateRandom10DigitCode();
   const displayCode = storedCode || defaultCode;
+
+  // If agent doesn't have a referral_code, write it to database automatically
+  useEffect(() => {
+    if (agent?.id && !storedCode) {
+      const getUniqueCode = async () => {
+        let uniqueCode = '';
+        let isUnique = false;
+        let attempts = 0;
+        
+        while (!isUnique && attempts < 10) {
+          uniqueCode = generateRandom10DigitCode();
+          const { data } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('referral_code', uniqueCode)
+            .maybeSingle();
+            
+          if (!data) {
+            isUnique = true;
+          }
+          attempts++;
+        }
+        
+        await base44.entities.User.update(agent.id, { referral_code: uniqueCode });
+        onCodeUpdated?.();
+      };
+      
+      getUniqueCode().catch(err => console.error('Failed to auto-generate unique referral code:', err));
+    }
+  }, [agent?.id, storedCode, onCodeUpdated]);
 
   const base = window.location.origin;
   const listingPath = selectedListing ? `/listings/${selectedListing}` : '/listings';
-  const referralUrl = `${base}${listingPath}?agent_ref=${agent?.id || ''}`;
+  const referralUrl = `${base}${listingPath}?agent_ref=${displayCode}`;
 
   const copy = () => {
     navigator.clipboard.writeText(referralUrl);
@@ -131,6 +167,11 @@ export default function ReferralLinkCard({ agent, listings, onCodeUpdated }) {
                   {copied ? 'Copied' : 'Copy'}
                 </Button>
               </div>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <span className="text-xs font-medium text-slate-500">Your Referral Code:</span>
+              <span className="text-sm font-bold font-mono text-slate-800 tracking-wider bg-white border px-2 py-0.5 rounded shadow-sm">{displayCode}</span>
             </div>
 
             <p className="text-xs text-muted-foreground">

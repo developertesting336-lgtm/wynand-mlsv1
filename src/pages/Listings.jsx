@@ -36,14 +36,27 @@ export default function Listings() {
       localStorage.removeItem('agent_property_referral_code');
       localStorage.removeItem('agent_property_referral_timestamp');
     } else if (urlAgentRefCode) {
-      localStorage.setItem('agent_property_referral_code', urlAgentRefCode);
-      localStorage.setItem('agent_property_referral_timestamp', new Date().toISOString());
+      // Check if we are on a specific listing path or if target listing ID is loaded.
+      // If we are on the global listings search page, treat the agent's code as a normal ref.
+      const isGlobalListingsPage = window.location.pathname === '/listings' || window.location.pathname === '/';
       
-      // Clear normal ref
-      sessionStorage.removeItem('referral_code');
-      localStorage.removeItem('referral_code');
-      localStorage.removeItem('referral_code_timestamp');
-      localStorage.removeItem('referral_target_listing_id');
+      if (isGlobalListingsPage) {
+        sessionStorage.setItem('referral_code', urlAgentRefCode);
+        localStorage.setItem('referral_code', urlAgentRefCode);
+        localStorage.setItem('referral_code_timestamp', new Date().toISOString());
+        localStorage.removeItem('referral_target_listing_id');
+        
+        localStorage.removeItem('agent_property_referral_code');
+        localStorage.removeItem('agent_property_referral_timestamp');
+      } else {
+        localStorage.setItem('agent_property_referral_code', urlAgentRefCode);
+        localStorage.setItem('agent_property_referral_timestamp', new Date().toISOString());
+        
+        sessionStorage.removeItem('referral_code');
+        localStorage.removeItem('referral_code');
+        localStorage.removeItem('referral_code_timestamp');
+        localStorage.removeItem('referral_target_listing_id');
+      }
     }
   }, [urlRefCode, urlAgentRefCode]);
 

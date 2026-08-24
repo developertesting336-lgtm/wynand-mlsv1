@@ -106,6 +106,37 @@ export default function Refer() {
   useEffect(() => {
     if (user) {
       setCurrentUser(user);
+      // Auto-generate unique 10-digit code if profile lacks one
+      if (user.id && !user.referral_code) {
+        const getUniqueCode = async () => {
+          const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+          let uniqueCode = '';
+          let isUnique = false;
+          let attempts = 0;
+          
+          while (!isUnique && attempts < 10) {
+            uniqueCode = '';
+            for (let i = 0; i < 10; i++) {
+              uniqueCode += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            const { data } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('referral_code', uniqueCode)
+              .maybeSingle();
+              
+            if (!data) {
+              isUnique = true;
+            }
+            attempts++;
+          }
+          
+          const updated = await base44.entities.User.update(user.id, { referral_code: uniqueCode });
+          if (updated) setCurrentUser(updated);
+        };
+        
+        getUniqueCode().catch(err => console.error('Failed to auto-generate unique referral code on refer page:', err));
+      }
     }
   }, [user]);
 
@@ -234,9 +265,10 @@ export default function Refer() {
           (() => {
             const isAgent = currentUser.role === 'agent';
             const listingPath = selectedListing ? `/listings/${selectedListing}` : '/listings';
+            const userCode = currentUser?.referral_code || currentUser?.id || '';
             const referralUrl = isAgent
-              ? `${window.location.origin}${listingPath}?agent_ref=${currentUser.id}`
-              : `${window.location.origin}${listingPath}?ref=${currentUser.id}`;
+              ? `${window.location.origin}${listingPath}?agent_ref=${userCode}`
+              : `${window.location.origin}${listingPath}?ref=${userCode}`;
 
             const hasStripeConnected = currentUser?.stripe_connect_id && currentUser?.stripe_onboarding_complete;
 
