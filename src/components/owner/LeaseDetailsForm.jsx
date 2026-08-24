@@ -174,10 +174,6 @@ export default function LeaseDetailsForm({
       toast.error('State is required.');
       return;
     }
-    if (!formData.propertyUnit || !formData.propertyUnit.trim()) {
-      toast.error('Unit number is required.');
-      return;
-    }
 
     // Transform radio selections into boolean fields for PDF
     const transformedData = {
@@ -272,10 +268,6 @@ export default function LeaseDetailsForm({
               <div>
                 <Label htmlFor="propertyState">State</Label>
                 <Input id="propertyState" value={formData.propertyState} onChange={(e) => handleChange('propertyState', e.target.value)} placeholder="e.g., NY" />
-              </div>
-              <div>
-                <Label htmlFor="propertyUnit">Unit / Apt #</Label>
-                <Input id="propertyUnit" value={formData.propertyUnit} onChange={(e) => handleChange('propertyUnit', e.target.value)} placeholder="e.g., Apt 4B" />
               </div>
               <div>
                 <Label htmlFor="personsAllowed">Persons Allowed</Label>

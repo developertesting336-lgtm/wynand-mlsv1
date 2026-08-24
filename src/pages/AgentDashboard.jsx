@@ -1777,7 +1777,7 @@ export default function AgentDashboard() {
                   onSubmit={(formData) => setEditingAgreementData(formData)}
                   onChange={(formData) => setEditingAgreementData(formData)}
                   onCancel={closeAgreementEdit}
-                  isSubmitting={updatingState?.id === editingAgreementId}
+                  isSubmitting={approveAndSendLease.isPending || updateAndResendLease.isPending}
                   hideSubmitButton={true}
                 />
                 {editingAgreementData && (

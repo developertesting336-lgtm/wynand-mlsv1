@@ -1114,9 +1114,11 @@ export default function OwnerDashboard() {
 
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['owner-bookings', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] })
+      ]);
       toast.success('Booking approved and lease agreement sent!');
       setUpdatingState({ id: null, action: null });
       setEditingBookingId(null);
@@ -1164,9 +1166,11 @@ export default function OwnerDashboard() {
 
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['owner-bookings', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] })
+      ]);
       toast.success('Agreement updated and resent!');
       setUpdatingState({ id: null, action: null });
       setEditingAgreementId(null);
@@ -1810,7 +1814,7 @@ export default function OwnerDashboard() {
                                           onCancel={() => {
                                             setEditingBookingId(null);
                                           }}
-                                          isSubmitting={updatingState?.id === b.id}
+                                          isSubmitting={approveAndSendLease.isPending}
                                         />
                                       </td>
                                     </tr>
@@ -2302,7 +2306,7 @@ export default function OwnerDashboard() {
                   }}
                   onChange={(formData) => setEditingAgreementData(formData)}
                   onCancel={() => { setEditingAgreementId(null); setEditingAgreementData(null); }}
-                  isSubmitting={updatingState?.id === editingAgreementId}
+                  isSubmitting={updateAndResendLease.isPending}
                   hideSubmitButton={true}
                 />
 
