@@ -124,7 +124,31 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
       if (error) throw new Error(error.message);
 
       // Call edge function to regenerate PDF with tenant signature URL and merged conditions
+      /* OLD ANVIL LOGIC (Commented out)
       const res = await supabase.functions.invoke('anvil-send-lease', {
+        body: {
+          bookingId: booking.id,
+          agreementConditions: mergedConditions,
+          tenantSignature: signatureUrl,
+          tenantSignatureDate: new Date().toISOString(),
+          nationality: tenantFormData.nationality,
+          passportNumber: tenantFormData.passportNumber,
+          tenantEmail: userProfile?.email || '',
+          tenantEmail2: tenantFormData.tenantEmail2,
+          tenantPhone: userProfile?.phone_number || '',
+          bankAccountNumber: tenantFormData.bankAccountNumber,
+          branch: tenantFormData.branch,
+          bank: tenantFormData.bank,
+          bankAddress1: tenantFormData.bankAddress1,
+          bankAddress2: tenantFormData.bankAddress2,
+          clabe: tenantFormData.clabe,
+          swiftCode: tenantFormData.swiftCode,
+          reference: tenantFormData.reference,
+        }
+      });
+      */
+
+      const res = await supabase.functions.invoke('generate-lease-pdf', {
         body: {
           bookingId: booking.id,
           agreementConditions: mergedConditions,

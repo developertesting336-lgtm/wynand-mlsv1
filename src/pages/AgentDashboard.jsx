@@ -315,6 +315,7 @@ export default function AgentDashboard() {
         console.warn('Failed to send lease fully approved notification to tenant', notiErr);
       }
 
+      /* OLD ANVIL LOGIC (Commented out)
       const anvilResponse = await supabase.functions.invoke('anvil-send-lease', {
         body: {
           bookingId: agentSigningBooking.id,
@@ -327,6 +328,21 @@ export default function AgentDashboard() {
       });
       if (anvilResponse.error) {
         throw new Error(anvilResponse.error.message || 'Failed to regenerate lease agreement through Anvil');
+      }
+      */
+
+      const anvilResponse = await supabase.functions.invoke('generate-lease-pdf', {
+        body: {
+          bookingId: agentSigningBooking.id,
+          agreementConditions: mergedConditions,
+          tenantSignature: existingConditions.tenantSignature,
+          tenantSignatureDate: existingConditions.tenantSignatureDate,
+          agentSignature: signatureUrl,
+          agentSignatureDate: mergedConditions.agentSignatureDate,
+        },
+      });
+      if (anvilResponse.error) {
+        throw new Error(anvilResponse.error.message || 'Failed to generate lease agreement PDF');
       }
 
       toast.success('Agreement signed successfully and lease updated.');
@@ -585,7 +601,11 @@ export default function AgentDashboard() {
         .update({ status: 'lease_pending', lease_status: 'pending_renter', updated_date: new Date().toISOString() })
         .eq('id', bookingId);
       if (updateError) throw new Error(updateError.message);
+      /* OLD ANVIL LOGIC (Commented out)
       const res = await supabase.functions.invoke('anvil-send-lease', { body: { bookingId, agreementConditions } });
+      if (res.error) throw new Error(res.error.message || 'Unknown error');
+      */
+      const res = await supabase.functions.invoke('generate-lease-pdf', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
       return res.data;
     },
@@ -605,7 +625,11 @@ export default function AgentDashboard() {
     mutationFn: async ({ bookingId, agreementConditions }) => {
       setUpdatingState({ id: bookingId, action: 'update' });
       await saveAgreementConditions.mutateAsync({ bookingId, conditions: agreementConditions });
+      /* OLD ANVIL LOGIC (Commented out)
       const res = await supabase.functions.invoke('anvil-send-lease', { body: { bookingId, agreementConditions } });
+      if (res.error) throw new Error(res.error.message || 'Unknown error');
+      */
+      const res = await supabase.functions.invoke('generate-lease-pdf', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
       return res.data;
     },

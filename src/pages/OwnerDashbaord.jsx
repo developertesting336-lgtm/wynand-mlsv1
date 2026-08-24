@@ -1089,7 +1089,11 @@ export default function OwnerDashboard() {
         })
         .eq('id', bookingId);
       if (error) throw new Error(error.message);
+      /* OLD ANVIL LOGIC (Commented out)
       const res = await supabase.functions.invoke('anvil-send-lease', { body: { bookingId, agreementConditions } });
+      if (res.error) throw new Error(res.error.message || 'Unknown error');
+      */
+      const res = await supabase.functions.invoke('generate-lease-pdf', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
 
       // Only tenant gets notified at this stage (tenant signs first). Agent will be notified after owner signs.
@@ -1135,7 +1139,11 @@ export default function OwnerDashboard() {
         .eq('id', bookingId)
         .single();
 
+      /* OLD ANVIL LOGIC (Commented out)
       const res = await supabase.functions.invoke('anvil-send-lease', { body: { bookingId, agreementConditions } });
+      if (res.error) throw new Error(res.error.message || 'Unknown error');
+      */
+      const res = await supabase.functions.invoke('generate-lease-pdf', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
 
       // Agent is not notified on owner edits before tenant signature.
@@ -1232,6 +1240,7 @@ export default function OwnerDashboard() {
         .eq('id', ownerSigningBooking.id);
       if (error) throw error;
 
+      /* OLD ANVIL LOGIC (Commented out)
       const anvilResponse = await supabase.functions.invoke('anvil-send-lease', {
         body: {
           bookingId: ownerSigningBooking.id,
@@ -1244,6 +1253,21 @@ export default function OwnerDashboard() {
       });
       if (anvilResponse.error) {
         throw new Error(anvilResponse.error.message || 'Failed to regenerate lease agreement through Anvil');
+      }
+      */
+
+      const anvilResponse = await supabase.functions.invoke('generate-lease-pdf', {
+        body: {
+          bookingId: ownerSigningBooking.id,
+          agreementConditions: mergedConditions,
+          tenantSignature: existingConditions.tenantSignature,
+          tenantSignatureDate: existingConditions.tenantSignatureDate,
+          landlordSignature: signatureUrl,
+          landlordSignatureDate: mergedConditions.landlordSignatureDate,
+        },
+      });
+      if (anvilResponse.error) {
+        throw new Error(anvilResponse.error.message || 'Failed to generate lease agreement PDF');
       }
 
       // Send push notification to agent if associated, otherwise to tenant (ready to pay)
