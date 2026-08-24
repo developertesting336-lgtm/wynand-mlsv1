@@ -829,6 +829,35 @@ export default function OwnerDashboard() {
     enabled: !!user?.id,
   });
 
+  // Real-time subscription to bookings updates for Owner
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('owner-bookings-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+        },
+        (payload) => {
+          const booking = payload.new;
+          // Invalidate listings/bookings queries if the change belongs to this owner or one of their listings
+          const directMatch = booking && (booking.owner_id === user.id || listingIds.includes(booking.listing_id));
+          if (directMatch || allBookings.length === 0) {
+            queryClient.invalidateQueries({ queryKey: ['owner-bookings', user.id] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, listingIds, allBookings.length, queryClient]);
+
   const { data: renterProfiles = [] } = useQuery({
     queryKey: ['renter-profiles-supabase', allBookings.map(b => b.renter_id).filter(Boolean)],
     queryFn: async () => {

@@ -9,7 +9,7 @@ import SignaturePad from '@/components/owner/SignaturePad';
 import { base44 } from '@/api/base44Client';
 import { sendPushNotification } from '@/utils/pushNotification';
 
-export default function SignLeaseButton({ booking, listing, onSigned }) {
+export default function SignLeaseButton({ booking, listing, onSigned, disabled = false }) {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
@@ -37,6 +37,7 @@ export default function SignLeaseButton({ booking, listing, onSigned }) {
   }, []);
 
   const handleSignClick = () => {
+    if (disabled) return;
     setIsOpen(true);
     setShowSignaturePad(false);
   };
@@ -196,7 +197,7 @@ export default function SignLeaseButton({ booking, listing, onSigned }) {
         <Button
           size="sm"
           onClick={handleSignClick}
-          disabled={isSigning}
+          disabled={isSigning || disabled}
           className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-transform active:scale-[0.98] py-1 px-2.5 h-auto whitespace-nowrap disabled:opacity-70 disabled:cursor-not-allowed"
         >
           <PenLine className="w-3.5 h-3.5 mr-1.5" />
@@ -236,7 +237,7 @@ export default function SignLeaseButton({ booking, listing, onSigned }) {
                 <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
                   <li>Review the lease agreement carefully</li>
                   <li>Ensure all details are correct</li>
-                  <li>Once signed, you'll be able to proceed with payment</li>
+                  {/* <li>Once signed, you'll be able to proceed with payment</li> */}
                 </ul>
               </div>
 

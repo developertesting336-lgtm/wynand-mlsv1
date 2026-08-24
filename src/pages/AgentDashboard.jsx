@@ -481,6 +481,31 @@ export default function AgentDashboard() {
     enabled: !!user?.id,
   });
 
+  // Real-time subscription to bookings updates for Agent
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('agent-bookings-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `agent_id=eq.${user.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['agent-bookings'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
+
   const { data: bookingProfiles = [] } = useQuery({
     queryKey: ['booking-profiles', myBookings.map(b => b.renter_id).concat(myBookings.map(b => b.owner_id)).filter(Boolean)],
     queryFn: async () => {

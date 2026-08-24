@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useFavorites } from '@/hooks/useFavorites';
 import { Link } from 'react-router-dom';
@@ -806,7 +806,7 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                         })()}
                       </td>
                       <td className="px-4 py-3">
-                        {b.end_lease ? (
+                        {b.end_lease && b.status !== 'declined' ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-slate-100 text-slate-700 border-slate-200">
                             <CheckCircle className="w-3.5 h-3.5 text-slate-500" /> Lease Ended
                           </span>
@@ -981,6 +981,7 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                           variant="outline"
                           className="text-xs whitespace-nowrap px-3 py-2"
                           onClick={() => openViewMaintenanceModal(b)}
+                          disabled={b.status === 'pending' || b.status === 'declined'}
                         >
                           {(b.maintenance_requests || []).length > 0
                             ? `Show All (${b.maintenance_requests.length})`
@@ -989,7 +990,9 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                       </td>
                       <td className="px-4 py-3 text-right">
                         {!(b.agreement_conditions?.tenantSignature) ? (
-                          <SignLeaseButton booking={b} listing={listing} onSigned={() => { }} />
+                          <div className={b.status === 'pending' || b.status === 'declined' ? "opacity-50 pointer-events-none cursor-not-allowed inline-block" : ""}>
+                            <SignLeaseButton booking={b} listing={listing} onSigned={() => { }} disabled={b.status === 'pending' || b.status === 'declined'} />
+                          </div>
                         ) : (b.status !== 'confirmed' && b.agreement_conditions?.tenantSignature && b.agreement_conditions?.landlordSignature && agentSigned && totalAmount > 0) ? (
                           <Button
                             size="sm"
@@ -1748,6 +1751,7 @@ export default function UserDashboard() {
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('tenant_dashboard_active_tab') || 'favorites';
   });
+  const queryClient = useQueryClient();
   const { onboardingLoading, handleStripeOnboard } = useStripeOnboarding(user);
 
   useEffect(() => {
@@ -1826,6 +1830,31 @@ export default function UserDashboard() {
     },
     enabled: !!user?.id,
   });
+
+  // Real-time subscription to bookings updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('renter-bookings-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `renter_id=eq.${user.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['user-bookings', user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   const { data: myPayments = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ['user-payments', user?.id],
