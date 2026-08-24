@@ -542,8 +542,6 @@ serve(async (req) => {
                             class="fill-blank">${conditions.propertyState || listing.state || "Jalisco"}</span>, las partes que comparecen para
                         ejecutar este Contrato de Arrendamiento son, por una parte, <span class="fill-blank">${lName}</span>, en
                         adelante denominada la “ARRENDADORA”; y por otra parte, <span class="fill-blank">${tName}</span>, actuando en su calidad de ‘ARRENDATARIO/A.</td>
-
-
                     <td>In the city of <span class="fill-blank">${conditions.propertyCity || listing.city || "Puerto Vallarta"}</span>, <span
                             class="fill-blank">${conditions.propertyState || listing.state || "Jalisco"}</span>, the parties appearing herein for the
                         purpose of executing this Lease Agreement are, on the one hand <span class="fill-blank">${lName}</span>,
@@ -555,12 +553,12 @@ serve(async (req) => {
                 </tr>
                 <tr>
                     <td style="border-bottom: none;"><strong>I. DEL ARRENDADOR:</strong> Declara ser ciudadana mexicana,
-                        mayor de edad, con domicilio en: <span class="fill-blank">${conditions.ownerAddress || ownerProfile?.address || "N/A"}</span>. Que
+                        mayor de edad, con domicilio en: <span class="fill-blank">${conditions.ownerResidentialAddress || conditions.ownerAddress || ownerProfile?.address || "N/A"}${conditions.ownerResidentialCity ? `, ${conditions.ownerResidentialCity}` : ""}${conditions.ownerResidentialState ? `, ${conditions.ownerResidentialState}` : ""}</span>. Que
                         es legítimo propietario del inmueble ubicado en <span
                             class="fill-blank">${conditions.propertyAddress || listing.address || "N/A"}</span> y que cuenta con capacidad legal
                         suficiente para celebrar este contrato.</td>
                     <td style="border-bottom: none;"><strong>I. LANDLORD:</strong> Declares to be a Mexican citizen, of
-                        legal age, domiciled at <span class="fill-blank">${conditions.ownerAddress || ownerProfile?.address || "N/A"}</span>. That he is
+                        legal age, domiciled at <span class="fill-blank">${conditions.ownerResidentialAddress || conditions.ownerAddress || ownerProfile?.address || "N/A"}${conditions.ownerResidentialCity ? `, ${conditions.ownerResidentialCity}` : ""}${conditions.ownerResidentialState ? `, ${conditions.ownerResidentialState}` : ""}</span>. That he is
                         the lawful owner of the property located at <span
                             class="fill-blank">${conditions.propertyAddress || listing.address || "N/A"}</span>, and has sufficient legal capacity to
                         execute this contract.
