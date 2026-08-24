@@ -380,7 +380,16 @@ export default function AgentDashboard() {
       // 1. Fetch listings owned or directly assigned to the agent via agent_email
       const directListings = await base44.entities.Listing.filter({ agent_email: user.email }, '-created_date', 100);
 
-      // 2. Fetch accepted referrals for this agent (where agent_referral_id = user.id and status = 'accepted')
+      // 2. Fetch listings where agent_email is user.email or they have accepted referrals
+      const { data: pvVerifiedListings, error: pvError } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('agent_email', user.email)
+        .order('created_date', { ascending: false });
+
+      const finalDirectListings = (!pvError && pvVerifiedListings && pvVerifiedListings.length > 0) ? pvVerifiedListings : directListings;
+
+      // 3. Fetch accepted referrals for this agent (where agent_referral_id = user.id and status = 'accepted')
       if (user?.id) {
         try {
           const { data: referrals, error: refError } = await supabase
@@ -401,7 +410,7 @@ export default function AgentDashboard() {
                 }
               }
               // Merge lists without duplicates
-              const allListings = [...directListings];
+              const allListings = [...finalDirectListings];
               referredListings.forEach(rl => {
                 if (!allListings.some(dl => dl.id === rl.id)) {
                   allListings.push(rl);
@@ -415,7 +424,7 @@ export default function AgentDashboard() {
         }
       }
 
-      return directListings;
+      return finalDirectListings;
     },
     enabled: !!user?.email && !!user?.id,
   });
@@ -497,6 +506,32 @@ export default function AgentDashboard() {
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ['agent-bookings'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
+
+  // Real-time subscription to property referrals updates for Agent
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('agent-referrals-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'property_referrals',
+        },
+        () => {
+          // Refetch listingsReferrals and listings queries to update state immediately
+          queryClient.invalidateQueries({ queryKey: ['listings-property-referrals'] });
+          queryClient.invalidateQueries({ queryKey: ['agent-listings'] });
         }
       )
       .subscribe();
@@ -2332,6 +2367,7 @@ function AgentAppointmentsTab({ user, listings = [] }) {
   const listingMap = Object.fromEntries(listings.map((l) => [l.id, l]));
   const [slotsInputs, setSlotsInputs] = useState({});
   const [suggestingId, setSuggestingId] = useState(null);
+  const queryClient = useQueryClient();
 
   const { data: appointments = [], isLoading, refetch } = useQuery({
     queryKey: ['agent-appointments', user?.id],
@@ -2347,6 +2383,33 @@ function AgentAppointmentsTab({ user, listings = [] }) {
     },
     enabled: !!user?.id,
   });
+
+  // Real-time subscription to appointments updates for Agent
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('agent-appointments-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+        },
+        (payload) => {
+          const appointment = payload.new;
+          if (appointment && (appointment.agent_id === user.id)) {
+            queryClient.invalidateQueries({ queryKey: ['agent-appointments', user.id] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   const { data: profiles = [] } = useQuery({
     queryKey: ['agent-appointments-profiles'],
@@ -2703,6 +2766,34 @@ function AgentReferralsTab({ user, listings = [] }) {
     },
     enabled: !!user?.id
   });
+
+  // Real-time subscription to property referrals updates for AgentReferralsTab
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('agent-referrals-tab-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'property_referrals',
+        },
+        (payload) => {
+          const refRow = payload.new || payload.old;
+          if (refRow && (refRow.agent_referral_id === user.id || refRow.agent_referrer_id === user.id)) {
+            queryClient.invalidateQueries({ queryKey: ['received-property-referrals', user.id] });
+            queryClient.invalidateQueries({ queryKey: ['sent-property-referrals', user.id] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   // Query profiles to resolve agent names
   const referrerIds = [...new Set(receivedReferrals.map(r => r.agent_referrer_id))];

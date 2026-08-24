@@ -266,6 +266,7 @@ function OwnerAppointmentsTab({ user, listings = [] }) {
   const listingMap = Object.fromEntries(listings.map(l => [l.id, l]));
   const [slotsInputs, setSlotsInputs] = useState({}); // { appointmentId: ['slot1', 'slot2', 'slot3'] }
   const [suggestingId, setSuggestingId] = useState(null);
+  const queryClient = useQueryClient();
 
   const { data: appointments = [], isLoading, refetch } = useQuery({
     queryKey: ['owner-appointments', user?.id],
@@ -280,6 +281,33 @@ function OwnerAppointmentsTab({ user, listings = [] }) {
     },
     enabled: !!user?.id,
   });
+
+  // Real-time subscription to appointments updates for Owner
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('owner-appointments-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+        },
+        (payload) => {
+          const appointment = payload.new;
+          if (appointment && (appointment.owner_id === user.id)) {
+            queryClient.invalidateQueries({ queryKey: ['owner-appointments', user.id] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   const { data: profiles = [] } = useQuery({
     queryKey: ['owner-appointments-profiles'],

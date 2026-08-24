@@ -76,17 +76,10 @@ export default function Refer() {
 
 
 
-          // Filter out booked/leased listings
-          let availableListings = listings.filter(l => !busyListingIds.has(l.id));
-
-
-          if (user.role === 'owner') {
-            // Owner should not see his own properties for creating individual property referral link
-            availableListings = availableListings.filter(l => l.owner_email !== user.email);
-          } else if (user.role === 'agent') {
-            // Filter to agent's own listings
-            availableListings = availableListings.filter(l => l.agent_email === user.email);
-
+          // Filter out booked/leased listings unless user is an agent (agents see all listings)
+          let availableListings = listings;
+          if (user.role !== 'agent') {
+            availableListings = listings.filter(l => !busyListingIds.has(l.id));
           }
 
           setAgentListings(availableListings);

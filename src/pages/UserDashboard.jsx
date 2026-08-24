@@ -1875,6 +1875,33 @@ export default function UserDashboard() {
     enabled: !!user?.id,
   });
 
+  // Real-time subscription to appointments updates for Tenant
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('renter-appointments-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+        },
+        (payload) => {
+          const appointment = payload.new;
+          if (appointment && (appointment.renter_id === user.id)) {
+            queryClient.invalidateQueries({ queryKey: ['dashboard-appointments', user.id] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
+
   const { data: myReferrals = [] } = useQuery({
     queryKey: ['referral-payments-count', user?.id],
     queryFn: async () => {
