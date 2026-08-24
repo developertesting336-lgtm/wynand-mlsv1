@@ -1148,10 +1148,24 @@ serve(async (req) => {
         formData.append("marginLeft", "0.39");
         formData.append("marginRight", "0.39");
 
-        const response = await fetch("https://demo.gotenberg.dev/forms/chromium/convert/html", {
-            method: "POST",
-            body: formData
-        });
+        // Using a resilient public Gotenberg conversion endpoint with a primary and fallback check
+        let response;
+        try {
+            response = await fetch("https://demo.gotenberg.dev/forms/chromium/convert/html", {
+                method: "POST",
+                body: formData
+            });
+            if (!response.ok) {
+                throw new Error("Primary failed");
+            }
+        } catch (e) {
+            console.warn("[Gotenberg fallback] Primary endpoint failed, trying backup endpoint...");
+            // Use another instance/mirror as backup if the demo instance is down/throwing 502
+            response = await fetch("https://gotenberg.demo.kestra.io/forms/chromium/convert/html", {
+                method: "POST",
+                body: formData
+            });
+        }
 
         if (!response.ok) {
             const errText = await response.text();

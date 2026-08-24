@@ -229,8 +229,15 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
         </Button>
       </div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={isOpen} onOpenChange={(val) => { if (!isSigning) setIsOpen(val); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto relative">
+          {isSigning && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-2">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              <p className="text-sm font-semibold text-slate-800">Generating Lease PDF...</p>
+              <p className="text-xs text-slate-500">Please do not close this window.</p>
+            </div>
+          )}
           <DialogHeader>
             <DialogTitle>Sign Lease Agreement</DialogTitle>
           </DialogHeader>

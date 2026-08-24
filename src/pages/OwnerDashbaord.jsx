@@ -2352,7 +2352,14 @@ export default function OwnerDashboard() {
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4 relative">
+              {ownerSigning && (
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-2">
+                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                  <p className="text-sm font-semibold text-slate-800">Generating Lease PDF...</p>
+                  <p className="text-xs text-slate-500">Please do not close this window.</p>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 By signing, you agree to the conditions defined in the lease.
               </p>
@@ -2373,7 +2380,7 @@ export default function OwnerDashboard() {
                 title="Owner Signature"
                 savedSignatures={user?.signatures || []}
                 onSave={handleOwnerSignatureSave}
-                onCancel={() => setOwnerSigningBooking(null)}
+                onCancel={() => !ownerSigning && setOwnerSigningBooking(null)}
                 isSubmitting={ownerSigning}
               />
             </div>

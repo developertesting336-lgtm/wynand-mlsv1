@@ -2064,8 +2064,15 @@ export default function AgentDashboard() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!agentSigningBooking} onOpenChange={(open) => !open && closeAgentSignatureModal()}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!agentSigningBooking} onOpenChange={(open) => { if (!open && !agentSigning) closeAgentSignatureModal(); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto relative">
+          {agentSigning && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-2">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              <p className="text-sm font-semibold text-slate-800">Generating Lease PDF...</p>
+              <p className="text-xs text-slate-500">Please do not close this window.</p>
+            </div>
+          )}
           <DialogHeader>
             <DialogTitle>Agent Signature</DialogTitle>
           </DialogHeader>
@@ -2074,7 +2081,7 @@ export default function AgentDashboard() {
             submitLabel="Save Signature"
             savedSignatures={agentSignatures}
             onSave={handleAgentSignatureSave}
-            onCancel={closeAgentSignatureModal}
+            onCancel={() => !agentSigning && closeAgentSignatureModal()}
             isSubmitting={agentSigning}
           />
         </DialogContent>
