@@ -346,7 +346,9 @@ export default function AgentDashboard() {
       }
 
       toast.success('Agreement signed successfully and lease updated.');
-      queryClient.invalidateQueries({ queryKey: ['agent-bookings'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['agent-bookings', user?.id, myListings.map(l => l.id)] })
+      ]);
       closeAgentSignatureModal();
     } catch (err) {
       console.error('Failed to save agent signature:', err);
@@ -2065,7 +2067,7 @@ export default function AgentDashboard() {
       </Dialog>
 
       <Dialog open={!!agentSigningBooking} onOpenChange={(open) => { if (!open && !agentSigning) closeAgentSignatureModal(); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto relative">
+        <DialogContent className="w-[92vw] max-w-3xl overflow-y-auto max-h-[85vh] my-auto">
           {agentSigning && (
             <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-2">
               <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />

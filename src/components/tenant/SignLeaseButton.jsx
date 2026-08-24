@@ -201,11 +201,13 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
       }
 
       toast.success('Lease signed successfully! Awaiting owner signature.');
+      // Invalidate queries to refresh the bookings list BEFORE closing modal / releasing spinner
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['user-bookings', userProfile?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['approved-listings'] })
+      ]);
       setIsOpen(false);
       setShowSignaturePad(false);
-      // Invalidate queries to refresh the bookings list
-      queryClient.invalidateQueries({ queryKey: ['user-bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['approved-listings'] });
       if (onSigned) onSigned();
     } catch (err) {
       console.error('Error signing lease:', err);
@@ -230,7 +232,7 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
       </div>
 
       <Dialog open={isOpen} onOpenChange={(val) => { if (!isSigning) setIsOpen(val); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto relative">
+        <DialogContent className="w-[92vw] max-w-3xl overflow-y-auto max-h-[85vh] my-auto">
           {isSigning && (
             <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-2">
               <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />

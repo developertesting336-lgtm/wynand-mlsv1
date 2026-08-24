@@ -1292,7 +1292,10 @@ export default function OwnerDashboard() {
       }
 
       toast.success('Lease signed successfully!');
-      queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['owner-bookings', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] })
+      ]);
       setOwnerSigningBooking(null);
     } catch (err) {
       console.error('Failed to save owner signature:', err);
