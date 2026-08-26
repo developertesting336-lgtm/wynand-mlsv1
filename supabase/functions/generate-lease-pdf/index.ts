@@ -1100,6 +1100,7 @@ serve(async (req) => {
             <div class="sig-block">
                 <div class="sig-label">EL ARRENDADOR / THE LANDLORD:</div>
                 ${landlordSignatureUrl ? `<img class="sig-image" src="${landlordSignatureUrl}" />` : ''}
+                <div style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordSign/</div>
                 <div class="sig-line"></div>
                 <div class="sig-name">${lName}</div>
                 <div class="sig-name">${formatSignatureDate(conditions.landlordSignatureDate)}</div>
@@ -1108,6 +1109,7 @@ serve(async (req) => {
             <div class="sig-block">
                 <div class="sig-label">EL ARRENDATARIO / THE TENANT:</div>
                 ${tenantSignatureUrl ? `<img class="sig-image" src="${tenantSignatureUrl}" />` : ''}
+                <div style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantSign/</div>
                 <div class="sig-line"></div>
                 <div class="sig-name">${tName}</div>
                 <div class="sig-name">${formatSignatureDate(tenantSignatureDate || conditions.tenantSignatureDate)}</div>
@@ -1117,6 +1119,7 @@ serve(async (req) => {
             <div class="sig-block" style="margin-top: 20px;">
                 <div class="sig-label">AGENTE / AGENT:</div>
                 ${agentSignatureUrl ? `<img class="sig-image" src="${agentSignatureUrl}" />` : ''}
+                <div style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/AgentSign/</div>
                 <div class="sig-line"></div>
                 <div class="sig-name">${agentProfile.full_name || 'Agent'}</div>
                 <div class="sig-name">${formatSignatureDate(agentSignatureDate || conditions.agentSignatureDate)}</div>

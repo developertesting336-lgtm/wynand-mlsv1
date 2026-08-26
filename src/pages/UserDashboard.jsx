@@ -220,6 +220,10 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
   const [viewMaintenanceModalOpen, setViewMaintenanceModalOpen] = useState(false);
   const [viewMaintenanceBooking, setViewMaintenanceBooking] = useState(null);
 
+  // States for DocuSign embedded modal
+  const [docusignUrl, setDocusignUrl] = useState('');
+  const [loadingDocusignId, setLoadingDocusignId] = useState(null);
+
   const openMaintenanceModal = (booking) => {
     setSelectedBookingForMaintenance(booking);
     setMaintenanceSubject('');
@@ -238,6 +242,39 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
       setInspectionSelectedSignature(prev => prev || userProfile.signatures[0]);
     }
   }, [inspectionBooking, userProfile?.signatures]);
+
+  // Handle docusign postMessage callbacks
+  const [activeDocusignBookingId, setActiveDocusignBookingId] = useState(null);
+
+  useEffect(() => {
+    const handleDocuSignMsg = async (event) => {
+      if (event.data === 'docusign_complete') {
+        setDocusignUrl('');
+        if (activeDocusignBookingId) {
+          try {
+            // Instantly verify signing state to update database directly
+            const response = await supabase.functions.invoke('docusign', {
+              body: {
+                action: 'verify-signer-status',
+                bookingId: activeDocusignBookingId
+              }
+            });
+            if (response.error) {
+              console.error('Failed to verify status:', response.error);
+            } else {
+              toast.success('Lease agreement updated successfully!');
+            }
+          } catch (verifyErr) {
+            console.error('Failed to auto-verify status:', verifyErr);
+          }
+        }
+        // Force state update reload
+        window.location.reload();
+      }
+    };
+    window.addEventListener('message', handleDocuSignMsg);
+    return () => window.removeEventListener('message', handleDocuSignMsg);
+  }, [activeDocusignBookingId]);
 
   const filteredBookings = bookings.filter(b => {
     const query = debouncedSearch.trim().toLowerCase();
@@ -344,6 +381,10 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
         userProfile={userProfile}
         openMaintenanceModal={openMaintenanceModal}
         openViewMaintenanceModal={openViewMaintenanceModal}
+        setDocusignUrl={setDocusignUrl}
+        loadingDocusignId={loadingDocusignId}
+        setLoadingDocusignId={setLoadingDocusignId}
+        setActiveDocusignBookingId={setActiveDocusignBookingId}
       />
       <MoveOutReportModal
         booking={moveOutBooking}
@@ -665,17 +706,37 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
           </DialogContent>
         </Dialog>
       )}
+
+      {/* DocuSign Embedded Modal */}
+      {docusignUrl && (
+        <Dialog open={!!docusignUrl} onOpenChange={(open) => { if (!open) setDocusignUrl(''); }}>
+          <DialogContent className="max-w-4xl w-[92vw] h-[85vh] p-0 overflow-hidden flex flex-col">
+            <DialogHeader className="p-4 border-b">
+              <DialogTitle>Sign Lease Agreement via DocuSign</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 w-full bg-slate-50 relative">
+              <iframe
+                src={docusignUrl}
+                title="DocuSign"
+                className="absolute inset-0 w-full h-full border-0"
+                allow="geolocation"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
 
-function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, setMoveOutBooking, totalPages, setInspectionBooking, setInspectionSelectedSignature, userProfile, openMaintenanceModal, openViewMaintenanceModal }) {
+function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, setMoveOutBooking, totalPages, setInspectionBooking, setInspectionSelectedSignature, userProfile, openMaintenanceModal, openViewMaintenanceModal, setDocusignUrl, loadingDocusignId, setLoadingDocusignId, setActiveDocusignBookingId }) {
   const statusConfig = {
     pending: { label: 'Pending Approval', icon: Hourglass, cls: 'bg-amber-100 text-amber-700 border-amber-200' },
     lease_pending: { label: 'Sign Lease Agreement', icon: PenLine, cls: 'bg-blue-100 text-blue-700 border-blue-200 animate-pulse' },
     approved: { label: 'Approved (Pay Now)', icon: CheckCircle, cls: 'bg-green-100 text-green-700 border-green-200 animate-pulse' },
     confirmed: { label: 'Confirmed & Paid', icon: CheckCircle, cls: 'bg-blue-100 text-blue-700 border-blue-200 font-semibold' },
     declined: { label: 'Declined', icon: XCircle, cls: 'bg-red-100 text-red-700 border-red-200' },
+    sent_via_docusign: { label: 'Awaiting DocuSign Signatures', icon: Hourglass, cls: 'bg-indigo-100 text-indigo-700 border-indigo-200 animate-pulse' },
   };
 
   return (
@@ -735,7 +796,15 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                   const listing = listingMap[b.listing_id];
                   const ownerEmail = b.owner_email || listing?.owner_email || '—';
                   const ownerName = listing?.owner_name || 'Owner';
-                  const { label, icon: Icon, cls } = statusConfig[b.status] || statusConfig.pending;
+                  let statusKey = b.status;
+                  if (b.lease_status === 'sent_via_docusign') {
+                    if (!conditions.nationality) {
+                      statusKey = 'lease_pending';
+                    } else {
+                      statusKey = 'sent_via_docusign';
+                    }
+                  }
+                  const { label, icon: Icon, cls } = statusConfig[statusKey] || statusConfig.pending;
 
                   // Use agreement_conditions for payment amounts
                   const conditions = b.agreement_conditions || {};
@@ -989,10 +1058,51 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                         </Button>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {!(b.agreement_conditions?.tenantSignature) ? (
+                        {(!b.agreement_conditions?.nationality) ? (
                           <div className={b.status === 'pending' || b.status === 'declined' ? "opacity-50 pointer-events-none cursor-not-allowed inline-block" : ""}>
                             <SignLeaseButton booking={b} listing={listing} onSigned={() => { }} disabled={b.status === 'pending' || b.status === 'declined'} />
                           </div>
+                        ) : b.lease_status === 'sent_via_docusign' && !b.agreement_conditions?.tenantSignature ? (
+                          <Button
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-transform active:scale-[0.98] py-1 px-2.5 h-auto whitespace-nowrap disabled:opacity-75"
+                            disabled={loadingDocusignId === b.id}
+                            onClick={async () => {
+                              try {
+                                setLoadingDocusignId(b.id);
+                                setActiveDocusignBookingId(b.id);
+                                const response = await supabase.functions.invoke('docusign', {
+                                  body: {
+                                    action: 'get-recipient-view',
+                                    bookingId: b.id,
+                                    recipientEmail: userProfile?.email,
+                                    recipientName: userProfile?.full_name || 'Tenant',
+                                    recipientId: userProfile?.id,
+                                    returnUrl: `${window.location.origin}/docusign-callback.html`
+                                  }
+                                });
+                                if (response.error) {
+                                  const errBody = response.error;
+                                  throw new Error(errBody.message || errBody.error || 'Error fetching view');
+                                }
+                                setDocusignUrl(response.data.url);
+                              } catch (err) {
+                                toast.error(err.message || 'Failed to open signing session');
+                              } finally {
+                                setLoadingDocusignId(null);
+                              }
+                            }}
+                          >
+                            {loadingDocusignId === b.id ? (
+                              <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Preparing...</>
+                            ) : (
+                              <><PenLine className="w-3.5 h-3.5 mr-1.5" /> Sign Lease (DocuSign)</>
+                            )}
+                          </Button>
+                        ) : (b.lease_status === 'sent_via_docusign' && b.agreement_conditions?.tenantSignature && !b.agreement_conditions?.landlordSignature) ? (
+                          <span className="text-xs text-amber-600 font-medium animate-pulse">Awaiting Owner Signature</span>
+                        ) : (b.lease_status === 'sent_via_docusign' && b.agreement_conditions?.tenantSignature && b.agreement_conditions?.landlordSignature && b.agent_id && !b.agreement_conditions?.agentSignature) ? (
+                          <span className="text-xs text-indigo-600 font-medium animate-pulse">Awaiting Agent Signature</span>
                         ) : (b.status !== 'confirmed' && b.agreement_conditions?.tenantSignature && b.agreement_conditions?.landlordSignature && agentSigned && totalAmount > 0) ? (
                           <Button
                             size="sm"

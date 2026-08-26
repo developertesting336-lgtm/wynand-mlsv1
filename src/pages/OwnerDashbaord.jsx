@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Home, Eye, Calendar, PlusCircle, ShieldCheck, CheckCircle,
   XCircle, Hourglass, ExternalLink, Building2, TrendingUp, BadgeCheck, Lock,
-  MessageSquare, CreditCard, Pencil, Loader2, FileText, Download, Search
+  MessageSquare, CreditCard, Pencil, Loader2, FileText, Download, Search, PenLine
 } from 'lucide-react';
 
 import { format } from 'date-fns';
@@ -972,6 +973,7 @@ export default function OwnerDashboard() {
   const [agreementData, setAgreementData] = useState(null);
   const [editingAgreementId, setEditingAgreementId] = useState(null);
   const [editingAgreementData, setEditingAgreementData] = useState(null);
+  const [isGeneratingLease, setIsGeneratingLease] = useState(false);
 
   const [propertiesSearch, setPropertiesSearch] = useState('');
   const [propertiesPage, setPropertiesPage] = useState(1);
@@ -999,6 +1001,8 @@ export default function OwnerDashboard() {
   const [maintenanceViewBooking, setMaintenanceViewBooking] = useState(null);
   const [ownerSigningBooking, setOwnerSigningBooking] = useState(null);
   const [ownerSigning, setOwnerSigning] = useState(false);
+  const [docusignUrl, setDocusignUrl] = useState('');
+  const [loadingDocusignId, setLoadingDocusignId] = useState(null);
 
   const [bookingsSearch, setBookingsSearch] = useState('');
   const [bookingsPage, setBookingsPage] = useState(1);
@@ -1065,7 +1069,9 @@ export default function OwnerDashboard() {
       if (error) throw new Error(error.message);
       return { success: true };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['owner-bookings'] }),
+    onSuccess: () => {
+      // Invalidation is handled by the parent mutations (approve/update) to avoid clearing loaders mid-flight
+    },
     onError: (err) => toast.error(`Failed to save agreement: ${err.message}`),
   });
 
@@ -1096,6 +1102,14 @@ export default function OwnerDashboard() {
       const res = await supabase.functions.invoke('generate-lease-pdf', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
 
+      // Dispatch DocuSign signature envelope to start the signing sequence
+      const docusignRes = await supabase.functions.invoke('docusign', {
+        body: { action: 'send-envelope', bookingId }
+      });
+      if (docusignRes.error) {
+        console.warn('DocuSign envelope creation failed, falling back to database update:', docusignRes.error);
+      }
+
       // Only tenant gets notified at this stage (tenant signs first). Agent will be notified after owner signs.
 
       // Send push notification to tenant/renter
@@ -1104,7 +1118,7 @@ export default function OwnerDashboard() {
         sendPushNotification(
           bookingData.renter_id,
           'Lease Agreement Ready',
-          `A lease agreement has been created for "${listingTitle}". Please review and sign.`,
+          `A lease agreement has been created for "${listingTitle}". Please review and sign via DocuSign.`,
           '/dashboard',
           'lease_pending'
         ).catch((notificationError) => {
@@ -1115,18 +1129,20 @@ export default function OwnerDashboard() {
       return res.data;
     },
     onSuccess: async () => {
+      setUpdatingState({ id: null, action: null });
+      setEditingBookingId(null);
+      setAgreementData(null);
+      setIsGeneratingLease(false);
+      toast.success('Booking approved and lease agreement sent!');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['owner-bookings', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] })
       ]);
-      toast.success('Booking approved and lease agreement sent!');
-      setUpdatingState({ id: null, action: null });
-      setEditingBookingId(null);
-      setAgreementData(null);
     },
     onError: (err) => {
-      toast.error(`Failed to approve booking: ${err.message}`);
       setUpdatingState({ id: null, action: null });
+      setIsGeneratingLease(false);
+      toast.error(`Failed to approve booking: ${err.message}`);
     },
   });
 
@@ -1148,6 +1164,14 @@ export default function OwnerDashboard() {
       const res = await supabase.functions.invoke('generate-lease-pdf', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
 
+      // Dispatch DocuSign signature envelope to start the signing sequence
+      const docusignRes = await supabase.functions.invoke('docusign', {
+        body: { action: 'send-envelope', bookingId }
+      });
+      if (docusignRes.error) {
+        console.warn('DocuSign envelope creation failed, falling back to database update:', docusignRes.error);
+      }
+
       // Agent is not notified on owner edits before tenant signature.
 
       // Send push notification to tenant/renter
@@ -1156,7 +1180,7 @@ export default function OwnerDashboard() {
         sendPushNotification(
           bookingData.renter_id,
           'Lease Agreement Updated',
-          `The owner has updated the lease agreement for "${listingTitle}". Please review and sign.`,
+          `The owner has updated the lease agreement for "${listingTitle}". Please review and sign via DocuSign.`,
           '/dashboard',
           'lease_pending'
         ).catch((notificationError) => {
@@ -1167,18 +1191,20 @@ export default function OwnerDashboard() {
       return res.data;
     },
     onSuccess: async () => {
+      setUpdatingState({ id: null, action: null });
+      setEditingAgreementId(null);
+      setEditingAgreementData(null);
+      setIsGeneratingLease(false);
+      toast.success('Agreement updated and resent!');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['owner-bookings', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['booked-listing-ids'] })
       ]);
-      toast.success('Agreement updated and resent!');
-      setUpdatingState({ id: null, action: null });
-      setEditingAgreementId(null);
-      setEditingAgreementData(null);
     },
     onError: (err) => {
-      toast.error(`Failed to update agreement: ${err.message}`);
       setUpdatingState({ id: null, action: null });
+      setIsGeneratingLease(false);
+      toast.error(`Failed to update agreement: ${err.message}`);
     },
   });
 
@@ -1283,7 +1309,7 @@ export default function OwnerDashboard() {
           `The owner has signed the lease agreement for "${listingTitle}". Please review and sign.`,
           '/agent-dashboard',
           'lease_pending'
-        ).catch(() => {});
+        ).catch(() => { });
       } else {
         const listingTitle = myListings.find((listing) => listing.id === ownerSigningBooking.listing_id)?.title || 'Property';
         sendPushNotification(
@@ -1292,7 +1318,7 @@ export default function OwnerDashboard() {
           `The lease agreement for "${listingTitle}" has been signed by all parties. Please proceed to payment.`,
           '/dashboard',
           'lease_approved'
-        ).catch(() => {});
+        ).catch(() => { });
       }
 
       toast.success('Lease signed successfully!');
@@ -1395,6 +1421,37 @@ export default function OwnerDashboard() {
       setResolvedPage(resolvedTotalPages);
     }
   }, [resolvedPage, resolvedTotalPages]);
+
+  // Handle docusign postMessage callbacks
+  const [activeDocusignBookingId, setActiveDocusignBookingId] = useState(null);
+
+  useEffect(() => {
+    const handleDocuSignMsg = async (event) => {
+      if (event.data === 'docusign_complete') {
+        setDocusignUrl('');
+        if (activeDocusignBookingId) {
+          try {
+            const response = await supabase.functions.invoke('docusign', {
+              body: {
+                action: 'verify-signer-status',
+                bookingId: activeDocusignBookingId
+              }
+            });
+            if (response.error) {
+              console.error('Failed to verify status:', response.error);
+            } else {
+              toast.success('Lease agreement updated successfully!');
+            }
+          } catch (verifyErr) {
+            console.error('Failed to auto-verify status:', verifyErr);
+          }
+        }
+        window.location.reload();
+      }
+    };
+    window.addEventListener('message', handleDocuSignMsg);
+    return () => window.removeEventListener('message', handleDocuSignMsg);
+  }, [activeDocusignBookingId]);
 
   const pendingBookingsCount = allBookings
     .filter(b => b.status === 'pending')
@@ -1627,7 +1684,7 @@ export default function OwnerDashboard() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="relative w-full lg:w-96">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <Input
+                      {/* <Input
                         value={bookingTab === 'requests' ? bookingRequestsSearch : bookingTab === 'bookings' ? bookingsSearch : resolvedSearch}
                         onChange={(e) => {
                           if (bookingTab === 'requests') {
@@ -1643,7 +1700,7 @@ export default function OwnerDashboard() {
                         }}
                         placeholder="Search bookings by tenant, property, status, or agent"
                         className="pl-10 pr-3 h-12 rounded-2xl border border-slate-200 bg-white shadow-sm focus:border-slate-300 focus:ring-2 focus:ring-primary/10"
-                      />
+                      /> */}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                       <label htmlFor="booking-subtab-page-size" className="font-medium">Show</label>
@@ -1791,7 +1848,14 @@ export default function OwnerDashboard() {
                                   </tr>
                                   {isEditing && (
                                     <tr className="bg-muted/10">
-                                      <td colSpan={8} className="px-4 py-4">
+                                      <td colSpan={8} className="px-4 py-4 relative">
+                                        {(approveAndSendLease.isPending || isGeneratingLease || updatingState?.id === b.id) && editingBookingId === b.id && (
+                                          <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-2 rounded-xl">
+                                            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                                            <p className="text-sm font-semibold text-slate-800">Generating lease PDF and DocuSign envelope...</p>
+                                            <p className="text-xs text-slate-500">Please do not close this window.</p>
+                                          </div>
+                                        )}
                                         <LeaseDetailsForm
                                           booking={b}
                                           listing={listing}
@@ -1799,6 +1863,7 @@ export default function OwnerDashboard() {
                                           renterProfile={renter}
                                           onSubmit={async (formData) => {
                                             try {
+                                              setIsGeneratingLease(true);
                                               await approveAndSendLease.mutateAsync({
                                                 bookingId: b.id,
                                                 agreementConditions: {
@@ -1809,12 +1874,13 @@ export default function OwnerDashboard() {
                                               });
                                             } catch (err) {
                                               toast.error(`Approval failed: ${err.message}`);
+                                              setIsGeneratingLease(false);
                                             }
                                           }}
                                           onCancel={() => {
                                             setEditingBookingId(null);
                                           }}
-                                          isSubmitting={approveAndSendLease.isPending}
+                                          isSubmitting={(approveAndSendLease.isPending || isGeneratingLease || updatingState?.id === b.id) && editingBookingId === b.id}
                                         />
                                       </td>
                                     </tr>
@@ -1867,8 +1933,9 @@ export default function OwnerDashboard() {
                             {paginatedCurrentBookings.map(b => {
                               const renter = renterProfileMap[b.renter_id];
                               const listing = listingMap[b.listing_id] || allListingMap[b.listing_id];
-                              const statusLabel = b.status === 'lease_pending' ? 'Lease Pending' : b.status === 'approved' ? 'Approved' : 'Confirmed';
-                              const statusCls = b.status === 'lease_pending' ? 'bg-blue-100 text-blue-700' : b.status === 'approved' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700';
+                              const isDocuSign = b.lease_status === 'sent_via_docusign';
+                              const statusLabel = isDocuSign ? 'Awaiting DocuSign' : b.status === 'lease_pending' ? 'Lease Pending' : b.status === 'approved' ? 'Approved' : 'Confirmed';
+                              const statusCls = isDocuSign ? 'bg-indigo-100 text-indigo-700' : b.status === 'lease_pending' ? 'bg-blue-100 text-blue-700' : b.status === 'approved' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700';
 
                               // Check if move_in_date has arrived or is in past
                               const moveInDateObj = new Date(b.move_in_date + 'T00:00:00');
@@ -2074,11 +2141,60 @@ export default function OwnerDashboard() {
                                         Show All ({b.maintenance_requests.length})
                                       </Button>
                                     )}
-                                  </td>
-                                  <td className="px-4 py-3 text-right">
                                     {(() => {
+                                      const isDocuSign = b.lease_status === 'sent_via_docusign';
                                       const canEditAgreement = b.agreement_conditions && !b.agreement_conditions?.tenantSignature;
                                       const needsOwnerSignature = b.agreement_conditions?.tenantSignature && !b.agreement_conditions?.landlordSignature;
+
+                                      if (isDocuSign) {
+                                        const isTenantSigned = b.agreement_conditions?.tenantSignature;
+                                        const isOwnerSigned = b.agreement_conditions?.landlordSignature;
+                                        const isAgentSigned = b.agreement_conditions?.agentSignature;
+
+                                        if (isOwnerSigned) {
+                                          if (b.agent_id && !isAgentSigned) {
+                                            return <span className="text-xs text-indigo-600 font-medium animate-pulse">Awaiting Agent Signature</span>;
+                                          }
+                                          return <span className="text-xs text-emerald-600 font-medium">Signed (Ready for Payment)</span>;
+                                        }
+
+                                        return (
+                                          <Button
+                                            size="sm"
+                                            className="text-xs font-semibold py-1 px-2.5 h-auto whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                            disabled={loadingDocusignId === b.id || !isTenantSigned}
+                                            title={!isTenantSigned ? "Waiting for tenant to sign lease agreement first" : ""}
+                                            onClick={async () => {
+                                              try {
+                                                setLoadingDocusignId(b.id);
+                                                setActiveDocusignBookingId(b.id);
+                                                const response = await supabase.functions.invoke('docusign', {
+                                                  body: {
+                                                    action: 'get-recipient-view',
+                                                    bookingId: b.id,
+                                                    recipientEmail: user?.email,
+                                                    recipientName: user?.full_name || 'Owner',
+                                                    recipientId: user?.id,
+                                                    returnUrl: `${window.location.origin}/docusign-callback.html`
+                                                  }
+                                                });
+                                                if (response.error) throw new Error(response.error.message || 'Error fetching view');
+                                                setDocusignUrl(response.data.url);
+                                              } catch (err) {
+                                                toast.error(`Failed to open signing session: ${err.message}`);
+                                              } finally {
+                                                setLoadingDocusignId(null);
+                                              }
+                                            }}
+                                          >
+                                            {loadingDocusignId === b.id ? (
+                                              <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Preparing...</>
+                                            ) : (
+                                              <><PenLine className="w-3.5 h-3.5 mr-1.5" /> Sign (DocuSign)</>
+                                            )}
+                                          </Button>
+                                        );
+                                      }
 
                                       if (needsOwnerSignature) {
                                         return (
@@ -2294,7 +2410,14 @@ export default function OwnerDashboard() {
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto" />
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 relative">
+                {(updateAndResendLease.isPending || updatingState?.id === editingAgreementId || updatingState?.action === 'update') && (
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-2 rounded-xl">
+                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                    <p className="text-sm font-semibold text-slate-800">Generating lease PDF and DocuSign envelope...</p>
+                    <p className="text-xs text-slate-500">Please do not close this window.</p>
+                  </div>
+                )}
                 <LeaseDetailsForm
                   booking={allBookings.find(b => b.id === editingAgreementId)}
                   listing={listingMap[allBookings.find(b => b.id === editingAgreementId)?.listing_id]}
@@ -2306,7 +2429,7 @@ export default function OwnerDashboard() {
                   }}
                   onChange={(formData) => setEditingAgreementData(formData)}
                   onCancel={() => { setEditingAgreementId(null); setEditingAgreementData(null); }}
-                  isSubmitting={updateAndResendLease.isPending}
+                  isSubmitting={updateAndResendLease.isPending || isGeneratingLease || updatingState?.id === editingAgreementId}
                   hideSubmitButton={true}
                 />
 
@@ -2321,14 +2444,21 @@ export default function OwnerDashboard() {
                             landlordSignature: null,
                             landlordSignatureDate: null,
                           };
-                          await updateAndResendLease.mutateAsync({
-                            bookingId: editingAgreementId,
-                            agreementConditions: finalAgreementData,
-                          });
+                          try {
+                            setIsGeneratingLease(true);
+                            await updateAndResendLease.mutateAsync({
+                              bookingId: editingAgreementId,
+                              agreementConditions: finalAgreementData,
+                            });
+                          } catch (err) {
+                            console.error(err);
+                          } finally {
+                            setIsGeneratingLease(false);
+                          }
                         }}
-                        disabled={updatingState?.id === editingAgreementId || !editingAgreementData.landlordName}
+                        disabled={updatingState?.id === editingAgreementId || isGeneratingLease || !editingAgreementData.landlordName}
                       >
-                        {updatingState?.id === editingAgreementId ? 'Submitting...' : 'Submit Changes'}
+                        {updatingState?.id === editingAgreementId || isGeneratingLease ? 'Submitting...' : 'Submit Changes'}
                       </Button>
                       <Button
                         type="button"
@@ -2823,6 +2953,24 @@ export default function OwnerDashboard() {
             setMoveOutBooking((prev) => prev ? { ...prev, move_out_report: updatedReport } : prev);
           }}
         />
+      )}
+      {/* DocuSign Embedded Modal */}
+      {docusignUrl && (
+        <Dialog open={!!docusignUrl} onOpenChange={(open) => { if (!open) setDocusignUrl(''); }}>
+          <DialogContent className="max-w-4xl w-[92vw] h-[85vh] p-0 overflow-hidden flex flex-col">
+            <DialogHeader className="p-4 border-b">
+              <DialogTitle>Sign Lease Agreement via DocuSign</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 w-full bg-slate-50 relative">
+              <iframe
+                src={docusignUrl}
+                title="DocuSign"
+                className="absolute inset-0 w-full h-full border-0"
+                allow="geolocation"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

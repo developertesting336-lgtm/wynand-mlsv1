@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }) => {
             setUser(cachedUser);
             setIsAuthenticated(true);
             setIsLoadingAuth(false);
+            clearTimeout(safetyTimeoutId);
           }
         }
       } catch (e) {
@@ -43,38 +44,41 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session } } = await supabase.auth.getSession();
         if (mounted) {
           if (session?.user) {
-            try {
-              const currentUser = await auth.me()
-              if (mounted) {
-                setUser(currentUser)
-                setIsAuthenticated(true)
-              }
-            } catch (error) {
-              console.error('Error fetching profile during init:', error)
-              if (mounted) {
-                setUser(null)
-                setIsAuthenticated(false)
-              }
+            setIsAuthenticated(true);
+            setIsLoadingAuth(false);
+            clearTimeout(safetyTimeoutId);
+
+            // Fetch actual full profile from Supabase and cache it
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+
+            if (mounted && profile) {
+              setUser(profile);
+              localStorage.setItem('app_user_data', JSON.stringify(profile));
             }
           } else {
-            if (mounted) {
-              setUser(null)
-              setIsAuthenticated(false)
-            }
+            setUser(null);
+            setIsAuthenticated(false);
+            setIsLoadingAuth(false);
+            localStorage.removeItem('app_user_data');
+            clearTimeout(safetyTimeoutId);
           }
         }
       } catch (error) {
-        console.error('Failed to get initial session:', error)
+        console.error('Failed to get initial session:', error);
       } finally {
         clearTimeout(safetyTimeoutId);
         if (mounted) {
-          setIsLoadingAuth(false)
+          setIsLoadingAuth(false);
         }
       }
-    }
+    };
 
     initializeAuth()
 

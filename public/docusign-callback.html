@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Signing Complete</title>
+</head>
+<body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f8fafc;">
+  <div style="text-align: center; padding: 2rem; border-radius: 1rem; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+    <h2 style="color: #0f172a; margin-bottom: 0.5rem;">Signature Submitted</h2>
+    <p style="color: #64748b; font-size: 0.875rem;">Completing connection session. Please wait...</p>
+  </div>
+  <script>
+    try {
+      // Send message to parent window (Dashboard)
+      window.parent.postMessage('docusign_complete', '*');
+    } catch (e) {
+      console.error('Failed to notify parent window:', e);
+    }
+  </script>
+</body>
+</html>

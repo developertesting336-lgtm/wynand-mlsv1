@@ -42,59 +42,13 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
     setShowSignaturePad(false);
   };
 
-  const handleSignatureSave = async (signature) => {
+  const handleDetailsSave = async () => {
     setIsSigning(true);
     try {
-      let signatureUrl = signature;
-      if (!signature.startsWith('http')) {
-        // Convert base64 data URL to a File object
-        const arr = signature.split(',');
-        const mime = arr[0].match(/:(.*?);/)[1];
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const file = new File([u8arr], `signs/signature_tenant_${booking.id}.png`, { type: mime });
-
-        // Upload file to Supabase storage bucket via base44 SDK
-        const uploadResult = await base44.integrations.Core.UploadFile({ file });
-        signatureUrl = uploadResult?.file_url;
-
-        if (!signatureUrl) {
-          throw new Error('Failed to obtain signature public URL from storage.');
-        }
-
-        // Save new signature to profile array
-        if (userProfile) {
-          try {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('signatures')
-              .eq('id', userProfile.id)
-              .single();
-            const currentSigs = profile?.signatures || [];
-            if (!currentSigs.includes(signatureUrl)) {
-              const updatedSigs = [...currentSigs, signatureUrl].slice(-3);
-              await supabase
-                .from('profiles')
-                .update({ signatures: updatedSigs })
-                .eq('id', userProfile.id);
-              setUserProfile(prev => ({ ...prev, signatures: updatedSigs }));
-            }
-          } catch (profileErr) {
-            console.error('Failed to append signature to profile:', profileErr);
-          }
-        }
-      }
-
       // Prepare merged conditions to preserve landlord's entries and add tenant details
       const existingConditions = booking.agreement_conditions || {};
       const mergedConditions = {
         ...existingConditions,
-        tenantSignature: signatureUrl,
-        tenantSignatureDate: new Date().toISOString(),
         nationality: tenantFormData.nationality,
         passportNumber: tenantFormData.passportNumber,
         tenantEmail: userProfile?.email || '',
@@ -110,12 +64,10 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
         reference: tenantFormData.reference,
       };
 
-      // Update booking with tenant signature status and merged conditions
+      // Update booking with tenant form entries
       const { error } = await supabase
         .from('bookings')
         .update({
-          status: 'lease_pending',
-          lease_status: 'pending_owner',
           agreement_conditions: mergedConditions,
           updated_date: new Date().toISOString()
         })
@@ -123,37 +75,11 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
 
       if (error) throw new Error(error.message);
 
-      // Call edge function to regenerate PDF with tenant signature URL and merged conditions
-      /* OLD ANVIL LOGIC (Commented out)
-      const res = await supabase.functions.invoke('anvil-send-lease', {
-        body: {
-          bookingId: booking.id,
-          agreementConditions: mergedConditions,
-          tenantSignature: signatureUrl,
-          tenantSignatureDate: new Date().toISOString(),
-          nationality: tenantFormData.nationality,
-          passportNumber: tenantFormData.passportNumber,
-          tenantEmail: userProfile?.email || '',
-          tenantEmail2: tenantFormData.tenantEmail2,
-          tenantPhone: userProfile?.phone_number || '',
-          bankAccountNumber: tenantFormData.bankAccountNumber,
-          branch: tenantFormData.branch,
-          bank: tenantFormData.bank,
-          bankAddress1: tenantFormData.bankAddress1,
-          bankAddress2: tenantFormData.bankAddress2,
-          clabe: tenantFormData.clabe,
-          swiftCode: tenantFormData.swiftCode,
-          reference: tenantFormData.reference,
-        }
-      });
-      */
-
+      // Call edge function to regenerate PDF with tenant details populated
       const res = await supabase.functions.invoke('generate-lease-pdf', {
         body: {
           bookingId: booking.id,
           agreementConditions: mergedConditions,
-          tenantSignature: signatureUrl,
-          tenantSignatureDate: new Date().toISOString(),
           nationality: tenantFormData.nationality,
           passportNumber: tenantFormData.passportNumber,
           tenantEmail: userProfile?.email || '',
@@ -172,46 +98,17 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
 
       if (res.error) throw new Error(res.error.message || 'Failed to update lease');
 
-      // Send push notification to owner
-      try {
-        const { data: bookingData } = await supabase
-          .from('bookings')
-          .select('owner_id, listing_id')
-          .eq('id', booking.id)
-          .single();
-        if (bookingData && bookingData.owner_id) {
-          const { data: listingData } = await supabase
-            .from('listings')
-            .select('title')
-            .eq('id', bookingData.listing_id)
-            .single();
-          const listingTitle = listingData?.title || 'Property';
-
-          // Helper call for notification
-          await sendPushNotification(
-            bookingData.owner_id,
-            'Lease signed by Tenant',
-            `The tenant has signed the lease agreement for "${listingTitle}". It is now ready for your signature.`,
-            '/owner-dashboard',
-            'lease_signed_tenant'
-          );
-        }
-      } catch (notiErr) {
-        console.warn('Failed to send lease signature notification to owner', notiErr);
-      }
-
-      toast.success('Lease signed successfully! Awaiting owner signature.');
-      // Invalidate queries to refresh the bookings list BEFORE closing modal / releasing spinner
+      toast.success('Renter details submitted successfully! You can now sign the lease.');
+      // Invalidate queries to refresh the bookings list immediately
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['user-bookings', userProfile?.id] }),
         queryClient.invalidateQueries({ queryKey: ['approved-listings'] })
       ]);
       setIsOpen(false);
-      setShowSignaturePad(false);
       if (onSigned) onSigned();
     } catch (err) {
-      console.error('Error signing lease:', err);
-      toast.error(`Failed to sign lease: ${err.message}`);
+      console.error('Error saving renter details:', err);
+      toast.error(`Failed to save details: ${err.message}`);
     } finally {
       setIsSigning(false);
     }
@@ -244,8 +141,7 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
             <DialogTitle>Sign Lease Agreement</DialogTitle>
           </DialogHeader>
 
-          {!showSignaturePad ? (
-            <div className="space-y-4">
+          <div className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-4">
                 <h3 className="font-semibold text-sm mb-2">Lease Agreement</h3>
                 <p className="text-xs text-muted-foreground mb-3">
@@ -422,31 +318,14 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
               </div>
 
               <Button
-                onClick={() => {
-                  if (!tenantFormData.nationality || !tenantFormData.passportNumber || !tenantFormData.tenantEmail2 || !tenantFormData.bank || !tenantFormData.branch || !tenantFormData.bankAddress1 || !tenantFormData.bankAccountNumber || !tenantFormData.clabe) {
-                    toast.error("Please fill in all mandatory fields before signing.");
-                    return;
-                  }
-                  setShowSignaturePad(true);
-                }}
+                onClick={handleDetailsSave}
                 className="w-full bg-blue-600 hover:bg-blue-700"
-                disabled={!booking.lease_pdf_url}
+                disabled={isSigning || !booking.lease_pdf_url}
               >
                 <PenLine className="w-4 h-4 mr-2" />
-                I've reviewed the lease - Sign Now
+                {isSigning ? 'Saving Details...' : 'Submit Details & Generate Lease'}
               </Button>
             </div>
-          ) : (
-            <SignaturePad
-              title="Tenant Signature"
-              savedSignatures={userProfile?.signatures || []}
-              onSave={handleSignatureSave}
-              onCancel={() => {
-                setShowSignaturePad(false);
-              }}
-              isSubmitting={isSigning}
-            />
-          )}
         </DialogContent>
       </Dialog>
     </>
