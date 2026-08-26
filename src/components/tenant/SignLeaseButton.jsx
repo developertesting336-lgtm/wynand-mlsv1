@@ -9,7 +9,7 @@ import SignaturePad from '@/components/owner/SignaturePad';
 import { base44 } from '@/api/base44Client';
 import { sendPushNotification } from '@/utils/pushNotification';
 
-export default function SignLeaseButton({ booking, listing, onSigned, disabled = false }) {
+export default function SignLeaseButton({ booking, listing, onSigned, onSaveStart, onSaveEnd, disabled = false }) {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
@@ -44,6 +44,7 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
 
   const handleDetailsSave = async () => {
     setIsSigning(true);
+    if (onSaveStart) onSaveStart();
     try {
       // Prepare merged conditions to preserve landlord's entries and add tenant details
       const existingConditions = booking.agreement_conditions || {};
@@ -98,6 +99,11 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
 
       if (res.error) throw new Error(res.error.message || 'Failed to update lease');
 
+      // Dispatch or refresh DocuSign signature envelope with updated PDF
+      await supabase.functions.invoke('docusign', {
+        body: { action: 'send-envelope', bookingId: booking.id }
+      }).catch(err => console.warn('DocuSign send-envelope trigger warning:', err));
+
       toast.success('Renter details submitted successfully! You can now sign the lease.');
       // Invalidate queries to refresh the bookings list immediately
       await Promise.all([
@@ -111,6 +117,7 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
       toast.error(`Failed to save details: ${err.message}`);
     } finally {
       setIsSigning(false);
+      if (onSaveEnd) onSaveEnd();
     }
   };
 
@@ -128,15 +135,19 @@ export default function SignLeaseButton({ booking, listing, onSigned, disabled =
         </Button>
       </div>
 
+      {/* Fixed full-screen loading overlay – outside Dialog so no dialog re-render can remove it */}
+      {isSigning && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-4 max-w-sm mx-4">
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+            <p className="text-base font-semibold text-slate-800 text-center">Generating Lease PDF...</p>
+            <p className="text-sm text-slate-500 text-center">Please do not close this window.</p>
+          </div>
+        </div>
+      )}
+
       <Dialog open={isOpen} onOpenChange={(val) => { if (!isSigning) setIsOpen(val); }}>
         <DialogContent className="w-[92vw] max-w-3xl overflow-y-auto max-h-[85vh] my-auto">
-          {isSigning && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-2">
-              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-              <p className="text-sm font-semibold text-slate-800">Generating Lease PDF...</p>
-              <p className="text-xs text-slate-500">Please do not close this window.</p>
-            </div>
-          )}
           <DialogHeader>
             <DialogTitle>Sign Lease Agreement</DialogTitle>
           </DialogHeader>

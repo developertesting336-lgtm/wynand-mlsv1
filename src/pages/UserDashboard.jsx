@@ -223,6 +223,8 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
   // States for DocuSign embedded modal
   const [docusignUrl, setDocusignUrl] = useState('');
   const [loadingDocusignId, setLoadingDocusignId] = useState(null);
+  const [isSubmittingDetails, setIsSubmittingDetails] = useState(false);
+  const [isVerifyingSignature, setIsVerifyingSignature] = useState(false);
 
   const openMaintenanceModal = (booking) => {
     setSelectedBookingForMaintenance(booking);
@@ -250,6 +252,7 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
     const handleDocuSignMsg = async (event) => {
       if (event.data === 'docusign_complete') {
         setDocusignUrl('');
+        setIsVerifyingSignature(true);
         if (activeDocusignBookingId) {
           try {
             // Instantly verify signing state to update database directly
@@ -266,6 +269,8 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
             }
           } catch (verifyErr) {
             console.error('Failed to auto-verify status:', verifyErr);
+          } finally {
+            setIsVerifyingSignature(false);
           }
         }
         // Force state update reload
@@ -359,6 +364,28 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
 
   return (
     <>
+      {/* Full-screen loader overlay for Bank Details submission */}
+      {isSubmittingDetails && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-4 max-w-sm mx-4">
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+            <p className="text-base font-semibold text-slate-800 text-center">Updating lease agreement & DocuSign...</p>
+            <p className="text-sm text-slate-500 text-center">Please do not close this window.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Full-screen loader overlay for DocuSign signature verification */}
+      {isVerifyingSignature && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-4 max-w-sm mx-4">
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+            <p className="text-base font-semibold text-slate-800 text-center">Verifying DocuSign signature...</p>
+            <p className="text-sm text-slate-500 text-center">Updating booking status, please wait.</p>
+          </div>
+        </div>
+      )}
+
       <BookingsTable
         bookings={bookings}
         listingMap={listingMap}
@@ -796,8 +823,10 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                   const listing = listingMap[b.listing_id];
                   const ownerEmail = b.owner_email || listing?.owner_email || '—';
                   const ownerName = listing?.owner_name || 'Owner';
+                  // Use agreement_conditions for details and payment amounts
+                  const conditions = b.agreement_conditions || {};
                   let statusKey = b.status;
-                  if (b.lease_status === 'sent_via_docusign') {
+                  if (b.lease_status === 'sent_via_docusign' || b.lease_status === 'pending_renter' || b.status === 'lease_pending') {
                     if (!conditions.nationality) {
                       statusKey = 'lease_pending';
                     } else {
@@ -806,8 +835,6 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                   }
                   const { label, icon: Icon, cls } = statusConfig[statusKey] || statusConfig.pending;
 
-                  // Use agreement_conditions for payment amounts
-                  const conditions = b.agreement_conditions || {};
                   const depositAmount = parseFloat(conditions.securityDepositAmount) || 0;
                   const lastMonthRentVal = parseFloat(conditions.lastMonthRent) || 0;
                   const advanceMonthsPaymentVal = parseFloat(conditions.advanceMonthsPayment) || 0;
@@ -1058,11 +1085,18 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                         </Button>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {(!b.agreement_conditions?.nationality) ? (
+                        {(!conditions.nationality) ? (
                           <div className={b.status === 'pending' || b.status === 'declined' ? "opacity-50 pointer-events-none cursor-not-allowed inline-block" : ""}>
-                            <SignLeaseButton booking={b} listing={listing} onSigned={() => { }} disabled={b.status === 'pending' || b.status === 'declined'} />
+                            <SignLeaseButton
+                              booking={b}
+                              listing={listing}
+                              onSigned={() => { }}
+                              onSaveStart={() => setIsSubmittingDetails(true)}
+                              onSaveEnd={() => setIsSubmittingDetails(false)}
+                              disabled={b.status === 'pending' || b.status === 'declined'}
+                            />
                           </div>
-                        ) : b.lease_status === 'sent_via_docusign' && !b.agreement_conditions?.tenantSignature ? (
+                        ) : !conditions.tenantSignature ? (
                           <Button
                             size="sm"
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-transform active:scale-[0.98] py-1 px-2.5 h-auto whitespace-nowrap disabled:opacity-75"
@@ -1071,7 +1105,7 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                               try {
                                 setLoadingDocusignId(b.id);
                                 setActiveDocusignBookingId(b.id);
-                                const response = await supabase.functions.invoke('docusign', {
+                                let response = await supabase.functions.invoke('docusign', {
                                   body: {
                                     action: 'get-recipient-view',
                                     bookingId: b.id,
@@ -1081,11 +1115,39 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                                     returnUrl: `${window.location.origin}/docusign-callback.html`
                                   }
                                 });
+
+                                // Fallback: If envelope not found or failed, send-envelope first then retry
+                                if (response.error) {
+                                  const errStr = typeof response.error === 'string' ? response.error : (response.error.message || JSON.stringify(response.error));
+                                  if (errStr.toLowerCase().includes('not found') || errStr.toLowerCase().includes('envelope')) {
+                                    const envRes = await supabase.functions.invoke('docusign', {
+                                      body: { action: 'send-envelope', bookingId: b.id }
+                                    });
+                                    if (envRes.error) {
+                                      throw new Error(envRes.error.message || 'DocuSign envelope creation failed');
+                                    }
+                                    response = await supabase.functions.invoke('docusign', {
+                                      body: {
+                                        action: 'get-recipient-view',
+                                        bookingId: b.id,
+                                        recipientEmail: userProfile?.email,
+                                        recipientName: userProfile?.full_name || 'Tenant',
+                                        recipientId: userProfile?.id,
+                                        returnUrl: `${window.location.origin}/docusign-callback.html`
+                                      }
+                                    });
+                                  }
+                                }
+
                                 if (response.error) {
                                   const errBody = response.error;
-                                  throw new Error(errBody.message || errBody.error || 'Error fetching view');
+                                  throw new Error(typeof errBody === 'string' ? errBody : (errBody.message || errBody.error || 'Error fetching view'));
                                 }
-                                setDocusignUrl(response.data.url);
+                                if (response.data?.url) {
+                                  setDocusignUrl(response.data.url);
+                                } else {
+                                  throw new Error('No signing session URL returned');
+                                }
                               } catch (err) {
                                 toast.error(err.message || 'Failed to open signing session');
                               } finally {
@@ -1099,11 +1161,11 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
                               <><PenLine className="w-3.5 h-3.5 mr-1.5" /> Sign Lease (DocuSign)</>
                             )}
                           </Button>
-                        ) : (b.lease_status === 'sent_via_docusign' && b.agreement_conditions?.tenantSignature && !b.agreement_conditions?.landlordSignature) ? (
+                        ) : (conditions.tenantSignature && !conditions.landlordSignature) ? (
                           <span className="text-xs text-amber-600 font-medium animate-pulse">Awaiting Owner Signature</span>
-                        ) : (b.lease_status === 'sent_via_docusign' && b.agreement_conditions?.tenantSignature && b.agreement_conditions?.landlordSignature && b.agent_id && !b.agreement_conditions?.agentSignature) ? (
+                        ) : (conditions.tenantSignature && conditions.landlordSignature && b.agent_id && !conditions.agentSignature) ? (
                           <span className="text-xs text-indigo-600 font-medium animate-pulse">Awaiting Agent Signature</span>
-                        ) : (b.status !== 'confirmed' && b.agreement_conditions?.tenantSignature && b.agreement_conditions?.landlordSignature && agentSigned && totalAmount > 0) ? (
+                        ) : (b.status !== 'confirmed' && conditions.tenantSignature && conditions.landlordSignature && agentSigned && totalAmount > 0) ? (
                           <Button
                             size="sm"
                             onClick={() => handlePayment(b.id)}

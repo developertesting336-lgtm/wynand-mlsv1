@@ -80,6 +80,7 @@ export default function AgentDashboard() {
   const [editingAgreementId, setEditingAgreementId] = useState(null);
   const [editingAgreementData, setEditingAgreementData] = useState(null);
   const [updatingState, setUpdatingState] = useState({ id: null, action: null });
+  const [isGeneratingLease, setIsGeneratingLease] = useState(false);
   const [documentModalBooking, setDocumentModalBooking] = useState(null);
   const [ownerVerification, setOwnerVerification] = useState(null);
   const [renterVerification, setRenterVerification] = useState(null);
@@ -642,25 +643,19 @@ export default function AgentDashboard() {
       const res = await supabase.functions.invoke('generate-lease-pdf', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
 
-      // Dispatch DocuSign signature envelope
-      const docusignRes = await supabase.functions.invoke('docusign', {
-        body: { action: 'send-envelope', bookingId }
-      });
-      if (docusignRes.error) {
-        console.warn('DocuSign envelope creation failed:', docusignRes.error);
-      }
-
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-bookings'] });
-      toast.success('Booking approved and lease agreement sent via DocuSign!');
       setUpdatingState({ id: null, action: null });
+      setIsGeneratingLease(false);
       closeAgreementEdit();
+      toast.success('Booking approved and lease agreement generated!');
+      queryClient.invalidateQueries({ queryKey: ['agent-bookings'] });
     },
     onError: (err) => {
-      toast.error(`Failed to approve booking: ${err.message}`);
       setUpdatingState({ id: null, action: null });
+      setIsGeneratingLease(false);
+      toast.error(`Failed to approve booking: ${err.message}`);
     },
   });
 
@@ -672,25 +667,19 @@ export default function AgentDashboard() {
       const res = await supabase.functions.invoke('generate-lease-pdf', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
 
-      // Dispatch DocuSign signature envelope
-      const docusignRes = await supabase.functions.invoke('docusign', {
-        body: { action: 'send-envelope', bookingId }
-      });
-      if (docusignRes.error) {
-        console.warn('DocuSign envelope creation failed:', docusignRes.error);
-      }
-
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-bookings'] });
-      toast.success('Agreement updated and resent via DocuSign!');
       setUpdatingState({ id: null, action: null });
+      setIsGeneratingLease(false);
       closeAgreementEdit();
+      toast.success('Agreement updated!');
+      queryClient.invalidateQueries({ queryKey: ['agent-bookings'] });
     },
     onError: (err) => {
-      toast.error(`Failed to update agreement: ${err.message}`);
       setUpdatingState({ id: null, action: null });
+      setIsGeneratingLease(false);
+      toast.error(`Failed to update agreement: ${err.message}`);
     },
   });
 
@@ -926,6 +915,17 @@ export default function AgentDashboard() {
   }, [resolvedPage, resolvedTotalPages]);
 
   return (
+    <>
+    {/* Fixed full-screen loading overlay – outside all modals/tables so nothing can remove it */}
+    {isGeneratingLease && (
+      <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+        <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-4 max-w-sm mx-4">
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+          <p className="text-base font-semibold text-slate-800 text-center">Generating lease PDF and DocuSign envelope...</p>
+          <p className="text-sm text-slate-500 text-center">Please do not close this window.</p>
+        </div>
+      </div>
+    )}
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <StripeConnectBanner
         user={user}
@@ -1883,13 +1883,7 @@ export default function AgentDashboard() {
               </div>
             ) : (
               <div className="space-y-4 relative">
-                {(approveAndSendLease.isPending || updateAndResendLease.isPending || updatingState?.id === editingAgreementId || updatingState?.action === 'approve' || updatingState?.action === 'update') && (
-                  <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-2 rounded-xl">
-                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-                    <p className="text-sm font-semibold text-slate-800">Generating lease PDF and DocuSign envelope...</p>
-                    <p className="text-xs text-slate-500">Please do not close this window.</p>
-                  </div>
-                )}
+
                 <LeaseDetailsForm
                   booking={myBookings.find(b => b.id === editingAgreementId)}
                   listing={listingMap[myBookings.find(b => b.id === editingAgreementId)?.listing_id]}
@@ -1923,20 +1917,26 @@ export default function AgentDashboard() {
                                 ...editingAgreementData,
                                 landlordSignatureDate: editingAgreementData.landlordSignatureDate || new Date().toISOString().split('T')[0],
                               };
-                              const booking = myBookings.find(b => b.id === editingAgreementId);
-                              if (isCurrentUserOwnerAndAgent(booking)) {
-                                await approveAndSendLease.mutateAsync({
-                                  bookingId: editingAgreementId,
-                                  agreementConditions: finalAgreementData,
-                                });
-                              } else {
-                                await updateAndResendLease.mutateAsync({
-                                  bookingId: editingAgreementId,
-                                  agreementConditions: finalAgreementData,
-                                });
+                              try {
+                                setIsGeneratingLease(true);
+                                const booking = myBookings.find(b => b.id === editingAgreementId);
+                                if (isCurrentUserOwnerAndAgent(booking)) {
+                                  await approveAndSendLease.mutateAsync({
+                                    bookingId: editingAgreementId,
+                                    agreementConditions: finalAgreementData,
+                                  });
+                                } else {
+                                  await updateAndResendLease.mutateAsync({
+                                    bookingId: editingAgreementId,
+                                    agreementConditions: finalAgreementData,
+                                  });
+                                }
+                              } catch (err) {
+                                setIsGeneratingLease(false);
+                                toast.error(`Failed: ${err.message}`);
                               }
                             }}
-                            disabled={updatingState?.id === editingAgreementId || !editingAgreementData.landlordName}
+                            disabled={isGeneratingLease || updatingState?.id === editingAgreementId || !editingAgreementData.landlordName}
                           >
                             {updatingState?.id === editingAgreementId
                               ? 'Submitting...'
@@ -2516,6 +2516,7 @@ export default function AgentDashboard() {
         </Dialog>
       )}
     </div>
+    </>
   );
 }
 

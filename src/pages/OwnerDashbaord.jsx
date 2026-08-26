@@ -1102,14 +1102,6 @@ export default function OwnerDashboard() {
       const res = await supabase.functions.invoke('generate-lease-pdf', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
 
-      // Dispatch DocuSign signature envelope to start the signing sequence
-      const docusignRes = await supabase.functions.invoke('docusign', {
-        body: { action: 'send-envelope', bookingId }
-      });
-      if (docusignRes.error) {
-        console.warn('DocuSign envelope creation failed, falling back to database update:', docusignRes.error);
-      }
-
       // Only tenant gets notified at this stage (tenant signs first). Agent will be notified after owner signs.
 
       // Send push notification to tenant/renter
@@ -1163,14 +1155,6 @@ export default function OwnerDashboard() {
       */
       const res = await supabase.functions.invoke('generate-lease-pdf', { body: { bookingId, agreementConditions } });
       if (res.error) throw new Error(res.error.message || 'Unknown error');
-
-      // Dispatch DocuSign signature envelope to start the signing sequence
-      const docusignRes = await supabase.functions.invoke('docusign', {
-        body: { action: 'send-envelope', bookingId }
-      });
-      if (docusignRes.error) {
-        console.warn('DocuSign envelope creation failed, falling back to database update:', docusignRes.error);
-      }
 
       // Agent is not notified on owner edits before tenant signature.
 
@@ -1492,6 +1476,17 @@ export default function OwnerDashboard() {
   }
 
   return (
+    <>
+    {/* Full-screen loading overlay – lives OUTSIDE the table so no table re-render can remove it */}
+    {isGeneratingLease && (
+      <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+        <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-4 max-w-sm mx-4">
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+          <p className="text-base font-semibold text-slate-800 text-center">Generating lease PDF and DocuSign envelope...</p>
+          <p className="text-sm text-slate-500 text-center">Please do not close this window.</p>
+        </div>
+      </div>
+    )}
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
         <div>
@@ -2973,6 +2968,7 @@ export default function OwnerDashboard() {
         </Dialog>
       )}
     </div>
+    </>
   );
 }
 
