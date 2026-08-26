@@ -424,8 +424,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -495,8 +495,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -522,8 +522,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -576,8 +576,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -657,8 +657,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -722,8 +722,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -775,8 +775,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -826,8 +826,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -877,8 +877,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -934,8 +934,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -990,8 +990,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -1035,8 +1035,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -1087,8 +1087,8 @@ serve(async (req) => {
             </tbody>
         </table>
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 
@@ -1128,8 +1128,8 @@ serve(async (req) => {
         </div>
 
         <div class="page-footer-initials">
-            <span>Inicial/Initial: ________________________</span>
-            <span>Inicial/Initial: ________________________</span>
+            <span>Inicial/Initial Landlord: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/LandlordInit/</span>________________________</span>
+            <span>Inicial/Initial Tenant: <span style="color: white; font-size: 1px; height: 1px; overflow: hidden;">/TenantInit/</span>________________________</span>
         </div>
     </div>
 

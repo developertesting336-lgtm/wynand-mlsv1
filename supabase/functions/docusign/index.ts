@@ -304,6 +304,14 @@ serve(async (req) => {
                                         anchorXOffset: "10",
                                         anchorYOffset: "0"
                                     }
+                                ],
+                                initialHereTabs: [
+                                    {
+                                        anchorString: "/TenantInit/",
+                                        anchorUnits: "pixels",
+                                        anchorXOffset: "10",
+                                        anchorYOffset: "0"
+                                    }
                                 ]
                             }
                         },
@@ -321,6 +329,14 @@ serve(async (req) => {
                                         anchorXOffset: "10",
                                         anchorYOffset: "0"
                                     }
+                                ],
+                                initialHereTabs: [
+                                    {
+                                        anchorString: "/LandlordInit/",
+                                        anchorUnits: "pixels",
+                                        anchorXOffset: "10",
+                                        anchorYOffset: "0"
+                                    }
                                 ]
                             }
                         },
@@ -334,6 +350,14 @@ serve(async (req) => {
                                 signHereTabs: [
                                     {
                                         anchorString: "/AgentSign/",
+                                        anchorUnits: "pixels",
+                                        anchorXOffset: "10",
+                                        anchorYOffset: "0"
+                                    }
+                                ],
+                                initialHereTabs: [
+                                    {
+                                        anchorString: "/AgentInit/",
                                         anchorUnits: "pixels",
                                         anchorXOffset: "10",
                                         anchorYOffset: "0"

@@ -412,6 +412,7 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
         loadingDocusignId={loadingDocusignId}
         setLoadingDocusignId={setLoadingDocusignId}
         setActiveDocusignBookingId={setActiveDocusignBookingId}
+        setIsSubmittingDetails={setIsSubmittingDetails}
       />
       <MoveOutReportModal
         booking={moveOutBooking}
@@ -756,7 +757,7 @@ function BookingsTab({ bookings = [], isLoading, listings = [], userEmail, userP
   );
 }
 
-function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, setMoveOutBooking, totalPages, setInspectionBooking, setInspectionSelectedSignature, userProfile, openMaintenanceModal, openViewMaintenanceModal, setDocusignUrl, loadingDocusignId, setLoadingDocusignId, setActiveDocusignBookingId }) {
+function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage, pageSize, setPageSize, filteredBookings, paginatedBookings, payingId, handlePayment, setSelectedBookingForMoveOut, setModalMoveOutDate, setMoveOutBooking, totalPages, setInspectionBooking, setInspectionSelectedSignature, userProfile, openMaintenanceModal, openViewMaintenanceModal, setDocusignUrl, loadingDocusignId, setLoadingDocusignId, setActiveDocusignBookingId, setIsSubmittingDetails }) {
   const statusConfig = {
     pending: { label: 'Pending Approval', icon: Hourglass, cls: 'bg-amber-100 text-amber-700 border-amber-200' },
     lease_pending: { label: 'Sign Lease Agreement', icon: PenLine, cls: 'bg-blue-100 text-blue-700 border-blue-200 animate-pulse' },
@@ -771,12 +772,12 @@ function BookingsTable({ bookings, listingMap, search, setSearch, page, setPage,
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
+          {/* <Input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search bookings by property, owner, or status"
             className="pl-10 pr-3 h-11 rounded-2xl border border-slate-200 bg-slate-50 shadow-sm focus:border-slate-300 focus:ring-2 focus:ring-primary/10"
-          />
+          /> */}
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <label htmlFor="bookings-page-size" className="font-medium">Show</label>

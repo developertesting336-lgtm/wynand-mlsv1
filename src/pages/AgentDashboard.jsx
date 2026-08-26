@@ -89,6 +89,7 @@ export default function AgentDashboard() {
   const [agentSignatures, setAgentSignatures] = useState([]);
   const [docusignUrl, setDocusignUrl] = useState('');
   const [loadingDocusignId, setLoadingDocusignId] = useState(null);
+  const [isVerifyingSignature, setIsVerifyingSignature] = useState(false);
 
   // Agent to Agent referral states
   const [referralModalListing, setReferralModalListing] = useState(null);
@@ -569,6 +570,7 @@ export default function AgentDashboard() {
     const handleDocuSignMsg = async (event) => {
       if (event.data === 'docusign_complete') {
         setDocusignUrl('');
+        setIsVerifyingSignature(true);
         if (activeDocusignBookingId) {
           try {
             const response = await supabase.functions.invoke('docusign', {
@@ -584,6 +586,8 @@ export default function AgentDashboard() {
             }
           } catch (verifyErr) {
             console.error('Failed to auto-verify status:', verifyErr);
+          } finally {
+            setIsVerifyingSignature(false);
           }
         }
         window.location.reload();
@@ -916,6 +920,16 @@ export default function AgentDashboard() {
 
   return (
     <>
+      {/* Fixed full-screen loading overlay for DocuSign signature verification */}
+      {isVerifyingSignature && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-4 max-w-sm mx-4">
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+            <p className="text-base font-semibold text-slate-800 text-center">Verifying DocuSign signature...</p>
+            <p className="text-sm text-slate-500 text-center">Updating booking status, please wait.</p>
+          </div>
+        </div>
+      )}
     {/* Fixed full-screen loading overlay – outside all modals/tables so nothing can remove it */}
     {isGeneratingLease && (
       <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
